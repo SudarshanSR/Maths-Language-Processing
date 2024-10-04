@@ -1,6 +1,11 @@
 #include "tokenise.h"
 
+#include <map>
 #include <optional>
+
+namespace {
+std::map<char, char> k_parenthesis_map{{'(', ')'}, {'[', ']'}, {'{', '}'}};
+}
 
 Constant::Constant(long double const value) : value(value) {}
 
@@ -66,8 +71,12 @@ Expression::~Expression() noexcept {
 Expression::operator std::string() const {
     std::string result;
 
+    result += '(';
+
     for (Token const *token : this->tokens_)
         result += static_cast<std::string>(*token);
+
+    result += ')';
 
     return result;
 }
@@ -84,6 +93,35 @@ Expression tokenise(std::string const &expression) {
 
         if (character == ' ')
             continue;
+
+        if (k_parenthesis_map.contains(character)) {
+            int count = 1;
+            char original = character;
+
+            character = expression[++i];
+
+            std::size_t const start = i;
+
+            while (i < expression.size() && count) {
+                if (character == original)
+                    ++count;
+
+                else if (character == k_parenthesis_map[original])
+                    --count;
+
+                character = expression[++i];
+            }
+
+            if (count)
+                throw std::invalid_argument("Expression is not valid!");
+
+            std::size_t const end = i - start;
+
+            result.add_token(
+                new Expression(tokenise(expression.substr(start, end))));
+
+            continue;
+        }
 
         if (auto *op = new Operation(character); op->operation) {
             result.add_token(op);

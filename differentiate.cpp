@@ -24,6 +24,13 @@ Expression differentiate(Expression const &expression,
             continue;
         }
 
+        if (typeid(*token) == typeid(Expression)) {
+            result.add_token(new Expression(
+                differentiate(*dynamic_cast<Expression *>(token), variable)));
+
+            continue;
+        }
+
         Term term{};
 
         while (i < tokens.size() && typeid(*token) != typeid(Operation)) {

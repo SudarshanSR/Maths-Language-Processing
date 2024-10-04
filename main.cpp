@@ -4,7 +4,7 @@
 #include <iostream>
 
 int main(int argc, char *argv[]) {
-    Expression const expression = tokenise("x^2 + 2x + 1");
+    Expression const expression = tokenise("x^2 - (2x - {3 + 5})");
 
     std::cout << expression << '\n';
 
