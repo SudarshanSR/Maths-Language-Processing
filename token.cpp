@@ -1,7 +1,9 @@
 #include "token.h"
 
 #include <algorithm>
+#include <iostream>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -71,10 +73,8 @@ Token *get_next_token(std::string const &expression, int &i) {
                             nullptr);
     }
 
-    if (auto *op = new Operation(character); op->operation)
-        return op;
-    else
-        delete op;
+    if (auto op = std::make_unique<Operation>(character); op->operation)
+        return op.release();
 
     if ('0' <= character && character <= '9') {
         std::string number;
@@ -203,6 +203,29 @@ Function::operator std::string() const {
             result << '^' << static_cast<std::string>(*this->power);
 
     return result.str();
+}
+
+Term::operator std::string() const {
+    std::stringstream result;
+
+    if (this->coefficient)
+        result << this->coefficient;
+
+    if (this->base)
+        result << this->base;
+
+    if (this->power) {
+        result << new Operation('^');
+        result << this->power;
+    }
+
+    return result.str();
+}
+
+Term::~Term() noexcept {
+    delete this->coefficient;
+    delete this->base;
+    delete this->power;
 }
 
 Expression::Expression(Term const &term) {
@@ -343,36 +366,30 @@ Expression tokenise(std::string expression) {
                             function->coefficient = constant;
                             tokens.pop_back();
                             tokens.pop_back();
-                        } else {
-                            function->coefficient = new Constant(1);
                         }
-                    } else {
-                        function->coefficient = new Constant(1);
                     }
-                } else {
-                    function->coefficient = new Constant(1);
                 }
 
-            else
+            if (!function->coefficient)
                 function->coefficient = new Constant(1);
 
-            if (i < expression.size()) {
+            if (i < expression.size())
                 if (Operation operation{expression[i + 1]};
-                    operation.operation) {
-                    if (operation.operation == Operation::op::pow) {
-                        i += 2;
+                    operation.operation &&
+                    operation.operation == Operation::op::pow) {
+                    i += 2;
 
-                        function->power = get_next_token(expression, i);
-                    } else {
-                        function->power = new Constant(1);
-                    }
-                } else {
-                    function->power = new Constant(1);
+                    function->power = get_next_token(expression, i);
                 }
-            } else {
+
+            if (!function->power)
                 function->power = new Constant(1);
-            }
         }
+
+        if (std::vector<Token *> const &tokens = result.tokens();
+            !tokens.empty() && typeid(*token) != typeid(Operation) &&
+            typeid(*tokens.back()) == typeid(Constant))
+            result.add_token(new Operation('*'));
 
         result.add_token(token);
     }

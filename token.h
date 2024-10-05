@@ -54,10 +54,14 @@ struct Function final : Token {
     explicit operator std::string() const override;
 };
 
-struct Term {
+struct Term final : Token {
     Constant *coefficient = nullptr;
     Token *base = nullptr;
     Token *power = nullptr;
+
+    explicit operator std::string() const override;
+
+    ~Term() noexcept override;
 };
 
 class Expression final : public Token {

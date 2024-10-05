@@ -33,14 +33,14 @@ Term get_next_term(std::vector<Token *> const &tokens, int &i) {
             if (term.coefficient)
                 throw std::invalid_argument("Expression is not valid!");
 
-            term.coefficient = dynamic_cast<Constant *>(token);
+            term.coefficient = dynamic_cast<Constant *>(copy(token));
         } else if (typeid(*token) == typeid(Variable) ||
                    typeid(*token) == typeid(Expression) ||
                    typeid(*token) == typeid(Function)) {
             if (term.base)
                 throw std::invalid_argument("Expression is not valid!");
 
-            term.base = token;
+            term.base = copy(token);
         }
 
         token = tokens[++i];
@@ -275,16 +275,22 @@ Token *differentiate(Function const &function, Variable const &variable) {
         functions.size() == 1) {
         auto const &[name, coefficient, power] = functions[0];
 
-        result->add_token(new Function(name, new Constant(coefficient),
-                                       function.parameter,
-                                       new Constant(power)));
+        result->add_token(new Function(
+            name, new Constant(coefficient * function.coefficient->value),
+            function.parameter, new Constant(power)));
     } else {
         auto *expression = new Expression;
+
+        auto *product = dynamic_cast<Constant *>(copy(function.coefficient));
+
+        expression->add_token(product);
 
         for (int i = 0; i < functions.size() - 1; ++i) {
             auto const &[name, coefficient, power] = functions[i];
 
-            expression->add_token(new Function(name, new Constant(coefficient),
+            product->value *= coefficient;
+
+            expression->add_token(new Function(name, new Constant(1),
                                                function.parameter,
                                                new Constant(power)));
             expression->add_token(new Operation('*'));
@@ -292,9 +298,10 @@ Token *differentiate(Function const &function, Variable const &variable) {
 
         auto const &[name, coefficient, power] = functions.back();
 
-        expression->add_token(new Function(name, new Constant(coefficient),
-                                           function.parameter,
-                                           new Constant(power)));
+        product->value *= coefficient;
+
+        expression->add_token(new Function(
+            name, new Constant(1), function.parameter, new Constant(power)));
 
         result->add_token(expression);
     }
@@ -335,7 +342,22 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
         if (i < tokens.size() - 1) {
             if (auto const *operation = dynamic_cast<Operation *>(tokens[i])) {
                 if (operation->operation == Operation::op::mul) {
-                    auto *v = new Expression(get_next_term(tokens, ++i));
+                    Term right = get_next_term(tokens, ++i);
+
+                    if (!term.base) {
+                        if (right.coefficient)
+                            right.coefficient->value *= term.coefficient->value;
+
+                        else
+                            right.coefficient = dynamic_cast<Constant *>(
+                                copy(term.coefficient));
+
+                        result->add_token(differentiate(right, variable));
+
+                        continue;
+                    }
+
+                    auto *v = new Expression(right);
                     auto *u = new Expression(term);
 
                     auto *u_d = differentiate(term, variable);
@@ -355,7 +377,22 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
                 }
 
                 if (operation->operation == Operation::op::div) {
-                    auto *v = new Expression(get_next_term(tokens, ++i));
+                    Term right = get_next_term(tokens, ++i);
+
+                    if (!term.base) {
+                        if (right.coefficient)
+                            right.coefficient->value *= term.coefficient->value;
+
+                        else
+                            right.coefficient = dynamic_cast<Constant *>(
+                                copy(term.coefficient));
+
+                        result->add_token(differentiate(right, variable));
+
+                        continue;
+                    }
+
+                    auto *v = new Expression(right);
                     auto *u = new Expression(term);
 
                     auto *u_d = differentiate(term, variable);
@@ -394,14 +431,14 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
                 }
 
                 try {
-                    term.power = tokens.at(++i);
+                    term.power = copy(tokens.at(++i));
                 } catch (std::out_of_range const &) {
                     throw std::invalid_argument("Expression is not valid!");
                 }
 
                 if (!term.base) {
                     if (term.coefficient) {
-                        term.base = term.coefficient;
+                        term.base = copy(term.coefficient);
                         term.coefficient = nullptr;
                     } else {
                         term.base = new Constant(1);
