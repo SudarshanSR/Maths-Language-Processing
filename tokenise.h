@@ -39,8 +39,23 @@ struct Operation final : Token {
     explicit operator std::string() const override;
 };
 
+struct Function final : Token {
+    std::string function;
+
+    Constant *coefficient;
+    Token *parameter;
+    Token *power;
+
+    explicit Function(std::string function, Constant *coefficient,
+                      Token *parameter, Token *power);
+
+    Function(Function const &function);
+
+    explicit operator std::string() const override;
+};
+
 struct Term {
-    Constant *constant = nullptr;
+    Constant *coefficient = nullptr;
     Token *base = nullptr;
     Token *power = nullptr;
 };
@@ -57,6 +72,8 @@ class Expression final : public Token {
 
     explicit operator std::string() const override;
 
+    [[nodiscard]] std::vector<Token *> &tokens();
+
     [[nodiscard]] std::vector<Token *> const &tokens() const;
 
     void add_token(Token *token);
@@ -65,6 +82,8 @@ class Expression final : public Token {
     std::vector<Token *> tokens_;
 };
 
-Expression tokenise(std::string const &expression);
+Expression tokenise(std::string expression);
+
+Token *copy(Token *token);
 
 #endif // TOKENISE_H
