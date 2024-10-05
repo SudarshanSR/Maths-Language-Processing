@@ -4,7 +4,7 @@
 #include <iostream>
 
 int main(int argc, char *argv[]) {
-    Expression const expression = tokenise("(x^3 + 2) * (x^2 + 1)");
+    Expression const expression = tokenise("x + y");
 
     std::cout << expression << '\n';
 

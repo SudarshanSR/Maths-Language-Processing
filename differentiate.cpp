@@ -23,18 +23,6 @@ Term get_next_term(std::vector<Token *> const &tokens, int &i) {
         token = tokens[++i];
     }
 
-    if (i < tokens.size())
-        if (auto const *operation = dynamic_cast<Operation *>(token);
-            operation && operation->operation == Operation::op::pow) {
-            try {
-                token = tokens.at(++i);
-            } catch (std::out_of_range const &) {
-                throw std::invalid_argument("Expression is not valid!");
-            }
-
-            term.power = token;
-        }
-
     return term;
 }
 } // namespace
@@ -61,8 +49,7 @@ Expression *differentiate(Term const &term, Variable const &variable) {
         c = *term.constant;
 
     if (!term.power) {
-        if (c.value != 1)
-            result->add_token(new Constant(c.value));
+        result->add_token(new Constant(c.value));
 
         if (typeid(*term.base) == typeid(Expression))
             result->add_token(differentiate(
@@ -72,9 +59,8 @@ Expression *differentiate(Term const &term, Variable const &variable) {
             long double const power =
                 dynamic_cast<Constant *>(term.power)->value;
 
-            long double const coefficient = c.value * power;
-
-            if (coefficient != 1)
+            if (long double const coefficient = c.value * power;
+                coefficient != 1 || power == 1)
                 result->add_token(new Constant(c.value * power));
 
             if (power == 1) {
@@ -106,7 +92,37 @@ Expression *differentiate(Term const &term, Variable const &variable) {
         } else if (typeid(*term.power) == typeid(Variable)) {
             if (auto const *power = dynamic_cast<Variable *>(term.power);
                 power->var != variable.var) {
-                // TODO -> MAKE VAR A CONST
+                auto *coefficient = new Expression;
+
+                if (c.value == 1)
+                    coefficient->add_token(new Constant(c.value));
+
+                coefficient->add_token(new Variable(power->var));
+
+                result->add_token(coefficient);
+
+                if (typeid(*term.base) == typeid(Variable))
+                    result->add_token(
+                        new Variable(dynamic_cast<Variable *>(term.base)->var));
+
+                else
+                    result->add_token(
+                        new Expression(*dynamic_cast<Expression *>(term.base)));
+
+                result->add_token(new Operation('^'));
+
+                auto *new_power = new Expression;
+                new_power->add_token(new Variable(power->var));
+                new_power->add_token(new Operation('-'));
+                new_power->add_token(new Constant(1));
+
+                result->add_token(new_power);
+
+                if (typeid(*term.base) == typeid(Expression)) {
+                    result->add_token(new Operation('*'));
+                    result->add_token(differentiate(
+                        *dynamic_cast<Expression *>(term.base), variable));
+                }
             } else {
                 // TODO -> CHAIN POWER RULE
             }
@@ -138,13 +154,10 @@ Expression *differentiate(Expression const &expression,
             continue;
         }
 
-        Term const &term = get_next_term(tokens, i);
+        Term term = get_next_term(tokens, i);
 
-        if (i < tokens.size()) {
+        if (i < tokens.size() - 1) {
             if (auto const *operation = dynamic_cast<Operation *>(tokens[i])) {
-                if (i == tokens.size() - 1)
-                    throw std::invalid_argument("Expression is not valid!");
-
                 if (operation->operation == Operation::op::mul) {
                     auto *v = new Expression(get_next_term(tokens, ++i));
                     auto *u = new Expression(term);
@@ -161,7 +174,11 @@ Expression *differentiate(Expression const &expression,
                     result->add_token(u_d);
                     result->add_token(new Operation('*'));
                     result->add_token(v);
-                } else if (operation->operation == Operation::op::div) {
+
+                    continue;
+                }
+
+                if (operation->operation == Operation::op::div) {
                     auto *v = new Expression(get_next_term(tokens, ++i));
                     auto *u = new Expression(term);
 
@@ -188,14 +205,26 @@ Expression *differentiate(Expression const &expression,
                     result->add_token(numerator);
                     result->add_token(new Operation('/'));
                     result->add_token(denominator);
-                } else {
-                    --i;
+
+                    continue;
                 }
 
-                continue;
-            }
+                if (operation->operation != Operation::op::pow) {
+                    --i;
 
-            --i;
+                    result->add_token(differentiate(term, variable));
+
+                    continue;
+                }
+
+                try {
+                    term.power = tokens.at(++i);
+                } catch (std::out_of_range const &) {
+                    throw std::invalid_argument("Expression is not valid!");
+                }
+            } else {
+                --i;
+            }
         }
 
         result->add_token(differentiate(term, variable));
