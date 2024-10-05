@@ -6,8 +6,8 @@ set(CMAKE_CXX_STANDARD 23)
 add_executable(calculus main.cpp)
 target_link_libraries(calculus PRIVATE token differentiate)
 
-add_library(token tokenise.cpp)
-target_sources(token PUBLIC tokenise.h)
+add_library(token token.cpp)
+target_sources(token PUBLIC token.h)
 
 add_library(differentiate differentiate.cpp)
 target_sources(differentiate PUBLIC differentiate.h)

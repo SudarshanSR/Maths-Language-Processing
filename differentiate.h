@@ -1,7 +1,7 @@
 #ifndef DIFFERENTIATE_H
 #define DIFFERENTIATE_H
 
-#include "tokenise.h"
+#include "token.h"
 
 Expression *differentiate(Term const &term, Variable const &variable);
 

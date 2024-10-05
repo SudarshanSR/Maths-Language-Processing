@@ -1,5 +1,5 @@
 #include "differentiate.h"
-#include "tokenise.h"
+#include "token.h"
 
 #include <iostream>
 
@@ -8,7 +8,9 @@ int main(int argc, char *argv[]) {
 
     std::cout << expression << '\n';
 
-    auto const *derivative = differentiate(expression, Variable('x'));
+    auto const *derivative = differentiate(expression, Variable('y'));
 
     std::cout << *derivative << '\n';
+
+    delete derivative;
 }

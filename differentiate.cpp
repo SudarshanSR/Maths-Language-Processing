@@ -81,6 +81,12 @@ Expression *differentiate(Term const &term, Variable const &variable) {
             result->add_token(differentiate(*base, variable));
     } else {
         if (auto const *p = dynamic_cast<Constant *>(term.power)) {
+            if (typeid(*term.base) == typeid(Constant)) {
+                result->add_token(new Constant(0));
+
+                return result;
+            }
+
             long double const power = p->value;
 
             if (long double const coefficient = c.value * power;
@@ -114,6 +120,12 @@ Expression *differentiate(Term const &term, Variable const &variable) {
             }
         } else if (auto *power = dynamic_cast<Variable *>(term.power)) {
             if (power->var != variable.var) {
+                if (typeid(*term.base) == typeid(Constant)) {
+                    result->add_token(new Constant(0));
+
+                    return result;
+                }
+
                 auto *coefficient = new Expression;
 
                 if (c.value == 1)
