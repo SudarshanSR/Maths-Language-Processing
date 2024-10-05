@@ -166,7 +166,6 @@ Operation::operator std::string() const {
         return "/";
     case op::pow:
         return "^";
-        break;
     }
 
     return "";
@@ -221,8 +220,7 @@ Expression::Expression(Expression const &expression) {
 
 Expression::~Expression() noexcept {
     for (Token *&token : this->tokens_) {
-        if (token)
-            delete token;
+        delete token;
 
         token = nullptr;
     }
@@ -231,12 +229,16 @@ Expression::~Expression() noexcept {
 Expression::operator std::string() const {
     std::stringstream result;
 
-    result << '(';
+    if (this->tokens_.size() > 1) {
+        result << '(';
 
-    for (Token const *token : this->tokens_)
-        result << static_cast<std::string>(*token);
+        for (Token const *token : this->tokens_)
+            result << static_cast<std::string>(*token);
 
-    result << ')';
+        result << ')';
+    } else {
+        result << static_cast<std::string>(*this->tokens_[0]);
+    }
 
     return result.str();
 }
