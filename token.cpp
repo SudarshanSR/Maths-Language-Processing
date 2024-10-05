@@ -186,8 +186,13 @@ Function::Function(Function const &function) {
 Function::operator std::string() const {
     std::stringstream result;
 
-    if (this->coefficient->value != 1)
-        result << std::to_string(this->coefficient->value);
+    if (this->coefficient->value != 1) {
+        if (this->coefficient->value == -1)
+            result << "-";
+
+        else
+            result << std::to_string(this->coefficient->value);
+    }
 
     result << this->function << '('
            << static_cast<std::string>(*this->parameter) << ')';
@@ -248,6 +253,65 @@ std::vector<Token *> &Expression::tokens() { return this->tokens_; }
 std::vector<Token *> const &Expression::tokens() const { return this->tokens_; }
 
 void Expression::add_token(Token *token) { this->tokens_.push_back(token); }
+
+Token *Expression::pop_token() {
+    Token *token = this->tokens_.back();
+
+    this->tokens_.pop_back();
+
+    return token;
+}
+
+void Expression::simplify() {
+    int i = 0;
+
+    while (i < this->tokens_.size() - 1) {
+        Token *token = this->tokens_[i];
+
+        if (typeid(*token) != typeid(Operation)) {
+            ++i;
+            continue;
+        }
+
+        auto *operation = dynamic_cast<Operation *>(token);
+
+        if (operation->operation == Operation::op::add) {
+            auto const *next = dynamic_cast<Function *>(this->tokens_[i + 1]);
+
+            if (!next || next->coefficient->value >= 0) {
+                if (i == 0)
+                    this->tokens_.erase(this->tokens_.begin());
+                else
+                    ++i;
+
+                continue;
+            }
+
+            next->coefficient->value = -next->coefficient->value;
+            operation->operation = Operation::op::sub;
+        } else if (operation->operation == Operation::op::sub) {
+            auto const *next = dynamic_cast<Function *>(this->tokens_[i + 1]);
+
+            if (!next || next->coefficient->value >= 0) {
+                ++i;
+
+                continue;
+            }
+
+            next->coefficient->value = -next->coefficient->value;
+
+            if (i == 0) {
+                this->tokens_.erase(this->tokens_.begin());
+
+                continue;
+            }
+
+            operation->operation = Operation::op::add;
+        }
+
+        ++i;
+    }
+}
 
 Expression tokenise(std::string expression) {
     Expression result{};

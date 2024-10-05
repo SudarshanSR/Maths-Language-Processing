@@ -1,6 +1,7 @@
 #include "differentiate.h"
 
 #include <map>
+#include <memory>
 
 namespace {
 std::map<std::string,
@@ -49,21 +50,15 @@ Term get_next_term(std::vector<Token *> const &tokens, int &i) {
 }
 } // namespace
 
-Expression *differentiate(Term const &term, Variable const &variable) {
-    auto *result = new Expression;
-
-    if (!term.base) {
-        result->add_token(new Constant(0));
-
-        return result;
-    }
+Token *differentiate(Term const &term, Variable const &variable) {
+    if (!term.base)
+        return new Constant(0);
 
     if (auto const *var = dynamic_cast<Variable *>(term.base);
-        var && var->var != variable.var) {
-        result->add_token(new Constant(0));
+        var && var->var != variable.var)
+        return new Constant(0);
 
-        return result;
-    }
+    auto result = std::make_unique<Expression>();
 
     Constant c{1};
 
@@ -81,11 +76,8 @@ Expression *differentiate(Term const &term, Variable const &variable) {
             result->add_token(differentiate(*base, variable));
     } else {
         if (auto const *p = dynamic_cast<Constant *>(term.power)) {
-            if (typeid(*term.base) == typeid(Constant)) {
-                result->add_token(new Constant(0));
-
-                return result;
-            }
+            if (typeid(*term.base) == typeid(Constant))
+                return new Constant(0);
 
             long double const power = p->value;
 
@@ -101,7 +93,9 @@ Expression *differentiate(Term const &term, Variable const &variable) {
                 else if (auto const *base = dynamic_cast<Function *>(term.base))
                     result->add_token(differentiate(*base, variable));
 
-                return result;
+                result->simplify();
+
+                return result.release();
             }
 
             result->add_token(copy(term.base));
@@ -123,7 +117,7 @@ Expression *differentiate(Term const &term, Variable const &variable) {
                 if (typeid(*term.base) == typeid(Constant)) {
                     result->add_token(new Constant(0));
 
-                    return result;
+                    return result.release();
                 }
 
                 auto *coefficient = new Expression;
@@ -173,7 +167,9 @@ Expression *differentiate(Term const &term, Variable const &variable) {
                     expression_2->add_token(new Function(
                         "ln", new Constant(1), copy(base), new Constant(1)));
 
-                    return result;
+                    result->simplify();
+
+                    return result.release();
                 }
 
                 expression_2->add_token(copy(term.power));
@@ -220,7 +216,9 @@ Expression *differentiate(Term const &term, Variable const &variable) {
                 expression_2->add_token(new Function(
                     "ln", new Constant(1), copy(base), new Constant(1)));
 
-                return result;
+                result->simplify();
+
+                return result.release();
             }
 
             expression_2->add_token(copy(term.power));
@@ -258,19 +256,20 @@ Expression *differentiate(Term const &term, Variable const &variable) {
         }
     }
 
-    return result;
+    if (result->tokens().size() == 1)
+        return result->pop_token();
+
+    result->simplify();
+
+    return result.release();
 }
 
-Expression *differentiate(Function const &function, Variable const &variable) {
-    auto *result = new Expression;
+Token *differentiate(Function const &function, Variable const &variable) {
+    if (auto const *p = dynamic_cast<Variable *>(function.parameter))
+        if (p->var != variable.var)
+            return new Constant(0);
 
-    if (auto const *p = dynamic_cast<Variable *>(function.parameter)) {
-        if (p->var != variable.var) {
-            result->add_token(new Constant(0));
-
-            return result;
-        }
-    }
+    auto result = std::make_unique<Expression>();
 
     if (auto functions = k_function_map[function.function];
         functions.size() == 1) {
@@ -310,12 +309,16 @@ Expression *differentiate(Function const &function, Variable const &variable) {
             result->add_token(differentiate(*p, variable));
     }
 
-    return result;
+    if (result->tokens().size() == 1)
+        return result->pop_token();
+
+    result->simplify();
+
+    return result.release();
 }
 
-Expression *differentiate(Expression const &expression,
-                          Variable const &variable) {
-    auto *result = new Expression;
+Token *differentiate(Expression const &expression, Variable const &variable) {
+    auto result = std::make_unique<Expression>();
 
     std::vector<Token *> const &tokens = expression.tokens();
 
@@ -412,5 +415,10 @@ Expression *differentiate(Expression const &expression,
         result->add_token(differentiate(term, variable));
     }
 
-    return result;
+    if (result->tokens().size() == 1)
+        return result->pop_token();
+
+    result->simplify();
+
+    return result.release();
 }

@@ -78,6 +78,10 @@ class Expression final : public Token {
 
     void add_token(Token *token);
 
+    Token *pop_token();
+
+    void simplify();
+
   private:
     std::vector<Token *> tokens_;
 };
