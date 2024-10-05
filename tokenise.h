@@ -39,8 +39,20 @@ struct Operation final : Token {
     explicit operator std::string() const override;
 };
 
+struct Term {
+    Constant *constant = nullptr;
+    Token *base = nullptr;
+    Token *power = nullptr;
+};
+
 class Expression final : public Token {
   public:
+    Expression() = default;
+
+    explicit Expression(Term const &term);
+
+    Expression(Expression const &expression);
+
     ~Expression() noexcept override;
 
     explicit operator std::string() const override;

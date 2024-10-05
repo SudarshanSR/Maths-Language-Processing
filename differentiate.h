@@ -3,7 +3,9 @@
 
 #include "tokenise.h"
 
-Expression differentiate(Expression const &expression,
-                         Variable const &variable);
+Expression *differentiate(Term const &term, Variable const &variable);
+
+Expression *differentiate(Expression const &expression,
+                          Variable const &variable);
 
 #endif // DIFFERENTIATE_H

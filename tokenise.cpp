@@ -63,9 +63,43 @@ Operation::operator std::string() const {
     return "";
 }
 
+Expression::Expression(Term const &term) {
+    if (term.constant)
+        this->add_token(term.constant);
+
+    if (term.base)
+        this->add_token(term.base);
+
+    if (term.power) {
+        this->add_token(new Operation('^'));
+        this->add_token(term.power);
+    }
+}
+
+Expression::Expression(Expression const &expression) {
+    for (Token *token : expression.tokens_) {
+        auto const &info = typeid(token);
+
+        if (info == typeid(Constant))
+            this->add_token(
+                new Constant(dynamic_cast<Constant *>(token)->value));
+        else if (info == typeid(Variable))
+            this->add_token(new Variable(dynamic_cast<Variable *>(token)->var));
+        else if (info == typeid(Operation))
+            this->add_token(new Operation(static_cast<std::string>(
+                *dynamic_cast<Operation *>(token))[0]));
+        else if (info == typeid(Expression))
+            this->add_token(new Expression(*dynamic_cast<Expression *>(token)));
+    }
+}
+
 Expression::~Expression() noexcept {
-    for (Token const *token : this->tokens_)
-        delete token;
+    for (Token *&token : this->tokens_) {
+        if (token)
+            delete token;
+
+        token = nullptr;
+    }
 }
 
 Expression::operator std::string() const {
