@@ -191,7 +191,7 @@ Function::operator std::string() const {
             result << "-";
 
         else
-            result << std::to_string(this->coefficient->value);
+            result << *this->coefficient;
     }
 
     result << this->function << '('
@@ -205,27 +205,35 @@ Function::operator std::string() const {
     return result.str();
 }
 
-Term::operator std::string() const {
-    std::stringstream result;
-
-    if (this->coefficient)
-        result << this->coefficient;
-
-    if (this->base)
-        result << this->base;
-
-    if (this->power) {
-        result << new Operation('^');
-        result << this->power;
-    }
-
-    return result.str();
-}
+Term::Term(Constant *coefficient, Token *base, Token *power)
+    : coefficient(coefficient), base(base), power(power) {}
 
 Term::~Term() noexcept {
     delete this->coefficient;
     delete this->base;
     delete this->power;
+}
+
+Term::operator std::string() const {
+    std::stringstream result;
+
+    if (this->coefficient && this->coefficient->value != 1) {
+        if (this->coefficient->value == -1)
+            result << "-";
+
+        else
+            result << *this->coefficient;
+    }
+
+    if (this->base)
+        result << *this->base;
+
+    if (this->power) {
+        result << '^';
+        result << *this->power;
+    }
+
+    return result.str();
 }
 
 Expression::Expression(Term const &term) {
@@ -403,17 +411,20 @@ std::ostream &operator<<(std::ostream &os, Token const &token) {
     return os;
 }
 
-Token *copy(Token *token) {
-    if (auto const *constant = dynamic_cast<Constant *>(token))
+Token *copy(Token const *token) {
+    if (auto const *constant = dynamic_cast<Constant const *>(token))
         return new Constant(constant->value);
-    if (auto const *variable = dynamic_cast<Variable *>(token))
+    if (auto const *variable = dynamic_cast<Variable const *>(token))
         return new Variable(variable->var);
-    if (auto const *operation = dynamic_cast<Operation *>(token))
+    if (auto const *operation = dynamic_cast<Operation const *>(token))
         return new Operation(static_cast<std::string>(*operation)[0]);
-    if (auto const *expression = dynamic_cast<Expression *>(token))
+    if (auto const *expression = dynamic_cast<Expression const *>(token))
         return new Expression(*expression);
-    if (auto const *function = dynamic_cast<Function *>(token))
+    if (auto const *function = dynamic_cast<Function const *>(token))
         return new Function(*function);
+    if (auto const *term = dynamic_cast<Term const *>(token))
+        return new Term(dynamic_cast<Constant *>(copy(term->coefficient)),
+                        copy(term->base), copy(term->power));
 
     return nullptr;
 }

@@ -4,7 +4,7 @@
 #include <iostream>
 
 int main(int argc, char *argv[]) {
-    Expression const expression = tokenise("2sin(2x)");
+    Expression const expression = tokenise("1/(2x)");
 
     std::cout << expression << '\n';
 

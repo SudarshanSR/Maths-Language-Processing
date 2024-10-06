@@ -381,13 +381,29 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
 
                     if (!term.base) {
                         if (right.coefficient)
-                            right.coefficient->value *= term.coefficient->value;
+                            right.coefficient->value /= term.coefficient->value;
 
                         else
-                            right.coefficient = dynamic_cast<Constant *>(
-                                copy(term.coefficient));
+                            right.coefficient =
+                                new Constant(1.0 / term.coefficient->value);
 
-                        result->add_token(differentiate(right, variable));
+                        Token *token = differentiate(right, variable);
+
+                        if (auto *constant = dynamic_cast<Constant *>(token))
+                            constant->value = -constant->value;
+
+                        else if (typeid(*token) == typeid(Expression))
+                            result->add_token(new Operation('-'));
+
+                        result->add_token(token);
+                        result->add_token(new Operation('/'));
+
+                        auto *denominator = new Expression;
+                        denominator->add_token(copy(&right));
+                        denominator->add_token(new Operation('^'));
+                        denominator->add_token(new Constant(2));
+
+                        result->add_token(denominator);
 
                         continue;
                     }

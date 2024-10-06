@@ -59,9 +59,13 @@ struct Term final : Token {
     Token *base = nullptr;
     Token *power = nullptr;
 
-    explicit operator std::string() const override;
+    Term() = default;
+
+    Term(Constant *coefficient, Token *base, Token *power);
 
     ~Term() noexcept override;
+
+    explicit operator std::string() const override;
 };
 
 class Expression final : public Token {
@@ -92,6 +96,6 @@ class Expression final : public Token {
 
 Expression tokenise(std::string expression);
 
-Token *copy(Token *token);
+Token *copy(Token const *token);
 
 #endif // TOKENISE_H
