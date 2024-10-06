@@ -8,9 +8,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << expression << '\n';
 
-    auto const *derivative = differentiate(expression, Variable('x'));
+    auto const derivative = differentiate(expression, Variable('x'));
 
     std::cout << *derivative << '\n';
-
-    delete derivative;
 }

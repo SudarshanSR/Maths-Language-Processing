@@ -1,7 +1,6 @@
 #include "differentiate.h"
 
 #include <map>
-#include <memory>
 
 namespace {
 std::map<std::string,
@@ -23,25 +22,28 @@ std::map<std::string,
         {"e^", {{"e^", 1, 1}}},
     };
 
-Term get_next_term(std::vector<Token *> const &tokens, int &i) {
+Term get_next_term(std::vector<std::shared_ptr<Token>> const &tokens, int &i) {
     Term term{};
 
-    Token *token = tokens[i];
+    std::shared_ptr<Token> token = tokens[i];
 
     while (i < tokens.size() && typeid(*token) != typeid(Operation)) {
         if (typeid(*token) == typeid(Constant)) {
             if (term.coefficient)
                 throw std::invalid_argument("Expression is not valid!");
 
-            term.coefficient = dynamic_cast<Constant *>(copy(token));
+            term.coefficient = std::dynamic_pointer_cast<Constant>(token);
         } else if (typeid(*token) == typeid(Variable) ||
                    typeid(*token) == typeid(Expression) ||
                    typeid(*token) == typeid(Function)) {
             if (term.base)
                 throw std::invalid_argument("Expression is not valid!");
 
-            term.base = copy(token);
+            term.base = token;
         }
+
+        if (i == tokens.size() - 1)
+            break;
 
         token = tokens[++i];
     }
@@ -49,29 +51,31 @@ Term get_next_term(std::vector<Token *> const &tokens, int &i) {
     return term;
 }
 
-Token *differentiate(Token const *param, Variable const &variable) {
-    if (auto *expression = dynamic_cast<Expression const *>(param))
+std::shared_ptr<Token> differentiate(std::shared_ptr<Token> const &param,
+                                     Variable const &variable) {
+    if (auto const expression = std::dynamic_pointer_cast<Expression>(param))
         return differentiate(*expression, variable);
 
-    if (auto *function = dynamic_cast<Function const *>(param))
+    if (auto const function = std::dynamic_pointer_cast<Function>(param))
         return differentiate(*function, variable);
 
-    if (auto *term = dynamic_cast<Term const *>(param))
+    if (auto const term = std::dynamic_pointer_cast<Term>(param))
         return differentiate(*term, variable);
 
     throw std::invalid_argument("Invalid argument!");
 }
 } // namespace
 
-Token *differentiate(Term const &term, Variable const &variable) {
+std::shared_ptr<Token> differentiate(Term const &term,
+                                     Variable const &variable) {
     if (!term.base)
-        return new Constant(0);
+        return std::make_shared<Constant>(0);
 
-    if (auto const *var = dynamic_cast<Variable *>(term.base);
+    if (auto const var = std::dynamic_pointer_cast<Variable>(term.base);
         var && var->var != variable.var)
-        return new Constant(0);
+        return std::make_shared<Constant>(0);
 
-    auto result = std::make_unique<Expression>();
+    auto const result = std::make_shared<Expression>();
 
     Constant c{1};
 
@@ -79,24 +83,24 @@ Token *differentiate(Term const &term, Variable const &variable) {
         c = *term.coefficient;
 
     if (!term.power) {
-        if (c.value != 1 || dynamic_cast<Variable *>(term.base))
-            result->add_token(new Constant(c.value));
+        if (c.value != 1 || std::dynamic_pointer_cast<Variable>(term.base))
+            result->add_token(std::make_shared<Constant>(c.value));
 
         if (typeid(*term.base) == typeid(Expression) ||
             typeid(*term.base) == typeid(Function) ||
             typeid(*term.base) == typeid(Term))
             result->add_token(differentiate(term.base, variable));
     } else {
-        if (auto const *p = dynamic_cast<Constant *>(term.power)) {
+        if (auto const p = std::dynamic_pointer_cast<Constant>(term.power)) {
             if (typeid(*term.base) == typeid(Constant))
-                return new Constant(0);
+                return std::make_shared<Constant>(0);
 
             long double const power = p->value;
 
             if (long double const coefficient = c.value * power;
                 coefficient != 1 ||
-                (power == 1 && dynamic_cast<Variable *>(term.base)))
-                result->add_token(new Constant(c.value * power));
+                (power == 1 && std::dynamic_pointer_cast<Variable>(term.base)))
+                result->add_token(std::make_shared<Constant>(c.value * power));
 
             if (power == 1) {
                 if (typeid(*term.base) == typeid(Expression) ||
@@ -104,180 +108,184 @@ Token *differentiate(Term const &term, Variable const &variable) {
                     typeid(*term.base) == typeid(Term))
                     result->add_token(differentiate(term.base, variable));
 
-                return Expression::simplify(result.release());
+                return Expression::simplify(result);
             }
 
-            result->add_token(copy(term.base));
+            result->add_token(term.base);
 
             if (power != 2) {
-                result->add_token(new Operation('^'));
-                result->add_token(new Constant(power - 1));
+                result->add_token(std::make_shared<Operation>('^'));
+                result->add_token(std::make_shared<Constant>(power - 1));
             }
 
             if (typeid(*term.base) == typeid(Expression) ||
                 typeid(*term.base) == typeid(Function) ||
                 typeid(*term.base) == typeid(Term)) {
-                result->add_token(new Operation('*'));
+                result->add_token(std::make_shared<Operation>('*'));
                 result->add_token(differentiate(term.base, variable));
             }
-        } else if (auto const *power = dynamic_cast<Variable *>(term.power)) {
+        } else if (auto const power =
+                       std::dynamic_pointer_cast<Variable>(term.power)) {
             if (power->var != variable.var) {
                 if (typeid(*term.base) == typeid(Constant))
-                    return new Constant(0);
+                    return std::make_shared<Constant>(0);
 
-                auto *coefficient = new Expression;
+                auto const coefficient = std::make_shared<Expression>();
 
                 if (c.value != 1)
-                    coefficient->add_token(copy(&c));
+                    coefficient->add_token(std::make_shared<Constant>(c));
 
-                coefficient->add_token(copy(power));
+                coefficient->add_token(power);
 
                 result->add_token(coefficient);
+                result->add_token(term.base);
+                result->add_token(std::make_shared<Operation>('^'));
 
-                result->add_token(copy(term.base));
-
-                result->add_token(new Operation('^'));
-
-                auto *new_power = new Expression;
-                new_power->add_token(new Variable(power->var));
-                new_power->add_token(new Operation('-'));
-                new_power->add_token(new Constant(1));
+                auto const new_power = std::make_shared<Expression>();
+                new_power->add_token(power);
+                new_power->add_token(std::make_shared<Operation>('-'));
+                new_power->add_token(std::make_shared<Constant>(1));
 
                 result->add_token(new_power);
 
                 if (typeid(*term.base) == typeid(Expression) ||
                     typeid(*term.base) == typeid(Function) ||
                     typeid(*term.base) == typeid(Term)) {
-                    result->add_token(new Operation('*'));
+                    result->add_token(std::make_shared<Operation>('*'));
                     result->add_token(differentiate(term.base, variable));
                 }
             } else {
                 if (c.value != 1)
-                    result->add_token(copy(&c));
+                    result->add_token(std::make_shared<Constant>(c));
 
-                auto *expression_1 = new Expression;
-                expression_1->add_token(copy(term.base));
-                expression_1->add_token(new Operation('^'));
-                expression_1->add_token(copy(term.power));
+                auto const expression_1 = std::make_shared<Expression>();
+                expression_1->add_token(term.base);
+                expression_1->add_token(std::make_shared<Operation>('^'));
+                expression_1->add_token(term.power);
 
                 result->add_token(expression_1);
-                result->add_token(new Operation('*'));
+                result->add_token(std::make_shared<Operation>('*'));
 
-                auto *expression_2 = new Expression;
+                auto const expression_2 = std::make_shared<Expression>();
                 result->add_token(expression_2);
 
-                if (auto const *base = dynamic_cast<Constant *>(term.base)) {
-                    expression_2->add_token(new Function(
-                        "ln", new Constant(1), copy(base), new Constant(1)));
+                if (auto const base =
+                        std::dynamic_pointer_cast<Constant>(term.base)) {
+                    expression_2->add_token(std::make_shared<Function>(
+                        "ln", std::make_shared<Constant>(1), base,
+                        std::make_shared<Constant>(1)));
 
-                    Token *token = Expression::simplify(result.release());
-
-                    return token;
+                    return Expression::simplify(result);
                 }
 
-                expression_2->add_token(copy(term.power));
+                expression_2->add_token(term.power);
 
                 if (typeid(*term.base) == typeid(Expression) ||
                     typeid(*term.base) == typeid(Function) ||
                     typeid(*term.base) == typeid(Term)) {
-                    expression_2->add_token(new Operation('*'));
+                    expression_2->add_token(std::make_shared<Operation>('*'));
                     expression_2->add_token(differentiate(term.base, variable));
-                } else if (auto const *base =
-                               dynamic_cast<Variable *>(term.base)) {
+                } else if (auto const base =
+                               std::dynamic_pointer_cast<Variable>(term.base)) {
                     if (base->var != variable.var) {
-                        expression_2->add_token(new Operation('*'));
+                        expression_2->add_token(
+                            std::make_shared<Operation>('*'));
 
-                        expression_2->add_token(copy(base));
+                        expression_2->add_token(base);
                     }
                 }
 
-                expression_2->add_token(new Operation('/'));
-                expression_2->add_token(copy(term.base));
+                expression_2->add_token(std::make_shared<Operation>('/'));
+                expression_2->add_token(term.base);
 
-                expression_2->add_token(new Operation('+'));
+                expression_2->add_token(std::make_shared<Operation>('+'));
 
-                expression_2->add_token(new Function(
-                    "ln", new Constant(1), copy(term.base), new Constant(1)));
+                expression_2->add_token(std::make_shared<Function>(
+                    "ln", std::make_shared<Constant>(1), term.base,
+                    std::make_shared<Constant>(1)));
             }
         } else {
             if (c.value != 1)
-                result->add_token(copy(&c));
+                result->add_token(std::make_shared<Constant>(c));
 
-            auto *expression_1 = new Expression;
-            expression_1->add_token(copy(term.base));
-            expression_1->add_token(new Operation('^'));
-            expression_1->add_token(copy(term.power));
+            auto const expression_1 = std::make_shared<Expression>();
+            expression_1->add_token(term.base);
+            expression_1->add_token(std::make_shared<Operation>('^'));
+            expression_1->add_token(term.power);
 
             result->add_token(expression_1);
-            result->add_token(new Operation('*'));
+            result->add_token(std::make_shared<Operation>('*'));
 
-            auto *expression_2 = new Expression;
+            auto const expression_2 = std::make_shared<Expression>();
             result->add_token(expression_2);
 
-            if (auto const *base = dynamic_cast<Constant *>(term.base)) {
-                expression_2->add_token(new Function(
-                    "ln", new Constant(1), copy(base), new Constant(1)));
+            if (auto const base =
+                    std::dynamic_pointer_cast<Constant>(term.base)) {
+                expression_2->add_token(std::make_shared<Function>(
+                    "ln", std::make_shared<Constant>(1), base,
+                    std::make_shared<Constant>(1)));
 
-                Token *token = Expression::simplify(result.release());
-
-                return token;
+                return Expression::simplify(result);
             }
 
-            expression_2->add_token(copy(term.power));
+            expression_2->add_token(term.power);
 
             if (typeid(*term.base) == typeid(Expression) ||
                 typeid(*term.base) == typeid(Function) ||
                 typeid(*term.base) == typeid(Term)) {
-                expression_2->add_token(new Operation('*'));
+                expression_2->add_token(std::make_shared<Operation>('*'));
                 expression_2->add_token(differentiate(term.base, variable));
-            } else if (auto const *base = dynamic_cast<Variable *>(term.base)) {
+            } else if (auto const base =
+                           std::dynamic_pointer_cast<Variable>(term.base)) {
                 if (base->var != variable.var) {
-                    expression_2->add_token(new Operation('*'));
+                    expression_2->add_token(std::make_shared<Operation>('*'));
 
-                    expression_2->add_token(copy(base));
+                    expression_2->add_token(base);
                 }
             }
 
-            expression_2->add_token(new Operation('/'));
-            expression_2->add_token(copy(term.base));
+            expression_2->add_token(std::make_shared<Operation>('/'));
+            expression_2->add_token(term.base);
 
-            expression_2->add_token(new Operation('+'));
+            expression_2->add_token(std::make_shared<Operation>('+'));
 
             if (typeid(*term.power) == typeid(Expression) ||
                 typeid(*term.power) == typeid(Function) ||
                 typeid(*term.power) == typeid(Term)) {
-                result->add_token(new Operation('*'));
+                result->add_token(std::make_shared<Operation>('*'));
                 result->add_token(differentiate(term.power, variable));
             }
 
-            expression_2->add_token(new Function(
-                "ln", new Constant(1), copy(term.base), new Constant(1)));
+            expression_2->add_token(std::make_shared<Function>(
+                "ln", std::make_shared<Constant>(1), term.base,
+                std::make_shared<Constant>(1)));
         }
     }
 
-    Token *token = Expression::simplify(result.release());
-
-    return token;
+    return Expression::simplify(result);
 }
 
-Token *differentiate(Function const &function, Variable const &variable) {
-    if (auto const *p = dynamic_cast<Variable *>(function.parameter))
+std::shared_ptr<Token> differentiate(Function const &function,
+                                     Variable const &variable) {
+    if (auto const p = std::dynamic_pointer_cast<Variable>(function.parameter))
         if (p->var != variable.var)
-            return new Constant(0);
+            return std::make_shared<Constant>(0);
 
-    auto result = std::make_unique<Expression>();
+    auto const result = std::make_shared<Expression>();
 
     if (auto functions = k_function_map[function.function];
         functions.size() == 1) {
         auto const &[name, coefficient, power] = functions[0];
 
-        result->add_token(new Function(
-            name, new Constant(coefficient * function.coefficient->value),
-            function.parameter, new Constant(power)));
+        result->add_token(std::make_shared<Function>(
+            name,
+            std::make_shared<Constant>(coefficient *
+                                       function.coefficient->value),
+            function.parameter, std::make_shared<Constant>(power)));
     } else {
-        auto *expression = new Expression;
+        auto const expression = std::make_shared<Expression>();
 
-        auto *product = dynamic_cast<Constant *>(copy(function.coefficient));
+        auto const product = function.coefficient;
 
         expression->add_token(product);
 
@@ -286,45 +294,49 @@ Token *differentiate(Function const &function, Variable const &variable) {
 
             product->value *= coefficient;
 
-            expression->add_token(new Function(name, new Constant(1),
-                                               function.parameter,
-                                               new Constant(power)));
-            expression->add_token(new Operation('*'));
+            expression->add_token(std::make_shared<Function>(
+                name, std::make_shared<Constant>(1), function.parameter,
+                std::make_shared<Constant>(power)));
+            expression->add_token(std::make_shared<Operation>('*'));
         }
 
         auto const &[name, coefficient, power] = functions.back();
 
         product->value *= coefficient;
 
-        expression->add_token(new Function(
-            name, new Constant(1), function.parameter, new Constant(power)));
+        expression->add_token(std::make_shared<Function>(
+            name, std::make_shared<Constant>(1), function.parameter,
+            std::make_shared<Constant>(power)));
 
         result->add_token(expression);
     }
 
     if (typeid(*function.parameter) != typeid(Variable)) {
-        result->add_token(new Operation('*'));
+        result->add_token(std::make_shared<Operation>('*'));
 
         if (typeid(*function.parameter) == typeid(Expression) ||
             typeid(*function.parameter) == typeid(Function) ||
             typeid(*function.parameter) == typeid(Term)) {
-            result->add_token(new Operation('*'));
+            result->add_token(std::make_shared<Operation>('*'));
             result->add_token(differentiate(function.parameter, variable));
         }
     }
 
-    return Expression::simplify(result.release());
+    return Expression::simplify(result);
 }
 
-Token *differentiate(Expression const &expression, Variable const &variable) {
-    auto result = std::make_unique<Expression>();
+std::shared_ptr<Token> differentiate(Expression const &expression,
+                                     Variable const &variable) {
+    auto const result = std::make_shared<Expression>();
 
-    std::vector<Token *> const &tokens = expression.tokens();
+    std::vector<std::shared_ptr<Token>> const &tokens = expression.tokens();
 
     for (int i = 0; i < tokens.size(); ++i) {
-        if (Token *token = tokens[i]; typeid(*token) == typeid(Operation)) {
-            result->add_token(new Operation(static_cast<std::string>(
-                *dynamic_cast<Operation *>(token))[0]));
+        if (std::shared_ptr<Token> const &token = tokens[i];
+            typeid(*token) == typeid(Operation)) {
+            result->add_token(
+                std::make_shared<Operation>(static_cast<std::string>(
+                    *std::dynamic_pointer_cast<Operation>(token))[0]));
 
             continue;
         }
@@ -332,23 +344,24 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
         Term term = get_next_term(tokens, i);
 
         if (i < tokens.size() - 1) {
-            if (auto const *operation = dynamic_cast<Operation *>(tokens[i])) {
+            if (auto const operation =
+                    std::dynamic_pointer_cast<Operation>(tokens[i])) {
                 if (operation->operation == Operation::op::mul) {
                     Term right = get_next_term(tokens, ++i);
 
-                    auto *v = dynamic_cast<Term *>(copy(&right));
+                    auto v = std::make_shared<Term>(right);
 
-                    auto *u_d = differentiate(term, variable);
-                    auto *v_d = differentiate(*v, variable);
+                    auto u_d = differentiate(term, variable);
+                    auto v_d = differentiate(*v, variable);
 
-                    result->add_token(copy(&term));
-                    result->add_token(new Operation('*'));
+                    result->add_token(std::make_shared<Term>(term));
+                    result->add_token(std::make_shared<Operation>('*'));
                     result->add_token(v_d);
 
-                    result->add_token(new Operation('+'));
+                    result->add_token(std::make_shared<Operation>('+'));
 
                     result->add_token(u_d);
-                    result->add_token(new Operation('*'));
+                    result->add_token(std::make_shared<Operation>('*'));
                     result->add_token(v);
 
                     continue;
@@ -357,30 +370,30 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
                 if (operation->operation == Operation::op::div) {
                     Term right = get_next_term(tokens, ++i);
 
-                    auto *v = dynamic_cast<Term *>(copy(&right));
+                    auto v = std::make_shared<Term>(right);
 
-                    auto *u_d = differentiate(term, variable);
-                    auto *v_d = differentiate(*v, variable);
+                    auto u_d = differentiate(term, variable);
+                    auto v_d = differentiate(*v, variable);
 
-                    auto *numerator = new Expression;
+                    auto numerator = std::make_shared<Expression>();
 
                     numerator->add_token(u_d);
-                    numerator->add_token(new Operation('*'));
+                    numerator->add_token(std::make_shared<Operation>('*'));
                     numerator->add_token(v);
 
-                    numerator->add_token(new Operation('-'));
+                    numerator->add_token(std::make_shared<Operation>('-'));
 
-                    numerator->add_token(copy(&term));
-                    numerator->add_token(new Operation('*'));
+                    numerator->add_token(std::make_shared<Term>(term));
+                    numerator->add_token(std::make_shared<Operation>('*'));
                     numerator->add_token(v_d);
 
-                    auto *denominator = new Expression;
-                    denominator->add_token(copy(v));
-                    denominator->add_token(new Operation('^'));
-                    denominator->add_token(new Constant(2));
+                    auto denominator = std::make_shared<Expression>();
+                    denominator->add_token(v);
+                    denominator->add_token(std::make_shared<Operation>('^'));
+                    denominator->add_token(std::make_shared<Constant>(2));
 
                     result->add_token(numerator);
-                    result->add_token(new Operation('/'));
+                    result->add_token(std::make_shared<Operation>('/'));
                     result->add_token(denominator);
 
                     continue;
@@ -395,17 +408,17 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
                 }
 
                 try {
-                    term.power = copy(tokens.at(++i));
+                    term.power = tokens.at(++i);
                 } catch (std::out_of_range const &) {
                     throw std::invalid_argument("Expression is not valid!");
                 }
 
                 if (!term.base) {
                     if (term.coefficient) {
-                        term.base = copy(term.coefficient);
+                        term.base = term.coefficient;
                         term.coefficient = nullptr;
                     } else {
-                        term.base = new Constant(1);
+                        term.base = std::make_shared<Constant>(1);
                     }
                 }
             } else {
@@ -416,7 +429,5 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
         result->add_token(differentiate(term, variable));
     }
 
-    Token *token = Expression::simplify(result.release());
-
-    return token;
+    return Expression::simplify(result);
 }

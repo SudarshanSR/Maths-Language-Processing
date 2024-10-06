@@ -1,6 +1,7 @@
 #ifndef TOKENISE_H
 #define TOKENISE_H
 
+#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -42,62 +43,64 @@ struct Operation final : Token {
 struct Function final : Token {
     std::string function;
 
-    Constant *coefficient;
-    Token *parameter;
-    Token *power;
+    std::shared_ptr<Constant> coefficient = nullptr;
+    std::shared_ptr<Token> parameter = nullptr;
+    std::shared_ptr<Token> power = nullptr;
 
-    explicit Function(std::string function, Constant *coefficient,
-                      Token *parameter, Token *power);
+    explicit Function(std::string function,
+                      std::shared_ptr<Constant> const &coefficient,
+                      std::shared_ptr<Token> const &parameter,
+                      std::shared_ptr<Token> const &power);
 
-    Function(Function const &function);
-
-    ~Function() noexcept override;
+    Function(Function const &function) = default;
 
     explicit operator std::string() const override;
 };
 
 struct Term final : Token {
-    Constant *coefficient = nullptr;
-    Token *base = nullptr;
-    Token *power = nullptr;
+    std::shared_ptr<Constant> coefficient = nullptr;
+    std::shared_ptr<Token> base = nullptr;
+    std::shared_ptr<Token> power = nullptr;
 
     Term() = default;
 
-    Term(Constant *coefficient, Token *base, Token *power);
+    Term(std::shared_ptr<Constant> const &coefficient,
+         std::shared_ptr<Token> const &base,
+         std::shared_ptr<Token> const &power);
 
-    ~Term() noexcept override;
+    Term(Term const &term) = default;
 
     explicit operator std::string() const override;
 
-    [[nodiscard]] static Token *simplify(Term *term);
+    [[nodiscard]] static std::shared_ptr<Token>
+    simplify(std::shared_ptr<Term> const &term);
 };
 
 class Expression final : public Token {
   public:
     Expression() = default;
 
-    Expression(Expression const &expression);
+    Expression(Expression const &expression) = default;
 
-    ~Expression() noexcept override;
+    ~Expression() noexcept override = default;
 
     explicit operator std::string() const override;
 
-    [[nodiscard]] std::vector<Token *> &tokens();
+    [[nodiscard]] std::vector<std::shared_ptr<Token>> &tokens();
 
-    [[nodiscard]] std::vector<Token *> const &tokens() const;
+    [[nodiscard]] std::vector<std::shared_ptr<Token>> const &tokens() const;
 
-    void add_token(Token *token);
+    void add_token(std::shared_ptr<Token> const &token);
 
-    [[nodiscard]] Token *pop_token();
+    [[nodiscard]] std::shared_ptr<Token> pop_token();
 
-    [[nodiscard]] static Token *simplify(Expression *expression);
+    [[nodiscard]] static std::shared_ptr<Token>
+    simplify(std::shared_ptr<Expression> expression);
 
   private:
-    std::vector<Token *> tokens_;
+    std::vector<std::shared_ptr<Token>> tokens_;
 };
 
 Expression tokenise(std::string expression);
-
-Token *copy(Token const *token);
 
 #endif // TOKENISE_H
