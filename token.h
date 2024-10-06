@@ -51,6 +51,8 @@ struct Function final : Token {
 
     Function(Function const &function);
 
+    ~Function() noexcept override;
+
     explicit operator std::string() const override;
 };
 
@@ -66,13 +68,13 @@ struct Term final : Token {
     ~Term() noexcept override;
 
     explicit operator std::string() const override;
+
+    [[nodiscard]] static Token *simplify(Term *term);
 };
 
 class Expression final : public Token {
   public:
     Expression() = default;
-
-    explicit Expression(Term const &term);
 
     Expression(Expression const &expression);
 
@@ -86,9 +88,9 @@ class Expression final : public Token {
 
     void add_token(Token *token);
 
-    Token *pop_token();
+    [[nodiscard]] Token *pop_token();
 
-    void simplify();
+    [[nodiscard]] static Token *simplify(Expression *expression);
 
   private:
     std::vector<Token *> tokens_;

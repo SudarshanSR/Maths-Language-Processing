@@ -1,6 +1,7 @@
 #include "token.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -42,17 +43,8 @@ Token *get_next_token(std::string const &expression, int &i) {
 
         std::size_t const end = i - start - 1;
 
-        auto *result = new Expression(tokenise(expression.substr(start, end)));
-
-        if (result->tokens().size() == 1) {
-            Token *token = copy(result->tokens()[0]);
-
-            delete result;
-
-            return token;
-        }
-
-        return result;
+        return Expression::simplify(
+            new Expression(tokenise(expression.substr(start, end))));
     }
 
     for (int const offset : {4, 3, 2})
@@ -183,6 +175,12 @@ Function::Function(Function const &function) {
     this->power = copy(function.power);
 }
 
+Function::~Function() noexcept {
+    delete this->coefficient;
+    delete this->parameter;
+    delete this->power;
+}
+
 Function::operator std::string() const {
     std::stringstream result;
 
@@ -236,21 +234,26 @@ Term::operator std::string() const {
     return result.str();
 }
 
-Expression::Expression(Term const &term) {
-    if (term.coefficient)
-        this->add_token(term.coefficient);
-
-    if (term.base)
-        this->add_token(term.base);
-
-    if (term.power) {
-        this->add_token(new Operation('^'));
-        this->add_token(term.power);
+Token *Term::simplify(Term *term) {
+    if (term->coefficient) {
+        if (term->coefficient->value == 0 || !term->base) {
+            auto *coefficient = term->coefficient;
+            term->coefficient = nullptr;
+            delete term;
+            return coefficient;
+        }
+    } else if (term->base) {
+        auto *base = term->base;
+        term->base = nullptr;
+        delete term;
+        return base;
     }
+
+    return term;
 }
 
 Expression::Expression(Expression const &expression) {
-    for (Token *token : expression.tokens_)
+    for (Token const *token : expression.tokens_)
         this->add_token(copy(token));
 }
 
@@ -265,15 +268,15 @@ Expression::~Expression() noexcept {
 Expression::operator std::string() const {
     std::stringstream result;
 
-    if (this->tokens_.size() > 1) {
+    if (this->tokens_.size() == 1) {
+        result << static_cast<std::string>(*this->tokens_[0]);
+    } else {
         result << '(';
 
         for (Token const *token : this->tokens_)
             result << static_cast<std::string>(*token);
 
         result << ')';
-    } else {
-        result << static_cast<std::string>(*this->tokens_[0]);
     }
 
     return result.str();
@@ -293,55 +296,329 @@ Token *Expression::pop_token() {
     return token;
 }
 
-void Expression::simplify() {
+Token *Expression::simplify(Expression *expression) {
+    std::vector<Token *> &tokens = expression->tokens_;
+
+    for (Token *&token : tokens) {
+        if (auto *e = dynamic_cast<Expression *>(token))
+            token = simplify(e);
+        else if (auto *term = dynamic_cast<Term *>(token))
+            token = Term::simplify(term);
+    }
+
     int i = 0;
 
-    while (i < this->tokens_.size() - 1) {
-        Token *token = this->tokens_[i];
+    while (i < tokens.size()) {
+        Token *&token = tokens[i];
 
-        if (typeid(*token) != typeid(Operation)) {
-            ++i;
-            continue;
-        }
-
-        auto *operation = dynamic_cast<Operation *>(token);
-
-        if (operation->operation == Operation::op::add) {
-            auto const *next = dynamic_cast<Function *>(this->tokens_[i + 1]);
-
-            if (!next || next->coefficient->value >= 0) {
-                if (i == 0)
-                    this->tokens_.erase(this->tokens_.begin());
-                else
-                    ++i;
-
-                continue;
-            }
-
-            next->coefficient->value = -next->coefficient->value;
-            operation->operation = Operation::op::sub;
-        } else if (operation->operation == Operation::op::sub) {
-            auto const *next = dynamic_cast<Function *>(this->tokens_[i + 1]);
-
-            if (!next || next->coefficient->value >= 0) {
+        if (auto *operation = dynamic_cast<Operation *>(token)) {
+            if (i == tokens.size() - 1) {
                 ++i;
 
                 continue;
             }
 
-            next->coefficient->value = -next->coefficient->value;
+            if (operation->operation == Operation::op::sub) {
+                Token *next = tokens[i + 1];
 
-            if (i == 0) {
-                this->tokens_.erase(this->tokens_.begin());
+                if (auto *constant = dynamic_cast<Constant *>(next)) {
+                    constant->value = -constant->value;
+
+                    operation->operation = Operation::op::add;
+                } else if (auto const *term = dynamic_cast<Term *>(next)) {
+                    term->coefficient->value = -term->coefficient->value;
+
+                    operation->operation = Operation::op::add;
+                } else if (auto const *function =
+                               dynamic_cast<Function *>(next)) {
+                    function->coefficient->value =
+                        -function->coefficient->value;
+
+                    operation->operation = Operation::op::add;
+                }
+
+                if (i == 0) {
+                    delete token;
+
+                    tokens.erase(tokens.begin());
+
+                    continue;
+                }
+            }
+
+            if (i == 0 && operation->operation == Operation::op::add) {
+                delete token;
+
+                tokens.erase(tokens.begin());
 
                 continue;
             }
 
-            operation->operation = Operation::op::add;
+            ++i;
+
+            continue;
+        }
+
+        if (auto *constant = dynamic_cast<Constant *>(token)) {
+            if (i == tokens.size() - 1) {
+                ++i;
+
+                continue;
+            }
+
+            if (constant->value == 0) {
+                if (auto const *operation =
+                        dynamic_cast<Operation *>(tokens[i + 1])) {
+                    // Simplifies 0 * expr and 0 / expr and 0 ^ expr
+                    if (operation->operation == Operation::op::mul ||
+                        operation->operation == Operation::op::div ||
+                        operation->operation == Operation::op::pow) {
+                        do {
+                            delete tokens[i];
+                            tokens.erase(tokens.begin() + i);
+
+                            if (i == tokens.size()) {
+                                delete tokens.back();
+                                tokens.erase(tokens.end());
+
+                                break;
+                            }
+
+                            if (auto const *op =
+                                    dynamic_cast<Operation *>(tokens[i]);
+                                op && (op->operation == Operation::op::add ||
+                                       op->operation == Operation::op::sub))
+                                break;
+                        } while (i < tokens.size());
+
+                        if (i == tokens.size() - 1 &&
+                            typeid(*tokens[i]) == typeid(Operation)) {
+                            delete tokens[i];
+                            tokens.erase(tokens.begin() + i);
+                        }
+
+                        continue;
+                    }
+
+                    delete constant;
+
+                    tokens.erase(tokens.begin() + i);
+
+                    continue;
+                }
+
+                ++i;
+
+                continue;
+            }
+
+            if (constant->value == 1) {
+                // Simplifies 1 * expr and 1 ^ expr
+                if (auto const *operation =
+                        dynamic_cast<Operation *>(tokens[i + 1])) {
+                    if (operation->operation == Operation::op::mul ||
+                        operation->operation == Operation::op::pow) {
+                        do {
+                            delete tokens[i];
+                            tokens.erase(tokens.begin() + i);
+
+                            if (i == tokens.size()) {
+                                delete tokens.back();
+                                tokens.erase(tokens.end());
+
+                                break;
+                            }
+
+                            if (auto const *op =
+                                    dynamic_cast<Operation *>(tokens[i]);
+                                op && (op->operation == Operation::op::add ||
+                                       op->operation == Operation::op::sub))
+                                break;
+                        } while (i < tokens.size());
+
+                        if (i == tokens.size() - 1 &&
+                            typeid(*tokens[i]) == typeid(Operation)) {
+                            delete tokens[i];
+                            tokens.erase(tokens.begin() + i);
+                        }
+
+                        continue;
+                    }
+                }
+            }
+
+            if (auto const *operation =
+                    dynamic_cast<Operation *>(tokens[i + 1])) {
+                if (operation->operation == Operation::op::pow) {
+                    if (auto const *c =
+                            dynamic_cast<Constant *>(tokens[i + 2])) {
+                        if (c->value == 0) {
+                            constant->value == 1;
+
+                            delete operation;
+                            delete c;
+
+                            tokens.erase(tokens.begin() + i + 1);
+                            tokens.erase(tokens.begin() + i + 1);
+                        } else if (constant->value > 0 ||
+                                   c->value ==
+                                       static_cast<long long>(c->value)) {
+                            constant->value =
+                                std::powl(constant->value, c->value);
+
+                            tokens.erase(tokens.begin() + i + 1);
+                            tokens.erase(tokens.begin() + i + 1);
+                        }
+                    }
+                } else if (operation->operation == Operation::op::mul) {
+                    if (auto *c = dynamic_cast<Constant *>(tokens[i + 2])) {
+                        c->value *= constant->value;
+
+                        delete constant;
+                        delete operation;
+
+                        tokens.erase(tokens.begin() + i);
+                        tokens.erase(tokens.begin() + i);
+
+                        continue;
+                    }
+
+                    if (auto const *term =
+                            dynamic_cast<Term *>(tokens[i + 2])) {
+                        term->coefficient->value *= constant->value;
+
+                        delete constant;
+                        delete operation;
+
+                        tokens.erase(tokens.begin() + i);
+                        tokens.erase(tokens.begin() + i);
+
+                        continue;
+                    }
+
+                    if (auto const *function =
+                            dynamic_cast<Function *>(tokens[i + 2])) {
+                        function->coefficient->value *= constant->value;
+
+                        delete constant;
+                        delete operation;
+
+                        tokens.erase(tokens.begin() + i);
+                        tokens.erase(tokens.begin() + i);
+
+                        continue;
+                    }
+
+                    auto *term = new Term;
+                    term->coefficient = dynamic_cast<Constant *>(tokens[i]);
+                    term->base = tokens[i + 2];
+                    term->power = new Constant(1);
+
+                    token = term;
+
+                    tokens.erase(tokens.begin() + i + 1);
+                    tokens.erase(tokens.begin() + i + 1);
+                } else if (operation->operation == Operation::op::div) {
+                    if (auto *c = dynamic_cast<Constant *>(tokens[i + 2])) {
+                        c->value = constant->value / c->value;
+
+                        delete constant;
+                        delete operation;
+
+                        tokens.erase(tokens.begin() + i);
+                        tokens.erase(tokens.begin() + i);
+
+                        continue;
+                    }
+
+                    if (auto *term = dynamic_cast<Term *>(tokens[i + 2])) {
+                        term->coefficient->value /= constant->value;
+
+                        if (auto *power =
+                                dynamic_cast<Constant *>(term->power)) {
+                            power->value = -power->value;
+                        } else if (auto *power =
+                                       dynamic_cast<Term *>(term->power)) {
+                            power->coefficient->value =
+                                -power->coefficient->value;
+                        } else if (auto *power =
+                                       dynamic_cast<Function *>(term->power)) {
+                            power->coefficient->value =
+                                -power->coefficient->value;
+                        } else {
+                            auto *p = new Term;
+                            p->coefficient = new Constant(-1);
+                            p->base = term->power;
+
+                            term->power = p;
+                        }
+
+                        delete constant;
+                        delete operation;
+
+                        tokens.erase(tokens.begin() + i);
+                        tokens.erase(tokens.begin() + i);
+
+                        continue;
+                    }
+
+                    if (auto *function =
+                            dynamic_cast<Function *>(tokens[i + 2])) {
+                        function->coefficient->value /= constant->value;
+
+                        if (auto *power =
+                                dynamic_cast<Constant *>(function->power)) {
+                            power->value = -power->value;
+                        } else if (auto *power =
+                                       dynamic_cast<Term *>(function->power)) {
+                            power->coefficient->value =
+                                -power->coefficient->value;
+                        } else if (auto *power = dynamic_cast<Function *>(
+                                       function->power)) {
+                            power->coefficient->value =
+                                -power->coefficient->value;
+                        } else {
+                            auto *p = new Term;
+                            p->coefficient = new Constant(-1);
+                            p->base = function->power;
+
+                            function->power = p;
+                        }
+
+                        delete constant;
+                        delete operation;
+
+                        tokens.erase(tokens.begin() + i);
+                        tokens.erase(tokens.begin() + i);
+
+                        continue;
+                    }
+
+                    auto *term = new Term;
+                    term->coefficient = dynamic_cast<Constant *>(tokens[i]);
+                    term->base = tokens[i + 2];
+                    term->power = new Constant(-1);
+
+                    token = term;
+
+                    tokens.erase(tokens.begin() + i + 1);
+                    tokens.erase(tokens.begin() + i + 1);
+                }
+            }
         }
 
         ++i;
     }
+
+    if (tokens.size() == 1) {
+        Token *token = expression->pop_token();
+
+        delete expression;
+
+        return token;
+    }
+
+    return expression;
 }
 
 Expression tokenise(std::string expression) {

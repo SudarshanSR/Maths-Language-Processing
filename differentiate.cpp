@@ -48,6 +48,19 @@ Term get_next_term(std::vector<Token *> const &tokens, int &i) {
 
     return term;
 }
+
+Token *differentiate(Token const *param, Variable const &variable) {
+    if (auto *expression = dynamic_cast<Expression const *>(param))
+        return differentiate(*expression, variable);
+
+    if (auto *function = dynamic_cast<Function const *>(param))
+        return differentiate(*function, variable);
+
+    if (auto *term = dynamic_cast<Term const *>(param))
+        return differentiate(*term, variable);
+
+    throw std::invalid_argument("Invalid argument!");
+}
 } // namespace
 
 Token *differentiate(Term const &term, Variable const &variable) {
@@ -69,11 +82,10 @@ Token *differentiate(Term const &term, Variable const &variable) {
         if (c.value != 1 || dynamic_cast<Variable *>(term.base))
             result->add_token(new Constant(c.value));
 
-        if (auto const *base = dynamic_cast<Expression *>(term.base))
-            result->add_token(differentiate(*base, variable));
-
-        else if (auto const *base = dynamic_cast<Function *>(term.base))
-            result->add_token(differentiate(*base, variable));
+        if (typeid(*term.base) == typeid(Expression) ||
+            typeid(*term.base) == typeid(Function) ||
+            typeid(*term.base) == typeid(Term))
+            result->add_token(differentiate(term.base, variable));
     } else {
         if (auto const *p = dynamic_cast<Constant *>(term.power)) {
             if (typeid(*term.base) == typeid(Constant))
@@ -87,15 +99,12 @@ Token *differentiate(Term const &term, Variable const &variable) {
                 result->add_token(new Constant(c.value * power));
 
             if (power == 1) {
-                if (auto const *base = dynamic_cast<Expression *>(term.base))
-                    result->add_token(differentiate(*base, variable));
+                if (typeid(*term.base) == typeid(Expression) ||
+                    typeid(*term.base) == typeid(Function) ||
+                    typeid(*term.base) == typeid(Term))
+                    result->add_token(differentiate(term.base, variable));
 
-                else if (auto const *base = dynamic_cast<Function *>(term.base))
-                    result->add_token(differentiate(*base, variable));
-
-                result->simplify();
-
-                return result.release();
+                return Expression::simplify(result.release());
             }
 
             result->add_token(copy(term.base));
@@ -105,24 +114,20 @@ Token *differentiate(Term const &term, Variable const &variable) {
                 result->add_token(new Constant(power - 1));
             }
 
-            if (auto const *base = dynamic_cast<Expression *>(term.base)) {
+            if (typeid(*term.base) == typeid(Expression) ||
+                typeid(*term.base) == typeid(Function) ||
+                typeid(*term.base) == typeid(Term)) {
                 result->add_token(new Operation('*'));
-                result->add_token(differentiate(*base, variable));
-            } else if (auto const *base = dynamic_cast<Function *>(term.base)) {
-                result->add_token(new Operation('*'));
-                result->add_token(differentiate(*base, variable));
+                result->add_token(differentiate(term.base, variable));
             }
-        } else if (auto *power = dynamic_cast<Variable *>(term.power)) {
+        } else if (auto const *power = dynamic_cast<Variable *>(term.power)) {
             if (power->var != variable.var) {
-                if (typeid(*term.base) == typeid(Constant)) {
-                    result->add_token(new Constant(0));
-
-                    return result.release();
-                }
+                if (typeid(*term.base) == typeid(Constant))
+                    return new Constant(0);
 
                 auto *coefficient = new Expression;
 
-                if (c.value == 1)
+                if (c.value != 1)
                     coefficient->add_token(copy(&c));
 
                 coefficient->add_token(copy(power));
@@ -140,13 +145,11 @@ Token *differentiate(Term const &term, Variable const &variable) {
 
                 result->add_token(new_power);
 
-                if (auto const *base = dynamic_cast<Expression *>(term.base)) {
+                if (typeid(*term.base) == typeid(Expression) ||
+                    typeid(*term.base) == typeid(Function) ||
+                    typeid(*term.base) == typeid(Term)) {
                     result->add_token(new Operation('*'));
-                    result->add_token(differentiate(*base, variable));
-                } else if (auto const *base =
-                               dynamic_cast<Function *>(term.base)) {
-                    result->add_token(new Operation('*'));
-                    result->add_token(differentiate(*base, variable));
+                    result->add_token(differentiate(term.base, variable));
                 }
             } else {
                 if (c.value != 1)
@@ -163,25 +166,24 @@ Token *differentiate(Term const &term, Variable const &variable) {
                 auto *expression_2 = new Expression;
                 result->add_token(expression_2);
 
-                if (auto *base = dynamic_cast<Constant *>(term.base)) {
+                if (auto const *base = dynamic_cast<Constant *>(term.base)) {
                     expression_2->add_token(new Function(
                         "ln", new Constant(1), copy(base), new Constant(1)));
 
-                    result->simplify();
+                    Token *token = Expression::simplify(result.release());
 
-                    return result.release();
+                    return token;
                 }
 
                 expression_2->add_token(copy(term.power));
 
-                if (auto const *base = dynamic_cast<Expression *>(term.base)) {
+                if (typeid(*term.base) == typeid(Expression) ||
+                    typeid(*term.base) == typeid(Function) ||
+                    typeid(*term.base) == typeid(Term)) {
                     expression_2->add_token(new Operation('*'));
-                    expression_2->add_token(differentiate(*base, variable));
+                    expression_2->add_token(differentiate(term.base, variable));
                 } else if (auto const *base =
-                               dynamic_cast<Function *>(term.base)) {
-                    expression_2->add_token(new Operation('*'));
-                    expression_2->add_token(differentiate(*base, variable));
-                } else if (auto *base = dynamic_cast<Variable *>(term.base)) {
+                               dynamic_cast<Variable *>(term.base)) {
                     if (base->var != variable.var) {
                         expression_2->add_token(new Operation('*'));
 
@@ -212,24 +214,23 @@ Token *differentiate(Term const &term, Variable const &variable) {
             auto *expression_2 = new Expression;
             result->add_token(expression_2);
 
-            if (auto *base = dynamic_cast<Constant *>(term.base)) {
+            if (auto const *base = dynamic_cast<Constant *>(term.base)) {
                 expression_2->add_token(new Function(
                     "ln", new Constant(1), copy(base), new Constant(1)));
 
-                result->simplify();
+                Token *token = Expression::simplify(result.release());
 
-                return result.release();
+                return token;
             }
 
             expression_2->add_token(copy(term.power));
 
-            if (auto const *base = dynamic_cast<Expression *>(term.base)) {
+            if (typeid(*term.base) == typeid(Expression) ||
+                typeid(*term.base) == typeid(Function) ||
+                typeid(*term.base) == typeid(Term)) {
                 expression_2->add_token(new Operation('*'));
-                expression_2->add_token(differentiate(*base, variable));
-            } else if (auto const *base = dynamic_cast<Function *>(term.base)) {
-                expression_2->add_token(new Operation('*'));
-                expression_2->add_token(differentiate(*base, variable));
-            } else if (auto *base = dynamic_cast<Variable *>(term.base)) {
+                expression_2->add_token(differentiate(term.base, variable));
+            } else if (auto const *base = dynamic_cast<Variable *>(term.base)) {
                 if (base->var != variable.var) {
                     expression_2->add_token(new Operation('*'));
 
@@ -242,13 +243,11 @@ Token *differentiate(Term const &term, Variable const &variable) {
 
             expression_2->add_token(new Operation('+'));
 
-            if (auto const *power = dynamic_cast<Expression *>(term.power)) {
-                expression_2->add_token(differentiate(*power, variable));
-                expression_2->add_token(new Operation('*'));
-            } else if (auto const *power =
-                           dynamic_cast<Function *>(term.power)) {
-                expression_2->add_token(differentiate(*power, variable));
-                expression_2->add_token(new Operation('*'));
+            if (typeid(*term.power) == typeid(Expression) ||
+                typeid(*term.power) == typeid(Function) ||
+                typeid(*term.power) == typeid(Term)) {
+                result->add_token(new Operation('*'));
+                result->add_token(differentiate(term.power, variable));
             }
 
             expression_2->add_token(new Function(
@@ -256,12 +255,9 @@ Token *differentiate(Term const &term, Variable const &variable) {
         }
     }
 
-    if (result->tokens().size() == 1)
-        return result->pop_token();
+    Token *token = Expression::simplify(result.release());
 
-    result->simplify();
-
-    return result.release();
+    return token;
 }
 
 Token *differentiate(Function const &function, Variable const &variable) {
@@ -309,19 +305,15 @@ Token *differentiate(Function const &function, Variable const &variable) {
     if (typeid(*function.parameter) != typeid(Variable)) {
         result->add_token(new Operation('*'));
 
-        if (auto const *p = dynamic_cast<Expression *>(function.parameter))
-            result->add_token(differentiate(*p, variable));
-
-        else if (auto const *p = dynamic_cast<Term *>(function.parameter))
-            result->add_token(differentiate(*p, variable));
+        if (typeid(*function.parameter) == typeid(Expression) ||
+            typeid(*function.parameter) == typeid(Function) ||
+            typeid(*function.parameter) == typeid(Term)) {
+            result->add_token(new Operation('*'));
+            result->add_token(differentiate(function.parameter, variable));
+        }
     }
 
-    if (result->tokens().size() == 1)
-        return result->pop_token();
-
-    result->simplify();
-
-    return result.release();
+    return Expression::simplify(result.release());
 }
 
 Token *differentiate(Expression const &expression, Variable const &variable) {
@@ -344,26 +336,12 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
                 if (operation->operation == Operation::op::mul) {
                     Term right = get_next_term(tokens, ++i);
 
-                    if (!term.base) {
-                        if (right.coefficient)
-                            right.coefficient->value *= term.coefficient->value;
-
-                        else
-                            right.coefficient = dynamic_cast<Constant *>(
-                                copy(term.coefficient));
-
-                        result->add_token(differentiate(right, variable));
-
-                        continue;
-                    }
-
-                    auto *v = new Expression(right);
-                    auto *u = new Expression(term);
+                    auto *v = dynamic_cast<Term *>(copy(&right));
 
                     auto *u_d = differentiate(term, variable);
                     auto *v_d = differentiate(*v, variable);
 
-                    result->add_token(u);
+                    result->add_token(copy(&term));
                     result->add_token(new Operation('*'));
                     result->add_token(v_d);
 
@@ -379,37 +357,7 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
                 if (operation->operation == Operation::op::div) {
                     Term right = get_next_term(tokens, ++i);
 
-                    if (!term.base) {
-                        if (right.coefficient)
-                            right.coefficient->value /= term.coefficient->value;
-
-                        else
-                            right.coefficient =
-                                new Constant(1.0 / term.coefficient->value);
-
-                        Token *token = differentiate(right, variable);
-
-                        if (auto *constant = dynamic_cast<Constant *>(token))
-                            constant->value = -constant->value;
-
-                        else if (typeid(*token) == typeid(Expression))
-                            result->add_token(new Operation('-'));
-
-                        result->add_token(token);
-                        result->add_token(new Operation('/'));
-
-                        auto *denominator = new Expression;
-                        denominator->add_token(copy(&right));
-                        denominator->add_token(new Operation('^'));
-                        denominator->add_token(new Constant(2));
-
-                        result->add_token(denominator);
-
-                        continue;
-                    }
-
-                    auto *v = new Expression(right);
-                    auto *u = new Expression(term);
+                    auto *v = dynamic_cast<Term *>(copy(&right));
 
                     auto *u_d = differentiate(term, variable);
                     auto *v_d = differentiate(*v, variable);
@@ -422,12 +370,12 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
 
                     numerator->add_token(new Operation('-'));
 
-                    numerator->add_token(u);
+                    numerator->add_token(copy(&term));
                     numerator->add_token(new Operation('*'));
                     numerator->add_token(v_d);
 
                     auto *denominator = new Expression;
-                    denominator->add_token(v);
+                    denominator->add_token(copy(v));
                     denominator->add_token(new Operation('^'));
                     denominator->add_token(new Constant(2));
 
@@ -468,10 +416,7 @@ Token *differentiate(Expression const &expression, Variable const &variable) {
         result->add_token(differentiate(term, variable));
     }
 
-    if (result->tokens().size() == 1)
-        return result->pop_token();
+    Token *token = Expression::simplify(result.release());
 
-    result->simplify();
-
-    return result.release();
+    return token;
 }
