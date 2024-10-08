@@ -198,20 +198,23 @@ void Function::simplify() {
         std::dynamic_pointer_cast<Function>(this->parameter)->simplify();
 }
 
-Term::Term(std::shared_ptr<Constant> const &coefficient,
-           std::shared_ptr<Token> const &base,
+Term::Term(long double const coefficient, std::shared_ptr<Token> const &base,
            std::shared_ptr<Token> const &power)
     : coefficient(coefficient), base(base), power(power) {}
+
+Term::Term(std::shared_ptr<Token> const &base,
+           std::shared_ptr<Token> const &power)
+    : base(base), power(power) {}
 
 Term::operator std::string() const {
     std::stringstream result;
 
-    if (this->coefficient && this->coefficient->value != 1) {
-        if (this->coefficient->value == -1)
+    if (this->coefficient.value != 1) {
+        if (this->coefficient.value == -1)
             result << "-";
 
         else
-            result << *this->coefficient;
+            result << this->coefficient;
     }
 
     if (this->base)
@@ -280,19 +283,16 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Token> const &token) {
 }
 
 std::shared_ptr<Token> simplify(std::shared_ptr<Term> const &term) {
-    if (!term->coefficient)
-        term->coefficient = std::make_shared<Constant>(1);
-
     if (!term->power)
         term->power = std::make_shared<Constant>(1);
 
     if (typeid(*term->power) == typeid(Constant)) {
-        if (term->coefficient->value == 1 &&
+        if (term->coefficient.value == 1 &&
             std::dynamic_pointer_cast<Constant>(term->power)->value == 1)
             return simplify(term->base);
 
         if (std::dynamic_pointer_cast<Constant>(term->power)->value == 0)
-            return term->coefficient;
+            return std::make_shared<Constant>(term->coefficient);
     }
 
     if (typeid(*term->base) == typeid(Constant)) {
@@ -300,19 +300,19 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Term> const &term) {
 
         if (typeid(*term->power) == typeid(Constant))
             return std::make_shared<Constant>(
-                term->coefficient->value *
+                term->coefficient.value *
                 std::powl(
                     base->value,
                     std::dynamic_pointer_cast<Constant>(term->power)->value));
 
-        if (*term->coefficient == *base) {
+        if (term->coefficient == *base) {
             if (typeid(*term->power) == typeid(Expression)) {
                 auto const power =
                     std::dynamic_pointer_cast<Expression>(term->power);
                 power->add_token(
                     std::make_shared<Operation>(Operation::op::add));
                 power->add_token(std::make_shared<Constant>(1));
-                term->coefficient->value = 1;
+                term->coefficient.value = 1;
             }
         }
     }
@@ -411,8 +411,7 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
             }
         }
 
-        auto term =
-            std::make_shared<Term>(std::make_shared<Constant>(1), left, right);
+        auto term = std::make_shared<Term>(1, left, right);
 
         tokens[i - 1] = term;
 
@@ -464,23 +463,15 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                 }
 
                 if (typeid(*right) == typeid(Constant)) {
-                    auto right_constant =
-                        std::dynamic_pointer_cast<Constant>(right);
-                    right_constant->value *= left_constant->value;
+                    std::dynamic_pointer_cast<Constant>(right)->value *=
+                        left_constant->value;
                 } else if (typeid(*right) == typeid(Term)) {
-                    auto right_term = std::dynamic_pointer_cast<Term>(right);
-
-                    right_term->coefficient->value *= left_constant->value;
-                } else if (typeid(*right) == typeid(Variable)) {
-                    auto right_variable =
-                        std::dynamic_pointer_cast<Variable>(right);
-
-                    tokens[i + 1] =
-                        std::make_shared<Term>(left_constant, right_variable,
-                                               std::make_shared<Constant>(1));
+                    std::dynamic_pointer_cast<Term>(right)->coefficient.value *=
+                        left_constant->value;
                 } else {
-                    tokens[i + 1] = std::make_shared<Term>(
-                        left_constant, right, std::make_shared<Constant>(1));
+                    tokens[i + 1] =
+                        std::make_shared<Term>(left_constant->value, right,
+                                               std::make_shared<Constant>(1));
                 }
             } else if (typeid(*right) == typeid(Constant)) {
                 auto right_constant =
@@ -505,21 +496,19 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                 }
 
                 if (typeid(*left) == typeid(Term)) {
-                    auto left_term = std::dynamic_pointer_cast<Term>(left);
-
-                    left_term->coefficient->value *= right_constant->value;
+                    std::dynamic_pointer_cast<Term>(left)->coefficient.value *=
+                        right_constant->value;
 
                     tokens[i + 1] = left;
                 } else if (typeid(*left) == typeid(Variable)) {
-                    auto left_variable =
-                        std::dynamic_pointer_cast<Variable>(left);
-
-                    tokens[i + 1] =
-                        std::make_shared<Term>(right_constant, left_variable,
-                                               std::make_shared<Constant>(1));
-                } else {
                     tokens[i + 1] = std::make_shared<Term>(
-                        right_constant, left, std::make_shared<Constant>(1));
+                        right_constant->value,
+                        std::dynamic_pointer_cast<Variable>(left),
+                        std::make_shared<Constant>(1));
+                } else {
+                    tokens[i + 1] =
+                        std::make_shared<Term>(right_constant->value, left,
+                                               std::make_shared<Constant>(1));
                 }
             } else {
                 if (tokens.size() == 3)
@@ -545,8 +534,9 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                     continue;
                 }
 
-                tokens[i + 1] = std::make_shared<Term>(
-                    left_constant, right, std::make_shared<Constant>(-1));
+                tokens[i + 1] =
+                    std::make_shared<Term>(left_constant->value, right,
+                                           std::make_shared<Constant>(-1));
 
                 --i;
 
@@ -562,8 +552,7 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
             result->add_token(left);
             result->add_token(std::make_shared<Operation>(Operation::op::mul));
             result->add_token(
-                std::make_shared<Term>(std::make_shared<Constant>(1), right,
-                                       std::make_shared<Constant>(-1)));
+                std::make_shared<Term>(right, std::make_shared<Constant>(-1)));
 
             tokens[i + 1] = result;
         }
@@ -708,7 +697,7 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                 } else if (typeid(*next) == typeid(Term)) {
                     auto const term = std::dynamic_pointer_cast<Term>(next);
 
-                    term->coefficient->value = -term->coefficient->value;
+                    term->coefficient.value = -term->coefficient.value;
 
                     operation->operation = Operation::op::add;
                 }
@@ -803,7 +792,7 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                         auto const term =
                             std::dynamic_pointer_cast<Term>(tokens[i + 2]);
 
-                        term->coefficient->value /= constant->value;
+                        term->coefficient.value /= constant->value;
 
                         if (auto const &power_type = typeid(*term->power);
                             power_type == typeid(Constant)) {
@@ -815,11 +804,11 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                             auto power =
                                 std::dynamic_pointer_cast<Term>(term->power);
 
-                            power->coefficient->value =
-                                -power->coefficient->value;
+                            power->coefficient.value =
+                                -power->coefficient.value;
                         } else {
                             auto const p = std::make_shared<Term>();
-                            p->coefficient = std::make_shared<Constant>(-1);
+                            p->coefficient.value = -1;
                             p->base = term->power;
 
                             term->power = p;
@@ -832,7 +821,7 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                     }
 
                     token = std::make_shared<Term>(
-                        std::dynamic_pointer_cast<Constant>(tokens[i]),
+                        std::dynamic_pointer_cast<Constant>(tokens[i])->value,
                         tokens[i + 2], std::make_shared<Constant>(-1));
 
                     tokens.erase(tokens.begin() + i + 1);
@@ -865,13 +854,15 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                                 ->value;
                     } else if (power_type == typeid(Constant)) {
                         auto power = std::make_shared<Term>(
-                            std::dynamic_pointer_cast<Constant>(term->power),
+                            std::dynamic_pointer_cast<Constant>(term->power)
+                                ->value,
                             tokens[i + 2], std::make_shared<Constant>(1));
 
                         term->power = power;
                     } else if (typeid(*tokens[i + 1]) == typeid(Constant)) {
                         auto power = std::make_shared<Term>(
-                            std::dynamic_pointer_cast<Constant>(tokens[i + 2]),
+                            std::dynamic_pointer_cast<Constant>(tokens[i + 2])
+                                ->value,
                             term->power, std::make_shared<Constant>(1));
 
                         term->power = power;
@@ -889,17 +880,15 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                 tokens.erase(tokens.begin() + i + 1);
                 tokens.erase(tokens.begin() + i + 1);
             } else if (operation->operation == Operation::op::mul &&
-                       typeid(*term->coefficient) == typeid(Constant) &&
                        typeid(*tokens[i + 2]) == typeid(Constant)) {
-                std::dynamic_pointer_cast<Constant>(term->coefficient)->value *=
+                term->coefficient.value *=
                     std::dynamic_pointer_cast<Constant>(tokens[i + 2])->value;
 
                 tokens.erase(tokens.begin() + i + 1);
                 tokens.erase(tokens.begin() + i + 1);
             } else if (operation->operation == Operation::op::div &&
-                       typeid(*term->coefficient) == typeid(Constant) &&
                        typeid(*tokens[i + 2]) == typeid(Constant)) {
-                std::dynamic_pointer_cast<Constant>(term->coefficient)->value /=
+                term->coefficient.value /=
                     std::dynamic_pointer_cast<Constant>(tokens[i + 2])->value;
 
                 tokens.erase(tokens.begin() + i + 1);

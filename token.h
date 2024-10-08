@@ -57,14 +57,16 @@ struct Function final : Token {
 };
 
 struct Term final : Token {
-    std::shared_ptr<Constant> coefficient = nullptr;
+    Constant coefficient{1};
     std::shared_ptr<Token> base = nullptr;
     std::shared_ptr<Token> power = nullptr;
 
     Term() = default;
 
-    Term(std::shared_ptr<Constant> const &coefficient,
-         std::shared_ptr<Token> const &base,
+    Term(long double coefficient, std::shared_ptr<Token> const &base,
+         std::shared_ptr<Token> const &power);
+
+    Term(std::shared_ptr<Token> const &base,
          std::shared_ptr<Token> const &power);
 
     Term(Term const &term) = default;

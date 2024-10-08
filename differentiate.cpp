@@ -36,16 +36,21 @@ get_next_term(std::vector<std::shared_ptr<Token>> const &tokens, int &i) {
 
     while (i < tokens.size() && typeid(*token) != typeid(Operation)) {
         if (typeid(*token) == typeid(Constant)) {
-            if (!term->coefficient)
-                term->coefficient = std::make_shared<Constant>(1);
+            if (!term->base)
+                term->base = token;
 
-            term->coefficient->value *=
+            term->coefficient.value *=
                 std::dynamic_pointer_cast<Constant>(token)->value;
         } else if (typeid(*token) == typeid(Variable) ||
                    typeid(*token) == typeid(Expression) ||
                    typeid(*token) == typeid(Function)) {
-            if (term->base)
-                throw std::invalid_argument("Expression is not valid!");
+            if (term->base) {
+                if (typeid(*term->base) == typeid(Constant))
+                    throw std::invalid_argument("Expression is not valid!");
+
+                term->coefficient.value *=
+                    std::dynamic_pointer_cast<Constant>(term->base)->value;
+            }
 
             term->base = token;
         }
@@ -108,14 +113,11 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
         *std::dynamic_pointer_cast<Variable>(term->base) != variable)
         return std::make_shared<Constant>(0);
 
-    Constant c{1};
-
-    if (term->coefficient)
-        c = *term->coefficient;
+    Constant c = term->coefficient;
 
     if (!term->power) {
         return simplify(differentiate(
-            simplify(std::make_shared<Term>(std::make_shared<Constant>(c.value),
+            simplify(std::make_shared<Term>(c.value,
                                             differentiate(term->base, variable),
                                             std::make_shared<Constant>(1))),
             variable, order - 1));
@@ -131,9 +133,9 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
         long double const power =
             std::dynamic_pointer_cast<Constant>(term->power)->value;
 
-        result->add_token(std::make_shared<Term>(
-            std::make_shared<Constant>(c.value * power), term->base,
-            std::make_shared<Constant>(power - 1)));
+        result->add_token(
+            std::make_shared<Term>(c.value * power, term->base,
+                                   std::make_shared<Constant>(power - 1)));
         result->add_token(std::make_shared<Operation>(Operation::op::mul));
         result->add_token(differentiate(term->base, variable));
 
@@ -150,8 +152,7 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
         auto const base = std::dynamic_pointer_cast<Constant>(term->base);
 
         expression_2->add_token(
-            std::make_shared<Term>(std::make_shared<Constant>(1),
-                                   std::make_shared<Function>("ln", base),
+            std::make_shared<Term>(1, std::make_shared<Function>("ln", base),
                                    std::make_shared<Constant>(1)));
         expression_2->add_token(
             std::make_shared<Operation>(Operation::op::mul));
@@ -171,8 +172,7 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
     expression_2->add_token(differentiate(term->power, variable));
     expression_2->add_token(std::make_shared<Operation>(Operation::op::mul));
     expression_2->add_token(
-        std::make_shared<Term>(std::make_shared<Constant>(1),
-                               std::make_shared<Function>("ln", term->base),
+        std::make_shared<Term>(1, std::make_shared<Function>("ln", term->base),
                                std::make_shared<Constant>(1)));
 
     return simplify(differentiate(simplify(result), variable, order - 1));
@@ -196,8 +196,7 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Function> const &function,
         auto const &[name, coefficient, power] = functions[0];
 
         result->add_token(std::make_shared<Term>(
-            std::make_shared<Constant>(coefficient),
-            std::make_shared<Function>(name, function->parameter),
+            coefficient, std::make_shared<Function>(name, function->parameter),
             std::make_shared<Constant>(power)));
     } else {
         auto const expression = std::make_shared<Expression>();
@@ -213,8 +212,7 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Function> const &function,
             product->value *= coefficient;
 
             expression->add_token(std::make_shared<Term>(
-                std::make_shared<Constant>(1),
-                std::make_shared<Function>(name, function->parameter),
+                1, std::make_shared<Function>(name, function->parameter),
                 std::make_shared<Constant>(power)));
         }
 
@@ -331,15 +329,6 @@ differentiate(std::shared_ptr<Expression> const &expression,
             term->power = tokens.at(++i);
         } catch (std::out_of_range const &) {
             throw std::invalid_argument("Expression is not valid!");
-        }
-
-        if (!term->base) {
-            if (term->coefficient) {
-                term->base = term->coefficient;
-                term->coefficient = nullptr;
-            } else {
-                term->base = std::make_shared<Constant>(1);
-            }
         }
 
         result->add_token(differentiate(term, variable));
