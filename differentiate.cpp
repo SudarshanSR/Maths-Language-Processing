@@ -120,9 +120,8 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
 
     auto const result = std::make_shared<Expression>();
 
-    auto const &power_type = typeid(*term->power);
-
-    if (power_type == typeid(Constant)) {
+    if (auto const &power_type = typeid(*term->power);
+        power_type == typeid(Constant)) {
         if (base_type == typeid(Constant))
             return std::make_shared<Constant>(0);
 
@@ -236,9 +235,8 @@ differentiate(std::shared_ptr<Expression> const &expression,
     for (int i = 0; i < tokens.size(); ++i) {
         std::shared_ptr<Token> const &token = tokens[i];
 
-        auto const &token_type = typeid(*token);
-
-        if (token_type == typeid(Operation)) {
+        if (auto const &token_type = typeid(*token);
+            token_type == typeid(Operation)) {
             result->add_token(
                 std::make_shared<Operation>(static_cast<std::string>(
                     *std::dynamic_pointer_cast<Operation>(token))[0]));

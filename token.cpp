@@ -298,7 +298,7 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Term> const &term) {
     }
 
     if (typeid(*term->base) == typeid(Constant)) {
-        auto base = std::dynamic_pointer_cast<Constant>(term->base);
+        auto const base = std::dynamic_pointer_cast<Constant>(term->base);
 
         if (typeid(*term->power) == typeid(Constant))
             return std::make_shared<Constant>(
@@ -309,7 +309,8 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Term> const &term) {
 
         if (*term->coefficient == *base) {
             if (typeid(*term->power) == typeid(Expression)) {
-                auto power = std::dynamic_pointer_cast<Expression>(term->power);
+                auto const power =
+                    std::dynamic_pointer_cast<Expression>(term->power);
                 power->add_token(std::make_shared<Operation>('+'));
                 power->add_token(std::make_shared<Constant>(1));
                 term->coefficient->value = 1;
