@@ -37,28 +37,29 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
             character = expression[++i];
         }
 
+        --i;
+
         if (count)
             throw std::invalid_argument("Expression is not valid!");
 
-        std::size_t const end = i - start - 1;
+        std::size_t const end = i - start;
 
-        auto token = tokenise(expression.substr(start, end));
-
-        if (typeid(*token) == typeid(Expression))
-            return simplify(std::dynamic_pointer_cast<Expression>(token));
-
-        return token;
+        return tokenise(expression.substr(start, end));
     }
 
-    for (int const offset : {4, 3, 2})
-        if (i + offset < expression.size())
-            if (std::string const &fn = expression.substr(i, offset);
-                k_functions.contains(fn)) {
-                i += offset;
+    for (int const offset : {4, 3, 2}) {
+        if (i + offset >= expression.size())
+            continue;
 
-                return std::make_shared<Function>(
-                    fn, get_next_token(expression, i));
-            }
+        std::string const &fn = expression.substr(i, offset);
+
+        if (!k_functions.contains(fn))
+            continue;
+
+        i += offset;
+
+        return std::make_shared<Function>(fn, get_next_token(expression, i));
+    }
 
     if (character == 'e' && i < expression.size() - 1 &&
         expression[i + 1] == '^') {
@@ -336,12 +337,9 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
         std::shared_ptr<Token> &token = tokens[i];
 
         if (auto const &token_Type = typeid(*token);
-            token_Type == typeid(Expression)) {
-            token = simplify(std::dynamic_pointer_cast<Expression>(token));
-        } else if (token_Type == typeid(Term)) {
-            token = simplify(std::dynamic_pointer_cast<Term>(token));
-        } else if (token_Type == typeid(Function)) {
-            std::dynamic_pointer_cast<Function>(token)->simplify();
+            token_Type == typeid(Expression) || token_Type == typeid(Term) ||
+            token_Type == typeid(Function)) {
+            simplify(token);
         }
 
         ++i;
@@ -677,12 +675,9 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
         std::shared_ptr<Token> &token = tokens[i];
 
         if (auto const &token_Type = typeid(*token);
-            token_Type == typeid(Expression)) {
-            token = simplify(std::dynamic_pointer_cast<Expression>(token));
-        } else if (token_Type == typeid(Term)) {
-            token = simplify(std::dynamic_pointer_cast<Term>(token));
-        } else if (token_Type == typeid(Function)) {
-            std::dynamic_pointer_cast<Function>(token)->simplify();
+            token_Type == typeid(Expression) || token_Type == typeid(Term) ||
+            token_Type == typeid(Function)) {
+            simplify(token);
         }
 
         ++i;
@@ -885,6 +880,7 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                     } else {
                         auto power = std::make_shared<Expression>();
                         power->add_token(term->power);
+                        power->add_token(std::make_shared<Operation>('*'));
                         power->add_token(tokens[i + 2]);
 
                         term->power = power;

@@ -82,6 +82,9 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Token> const &param,
         return differentiate(std::dynamic_pointer_cast<Variable>(param),
                              variable);
 
+    if (typeid(*param) == typeid(Constant))
+        return std::make_shared<Constant>(0);
+
     throw std::invalid_argument("Invalid argument!");
 }
 
