@@ -1,7 +1,6 @@
 #ifndef TOKENISE_H
 #define TOKENISE_H
 
-#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -20,6 +19,8 @@ struct Constant final : Token {
     explicit Constant(long double value);
 
     explicit operator std::string() const override;
+
+    bool operator==(Constant const &) const;
 };
 
 struct Variable final : Token {
@@ -28,6 +29,8 @@ struct Variable final : Token {
     explicit Variable(char var);
 
     explicit operator std::string() const override;
+
+    bool operator==(Variable const &) const;
 };
 
 struct Operation final : Token {
@@ -43,18 +46,16 @@ struct Operation final : Token {
 struct Function final : Token {
     std::string function;
 
-    std::shared_ptr<Constant> coefficient = nullptr;
     std::shared_ptr<Token> parameter = nullptr;
-    std::shared_ptr<Token> power = nullptr;
 
     explicit Function(std::string function,
-                      std::shared_ptr<Constant> const &coefficient,
-                      std::shared_ptr<Token> const &parameter,
-                      std::shared_ptr<Token> const &power);
+                      std::shared_ptr<Token> const &parameter);
 
     Function(Function const &function) = default;
 
     explicit operator std::string() const override;
+
+    void simplify();
 };
 
 struct Term final : Token {
@@ -71,13 +72,12 @@ struct Term final : Token {
     Term(Term const &term) = default;
 
     explicit operator std::string() const override;
-
-    [[nodiscard]] static std::shared_ptr<Token>
-    simplify(std::shared_ptr<Term> const &term);
 };
 
 class Expression final : public Token {
   public:
+    std::vector<std::shared_ptr<Token>> tokens;
+
     Expression() = default;
 
     Expression(Expression const &expression) = default;
@@ -86,21 +86,17 @@ class Expression final : public Token {
 
     explicit operator std::string() const override;
 
-    [[nodiscard]] std::vector<std::shared_ptr<Token>> &tokens();
-
-    [[nodiscard]] std::vector<std::shared_ptr<Token>> const &tokens() const;
-
     void add_token(std::shared_ptr<Token> const &token);
 
     [[nodiscard]] std::shared_ptr<Token> pop_token();
-
-    [[nodiscard]] static std::shared_ptr<Token>
-    simplify(std::shared_ptr<Expression> expression);
-
-  private:
-    std::vector<std::shared_ptr<Token>> tokens_;
 };
 
-Expression tokenise(std::string expression);
+std::shared_ptr<Token> simplify(std::shared_ptr<Token> const &);
+
+std::shared_ptr<Token> simplify(std::shared_ptr<Term> const &term);
+
+std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression);
+
+std::shared_ptr<Token> tokenise(std::string expression);
 
 #endif // TOKENISE_H
