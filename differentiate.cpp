@@ -134,14 +134,14 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
         result->add_token(std::make_shared<Term>(
             std::make_shared<Constant>(c.value * power), term->base,
             std::make_shared<Constant>(power - 1)));
-        result->add_token(std::make_shared<Operation>('*'));
+        result->add_token(std::make_shared<Operation>(Operation::op::mul));
         result->add_token(differentiate(term->base, variable));
 
         return simplify(differentiate(simplify(result), variable, order - 1));
     }
 
     result->add_token(term);
-    result->add_token(std::make_shared<Operation>('*'));
+    result->add_token(std::make_shared<Operation>(Operation::op::mul));
 
     auto const expression_2 = std::make_shared<Expression>();
     result->add_token(expression_2);
@@ -153,22 +153,23 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
             std::make_shared<Term>(std::make_shared<Constant>(1),
                                    std::make_shared<Function>("ln", base),
                                    std::make_shared<Constant>(1)));
-        expression_2->add_token(std::make_unique<Operation>('*'));
+        expression_2->add_token(
+            std::make_shared<Operation>(Operation::op::mul));
         expression_2->add_token(differentiate(term->power, variable));
 
         return simplify(differentiate(simplify(result), variable, order - 1));
     }
 
     expression_2->add_token(term->power);
-    expression_2->add_token(std::make_shared<Operation>('*'));
+    expression_2->add_token(std::make_shared<Operation>(Operation::op::mul));
     expression_2->add_token(differentiate(term->base, variable));
-    expression_2->add_token(std::make_shared<Operation>('/'));
+    expression_2->add_token(std::make_shared<Operation>(Operation::op::div));
     expression_2->add_token(term->base);
 
-    expression_2->add_token(std::make_shared<Operation>('+'));
+    expression_2->add_token(std::make_shared<Operation>(Operation::op::add));
 
     expression_2->add_token(differentiate(term->power, variable));
-    expression_2->add_token(std::make_shared<Operation>('*'));
+    expression_2->add_token(std::make_shared<Operation>(Operation::op::mul));
     expression_2->add_token(
         std::make_shared<Term>(std::make_shared<Constant>(1),
                                std::make_shared<Function>("ln", term->base),
@@ -206,7 +207,8 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Function> const &function,
         expression->add_token(product);
 
         for (auto const &[name, coefficient, power] : functions) {
-            expression->add_token(std::make_shared<Operation>('*'));
+            expression->add_token(
+                std::make_shared<Operation>(Operation::op::mul));
 
             product->value *= coefficient;
 
@@ -219,7 +221,7 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Function> const &function,
         result->add_token(expression);
     }
 
-    result->add_token(std::make_shared<Operation>('*'));
+    result->add_token(std::make_shared<Operation>(Operation::op::mul));
     result->add_token(differentiate(function->parameter, variable));
 
     return simplify(differentiate(simplify(result), variable, order - 1));
@@ -240,9 +242,8 @@ differentiate(std::shared_ptr<Expression> const &expression,
 
         if (auto const &token_type = typeid(*token);
             token_type == typeid(Operation)) {
-            result->add_token(
-                std::make_shared<Operation>(static_cast<std::string>(
-                    *std::dynamic_pointer_cast<Operation>(token))[0]));
+            result->add_token(std::make_shared<Operation>(
+                std::dynamic_pointer_cast<Operation>(token)->operation));
 
             continue;
         }
@@ -272,13 +273,13 @@ differentiate(std::shared_ptr<Expression> const &expression,
             auto v_d = differentiate(v, variable);
 
             result->add_token(term);
-            result->add_token(std::make_shared<Operation>('*'));
+            result->add_token(std::make_shared<Operation>(Operation::op::mul));
             result->add_token(v_d);
 
-            result->add_token(std::make_shared<Operation>('+'));
+            result->add_token(std::make_shared<Operation>(Operation::op::add));
 
             result->add_token(u_d);
-            result->add_token(std::make_shared<Operation>('*'));
+            result->add_token(std::make_shared<Operation>(Operation::op::mul));
             result->add_token(v);
 
             continue;
@@ -293,22 +294,26 @@ differentiate(std::shared_ptr<Expression> const &expression,
             auto numerator = std::make_shared<Expression>();
 
             numerator->add_token(u_d);
-            numerator->add_token(std::make_shared<Operation>('*'));
+            numerator->add_token(
+                std::make_shared<Operation>(Operation::op::mul));
             numerator->add_token(v);
 
-            numerator->add_token(std::make_shared<Operation>('-'));
+            numerator->add_token(
+                std::make_shared<Operation>(Operation::op::sub));
 
             numerator->add_token(term);
-            numerator->add_token(std::make_shared<Operation>('*'));
+            numerator->add_token(
+                std::make_shared<Operation>(Operation::op::mul));
             numerator->add_token(v_d);
 
             auto denominator = std::make_shared<Expression>();
             denominator->add_token(v);
-            denominator->add_token(std::make_shared<Operation>('^'));
+            denominator->add_token(
+                std::make_shared<Operation>(Operation::op::pow));
             denominator->add_token(std::make_shared<Constant>(2));
 
             result->add_token(numerator);
-            result->add_token(std::make_shared<Operation>('/'));
+            result->add_token(std::make_shared<Operation>(Operation::op::div));
             result->add_token(denominator);
 
             continue;

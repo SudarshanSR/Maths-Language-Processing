@@ -68,7 +68,7 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
         return std::make_shared<Function>("e^", get_next_token(expression, i));
     }
 
-    if (auto op = std::make_unique<Operation>(character); op->operation)
+    if (auto op = Operation::from_char(character))
         return op;
 
     if ('0' <= character && character <= '9') {
@@ -127,30 +127,27 @@ bool Variable::operator==(Variable const &variable) const {
     return this->var == variable.var;
 }
 
-Operation::Operation(char const operation) {
+Operation::Operation(op const operation) : operation(operation) {}
+
+std::shared_ptr<Operation> Operation::from_char(char const operation) {
     switch (operation) {
     case '+':
-        this->operation = op::add;
-        break;
+        return std::make_shared<Operation>(add);
 
     case '-':
-        this->operation = op::sub;
-        break;
+        return std::make_shared<Operation>(sub);
 
     case '*':
-        this->operation = op::mul;
-        break;
+        return std::make_shared<Operation>(mul);
 
     case '/':
-        this->operation = op::div;
-        break;
+        return std::make_shared<Operation>(div);
 
     case '^':
-        this->operation = op::pow;
-        break;
+        return std::make_shared<Operation>(pow);
 
     default:
-        break;
+        return nullptr;
     }
 }
 
@@ -158,16 +155,16 @@ Operation::operator std::string() const {
     if (!this->operation)
         return "";
 
-    switch (*this->operation) {
-    case op::add:
+    switch (this->operation) {
+    case add:
         return "+";
-    case op::sub:
+    case sub:
         return "-";
-    case op::mul:
+    case mul:
         return "*";
-    case op::div:
+    case div:
         return "/";
-    case op::pow:
+    case pow:
         return "^";
     }
 
@@ -312,7 +309,8 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Term> const &term) {
             if (typeid(*term->power) == typeid(Expression)) {
                 auto const power =
                     std::dynamic_pointer_cast<Expression>(term->power);
-                power->add_token(std::make_shared<Operation>('+'));
+                power->add_token(
+                    std::make_shared<Operation>(Operation::op::add));
                 power->add_token(std::make_shared<Constant>(1));
                 term->coefficient->value = 1;
             }
@@ -562,7 +560,7 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
 
             auto result = std::make_shared<Expression>();
             result->add_token(left);
-            result->add_token(std::make_shared<Operation>('*'));
+            result->add_token(std::make_shared<Operation>(Operation::op::mul));
             result->add_token(
                 std::make_shared<Term>(std::make_shared<Constant>(1), right,
                                        std::make_shared<Constant>(-1)));
@@ -880,7 +878,8 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                     } else {
                         auto power = std::make_shared<Expression>();
                         power->add_token(term->power);
-                        power->add_token(std::make_shared<Operation>('*'));
+                        power->add_token(
+                            std::make_shared<Operation>(Operation::op::mul));
                         power->add_token(tokens[i + 2]);
 
                         term->power = power;
@@ -933,7 +932,7 @@ std::shared_ptr<Token> tokenise(std::string expression) {
         if (std::vector<std::shared_ptr<Token>> const &tokens = result->tokens;
             !tokens.empty() && typeid(*token) != typeid(Operation) &&
             typeid(*tokens.back()) != typeid(Operation))
-            result->add_token(std::make_shared<Operation>('*'));
+            result->add_token(std::make_shared<Operation>(Operation::op::mul));
 
         result->add_token(token);
     }

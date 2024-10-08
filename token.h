@@ -34,11 +34,11 @@ struct Variable final : Token {
 };
 
 struct Operation final : Token {
-    enum class op { add, sub, mul, div, pow };
+    enum op { add, sub, mul, div, pow } operation;
 
-    std::optional<op> operation;
+    explicit Operation(op operation);
 
-    explicit Operation(char operation);
+    static std::shared_ptr<Operation> from_char(char operation);
 
     explicit operator std::string() const override;
 };
@@ -50,8 +50,6 @@ struct Function final : Token {
 
     explicit Function(std::string function,
                       std::shared_ptr<Token> const &parameter);
-
-    Function(Function const &function) = default;
 
     explicit operator std::string() const override;
 
