@@ -285,10 +285,9 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                 if (tokens.size() == 3)
                     continue;
 
-                auto result = std::make_shared<Expression>();
-                result->add_token(left);
-                result->add_token(operation);
-                result->add_token(right);
+                auto result = std::make_shared<Terms>();
+                result->add_term(left);
+                result->add_term(right);
 
                 tokens[i + 1] = result;
             }
@@ -319,10 +318,9 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
                 continue;
             }
 
-            auto result = std::make_shared<Expression>();
-            result->add_token(left);
-            result->add_token(std::make_shared<Operation>(Operation::mul));
-            result->add_token(
+            auto result = std::make_shared<Terms>();
+            result->add_term(left);
+            result->add_term(
                 std::make_shared<Term>(right, std::make_shared<Constant>(-1)));
 
             tokens[i + 1] = result;
@@ -658,11 +656,9 @@ std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression) {
 
                         term->power = power;
                     } else {
-                        auto power = std::make_shared<Expression>();
-                        power->add_token(term->power);
-                        power->add_token(
-                            std::make_shared<Operation>(Operation::mul));
-                        power->add_token(tokens[i + 2]);
+                        auto power = std::make_shared<Terms>();
+                        power->add_term(term->power);
+                        power->add_term(tokens[i + 2]);
 
                         term->power = power;
                     }
