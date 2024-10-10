@@ -91,8 +91,6 @@ class Expression final : public Token {
 
     Expression() = default;
 
-    Expression(Expression const &expression) = default;
-
     ~Expression() noexcept override = default;
 
     explicit operator std::string() const override;

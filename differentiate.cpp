@@ -26,8 +26,12 @@ std::map<std::string,
     };
 
 std::shared_ptr<Token> differentiate(std::shared_ptr<Variable> const &param,
-                                     Variable const &variable) {
-    return std::make_shared<Constant>(*param == variable ? 1 : 0);
+                                     Variable const &variable,
+                                     std::uint32_t const order = 1) {
+    if (!order)
+        return param;
+
+    return std::make_shared<Constant>(*param == variable && order == 1 ? 1 : 0);
 }
 
 std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
@@ -244,7 +248,7 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Token> const &param,
 
     if (typeid(*param) == typeid(Variable))
         return differentiate(std::dynamic_pointer_cast<Variable>(param),
-                             variable);
+                             variable, order);
 
     if (typeid(*param) == typeid(Constant))
         return std::make_shared<Constant>(0);
