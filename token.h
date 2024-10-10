@@ -1,6 +1,7 @@
 #ifndef TOKENISE_H
 #define TOKENISE_H
 
+#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -52,8 +53,6 @@ struct Function final : Token {
                       std::shared_ptr<Token> const &parameter);
 
     explicit operator std::string() const override;
-
-    void simplify();
 };
 
 struct Term final : Token {
@@ -74,6 +73,18 @@ struct Term final : Token {
     explicit operator std::string() const override;
 };
 
+struct Terms final : Token {
+    Constant coefficient{1};
+
+    std::vector<std::shared_ptr<Token>> terms;
+
+    Terms() = default;
+
+    explicit operator std::string() const override;
+
+    void add_term(std::shared_ptr<Token> const &term);
+};
+
 class Expression final : public Token {
   public:
     std::vector<std::shared_ptr<Token>> tokens;
@@ -90,12 +101,6 @@ class Expression final : public Token {
 
     [[nodiscard]] std::shared_ptr<Token> pop_token();
 };
-
-std::shared_ptr<Token> simplify(std::shared_ptr<Token> const &);
-
-std::shared_ptr<Token> simplify(std::shared_ptr<Term> const &term);
-
-std::shared_ptr<Token> simplify(std::shared_ptr<Expression> expression);
 
 std::shared_ptr<Token> tokenise(std::string expression);
 

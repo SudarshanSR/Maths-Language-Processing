@@ -1,4 +1,5 @@
 #include "differentiate.h"
+#include "simplify.h"
 
 #include <map>
 
@@ -22,77 +23,6 @@ std::map<std::string,
         {"e^", {{"e^", 1, 1}}},
     };
 
-std::shared_ptr<Term>
-get_next_term(std::vector<std::shared_ptr<Token>> const &tokens, int &i) {
-    std::shared_ptr<Token> token = tokens[i];
-
-    if (typeid(*token) == typeid(Term)) {
-        ++i;
-
-        return std::dynamic_pointer_cast<Term>(token);
-    }
-
-    auto term = std::make_shared<Term>();
-
-    while (i < tokens.size() && typeid(*token) != typeid(Operation)) {
-        if (typeid(*token) == typeid(Constant)) {
-            if (!term->base)
-                term->base = token;
-
-            term->coefficient.value *=
-                std::dynamic_pointer_cast<Constant>(token)->value;
-        } else if (typeid(*token) == typeid(Variable) ||
-                   typeid(*token) == typeid(Expression) ||
-                   typeid(*token) == typeid(Function)) {
-            if (term->base) {
-                if (typeid(*term->base) == typeid(Constant))
-                    throw std::invalid_argument("Expression is not valid!");
-
-                term->coefficient.value *=
-                    std::dynamic_pointer_cast<Constant>(term->base)->value;
-            }
-
-            term->base = token;
-        }
-
-        if (i == tokens.size() - 1)
-            break;
-
-        token = tokens[++i];
-    }
-
-    return term;
-}
-} // namespace
-
-std::shared_ptr<Token> differentiate(std::shared_ptr<Token> const &param,
-                                     Variable const &variable,
-                                     std::uint32_t const order) {
-    if (!order)
-        return param;
-
-    if (typeid(*param) == typeid(Expression))
-        return differentiate(std::dynamic_pointer_cast<Expression>(param),
-                             variable, order);
-
-    if (typeid(*param) == typeid(Function))
-        return differentiate(std::dynamic_pointer_cast<Function>(param),
-                             variable, order);
-
-    if (typeid(*param) == typeid(Term))
-        return differentiate(std::dynamic_pointer_cast<Term>(param), variable,
-                             order);
-
-    if (typeid(*param) == typeid(Variable))
-        return differentiate(std::dynamic_pointer_cast<Variable>(param),
-                             variable);
-
-    if (typeid(*param) == typeid(Constant))
-        return std::make_shared<Constant>(0);
-
-    throw std::invalid_argument("Invalid argument!");
-}
-
 std::shared_ptr<Token> differentiate(std::shared_ptr<Variable> const &param,
                                      Variable const &variable) {
     return std::make_shared<Constant>(*param == variable ? 1 : 0);
@@ -100,7 +30,7 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Variable> const &param,
 
 std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
                                      Variable const &variable,
-                                     std::uint32_t const order) {
+                                     std::uint32_t const order = 1) {
     if (!order)
         return term;
 
@@ -123,8 +53,6 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
             variable, order - 1));
     }
 
-    auto const result = std::make_shared<Expression>();
-
     if (auto const &power_type = typeid(*term->power);
         power_type == typeid(Constant)) {
         if (base_type == typeid(Constant))
@@ -133,14 +61,16 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
         long double const power =
             std::dynamic_pointer_cast<Constant>(term->power)->value;
 
-        result->add_token(
-            std::make_shared<Term>(c.value * power, term->base,
-                                   std::make_shared<Constant>(power - 1)));
-        result->add_token(std::make_shared<Operation>(Operation::op::mul));
-        result->add_token(differentiate(term->base, variable));
+        auto const terms = std::make_shared<Terms>();
+        terms->coefficient.value *= c.value * power;
+        terms->add_term(std::make_shared<Term>(
+            1, term->base, std::make_shared<Constant>(power - 1)));
+        terms->add_term(differentiate(term->base, variable));
 
-        return simplify(differentiate(simplify(result), variable, order - 1));
+        return simplify(differentiate(simplify(terms), variable, order - 1));
     }
+
+    auto const result = std::make_shared<Expression>();
 
     result->add_token(term);
     result->add_token(std::make_shared<Operation>(Operation::op::mul));
@@ -180,7 +110,7 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
 
 std::shared_ptr<Token> differentiate(std::shared_ptr<Function> const &function,
                                      Variable const &variable,
-                                     std::uint32_t const order) {
+                                     std::uint32_t const order = 1) {
     if (!order)
         return function;
 
@@ -227,112 +157,112 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Function> const &function,
 
 std::shared_ptr<Token>
 differentiate(std::shared_ptr<Expression> const &expression,
-              Variable const &variable, std::uint32_t const order) {
+              Variable const &variable, std::uint32_t const order = 1) {
     if (!order)
         return expression;
 
     auto const result = std::make_shared<Expression>();
 
-    std::vector<std::shared_ptr<Token>> const &tokens = expression->tokens;
-
-    for (int i = 0; i < tokens.size(); ++i) {
-        std::shared_ptr<Token> const &token = tokens[i];
-
-        if (auto const &token_type = typeid(*token);
+    for (std::shared_ptr<Token> const &term : expression->tokens) {
+        if (auto const &token_type = typeid(*term);
             token_type == typeid(Operation)) {
             result->add_token(std::make_shared<Operation>(
-                std::dynamic_pointer_cast<Operation>(token)->operation));
+                std::dynamic_pointer_cast<Operation>(term)->operation));
 
             continue;
-        }
-
-        std::shared_ptr<Term> term = get_next_term(tokens, i);
-
-        if (i >= tokens.size() - 1) {
-            result->add_token(differentiate(term, variable));
-
-            continue;
-        }
-
-        if (typeid(*tokens[i]) != typeid(Operation)) {
-            --i;
-
-            result->add_token(differentiate(term, variable));
-
-            continue;
-        }
-
-        auto const operation = std::dynamic_pointer_cast<Operation>(tokens[i]);
-
-        if (operation->operation == Operation::op::mul) {
-            std::shared_ptr<Term> v = get_next_term(tokens, ++i);
-
-            auto u_d = differentiate(term, variable);
-            auto v_d = differentiate(v, variable);
-
-            result->add_token(term);
-            result->add_token(std::make_shared<Operation>(Operation::op::mul));
-            result->add_token(v_d);
-
-            result->add_token(std::make_shared<Operation>(Operation::op::add));
-
-            result->add_token(u_d);
-            result->add_token(std::make_shared<Operation>(Operation::op::mul));
-            result->add_token(v);
-
-            continue;
-        }
-
-        if (operation->operation == Operation::op::div) {
-            std::shared_ptr<Term> v = get_next_term(tokens, ++i);
-
-            auto u_d = differentiate(term, variable);
-            auto v_d = differentiate(v, variable);
-
-            auto numerator = std::make_shared<Expression>();
-
-            numerator->add_token(u_d);
-            numerator->add_token(
-                std::make_shared<Operation>(Operation::op::mul));
-            numerator->add_token(v);
-
-            numerator->add_token(
-                std::make_shared<Operation>(Operation::op::sub));
-
-            numerator->add_token(term);
-            numerator->add_token(
-                std::make_shared<Operation>(Operation::op::mul));
-            numerator->add_token(v_d);
-
-            auto denominator = std::make_shared<Expression>();
-            denominator->add_token(v);
-            denominator->add_token(
-                std::make_shared<Operation>(Operation::op::pow));
-            denominator->add_token(std::make_shared<Constant>(2));
-
-            result->add_token(numerator);
-            result->add_token(std::make_shared<Operation>(Operation::op::div));
-            result->add_token(denominator);
-
-            continue;
-        }
-
-        if (operation->operation != Operation::op::pow) {
-            --i;
-
-            result->add_token(differentiate(term, variable));
-
-            continue;
-        }
-
-        try {
-            term->power = tokens.at(++i);
-        } catch (std::out_of_range const &) {
-            throw std::invalid_argument("Expression is not valid!");
         }
 
         result->add_token(differentiate(term, variable));
     }
 
     return simplify(differentiate(simplify(result), variable, order - 1));
+}
+
+std::shared_ptr<Token> differentiate(std::shared_ptr<Terms> const &terms,
+                                     Variable const &variable,
+                                     std::uint32_t const order = 1) {
+    if (!order)
+        return terms;
+
+    if (terms->coefficient.value == 0)
+        return std::make_shared<Constant>(0);
+
+    auto const result = std::make_shared<Expression>();
+
+    for (int i = 0; i < terms->terms.size(); ++i) {
+        auto const term = std::make_shared<Terms>();
+
+        for (int j = 0; j < terms->terms.size(); ++j) {
+            if (i != j) {
+                term->terms.push_back(terms->terms[j]);
+
+                continue;
+            }
+
+            if (auto derivative = differentiate(terms->terms[i], variable);
+                typeid(*derivative) == typeid(Constant)) {
+                term->coefficient.value *=
+                    std::dynamic_pointer_cast<Constant>(derivative)->value;
+            } else if (typeid(*derivative) == typeid(Term)) {
+                auto t = std::dynamic_pointer_cast<Term>(derivative);
+                term->coefficient.value *= t->coefficient.value;
+                t->coefficient.value = 1;
+
+                term->terms.push_back(t);
+            } else if (typeid(*derivative) == typeid(Terms)) {
+                auto t = std::dynamic_pointer_cast<Terms>(derivative);
+                term->coefficient.value *= t->coefficient.value;
+                t->coefficient.value = 1;
+
+                term->terms.push_back(t);
+            } else {
+                term->terms.push_back(derivative);
+            }
+        }
+
+        result->add_token(term);
+
+        if (i != terms->terms.size() - 1) {
+            result->add_token(std::make_shared<Operation>(Operation::add));
+        }
+    }
+
+    auto const end = std::make_shared<Terms>();
+    end->coefficient = terms->coefficient;
+    end->add_term(result);
+
+    return simplify(differentiate(simplify(end), variable, order - 1));
+}
+} // namespace
+
+std::shared_ptr<Token> differentiate(std::shared_ptr<Token> const &param,
+                                     Variable const &variable,
+                                     std::uint32_t const order) {
+    if (!order)
+        return param;
+
+    if (typeid(*param) == typeid(Expression))
+        return differentiate(std::dynamic_pointer_cast<Expression>(param),
+                             variable, order);
+
+    if (typeid(*param) == typeid(Terms))
+        return differentiate(std::dynamic_pointer_cast<Terms>(param), variable,
+                             order);
+
+    if (typeid(*param) == typeid(Function))
+        return differentiate(std::dynamic_pointer_cast<Function>(param),
+                             variable, order);
+
+    if (typeid(*param) == typeid(Term))
+        return differentiate(std::dynamic_pointer_cast<Term>(param), variable,
+                             order);
+
+    if (typeid(*param) == typeid(Variable))
+        return differentiate(std::dynamic_pointer_cast<Variable>(param),
+                             variable);
+
+    if (typeid(*param) == typeid(Constant))
+        return std::make_shared<Constant>(0);
+
+    throw std::invalid_argument("Invalid argument!");
 }
