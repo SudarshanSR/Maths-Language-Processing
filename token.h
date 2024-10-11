@@ -16,6 +16,9 @@ struct Token {
     [[nodiscard]] virtual std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const = 0;
 
+    [[nodiscard]] virtual std::shared_ptr<Token>
+    integral(Variable const &variable) const = 0;
+
     explicit virtual operator std::string() const = 0;
 };
 
@@ -28,6 +31,9 @@ struct Constant final : Token {
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
+    ) const override;
 
     explicit operator std::string() const override;
 
@@ -44,6 +50,9 @@ struct Variable final : Token {
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
 
+    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
+    ) const override;
+
     explicit operator std::string() const override;
 
     bool operator==(Variable const &) const;
@@ -58,6 +67,9 @@ struct Operation final : Token {
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
+    ) const override;
 
     static std::shared_ptr<Operation> from_char(char operation);
 
@@ -76,6 +88,9 @@ struct Function final : Token {
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
+    ) const override;
 
     explicit operator std::string() const override;
 };
@@ -101,6 +116,9 @@ struct Term final : Token {
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
 
+    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
+    ) const override;
+
     explicit operator std::string() const override;
 };
 
@@ -115,6 +133,9 @@ struct Terms final : Token {
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
+    ) const override;
 
     explicit operator std::string() const override;
 
@@ -132,6 +153,9 @@ struct Expression final : Token {
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
+    ) const override;
 
     void add_token(std::shared_ptr<Token> const &token);
 

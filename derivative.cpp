@@ -246,14 +246,12 @@ Terms::derivative(Variable const &variable, std::uint32_t const order) const {
 std::shared_ptr<Token> Expression::derivative(
     Variable const &variable, std::uint32_t const order
 ) const {
-    auto expression = std::make_shared<Expression>(*this);
-
     if (!order)
-        return expression;
+        return std::make_shared<Expression>(*this);
 
     auto const result = std::make_shared<Expression>();
 
-    for (std::shared_ptr<Token> const &term : expression->tokens) {
+    for (std::shared_ptr<Token> const &term : this->tokens) {
         if (auto const &token_type = typeid(*term);
             token_type == typeid(Operation)) {
             result->add_token(std::make_shared<Operation>(
