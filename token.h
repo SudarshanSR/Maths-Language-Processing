@@ -11,10 +11,10 @@ struct Variable;
 struct Token {
     virtual ~Token() = default;
 
-    virtual std::shared_ptr<Token> simplify() = 0;
+    [[nodiscard]] virtual std::shared_ptr<Token> simplified() const = 0;
 
-    virtual std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) = 0;
+    [[nodiscard]] virtual std::shared_ptr<Token>
+    derivative(Variable const &variable, std::uint32_t order) const = 0;
 
     explicit virtual operator std::string() const = 0;
 };
@@ -24,10 +24,10 @@ struct Constant final : Token {
 
     explicit Constant(long double value);
 
-    std::shared_ptr<Token> simplify() override;
+    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
-    std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) override;
+    [[nodiscard]] std::shared_ptr<Token>
+    derivative(Variable const &variable, std::uint32_t order) const override;
 
     explicit operator std::string() const override;
 
@@ -39,10 +39,10 @@ struct Variable final : Token {
 
     explicit Variable(char var);
 
-    std::shared_ptr<Token> simplify() override;
+    std::shared_ptr<Token> simplified() const override;
 
     std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) override;
+    derivative(Variable const &variable, std::uint32_t order) const override;
 
     explicit operator std::string() const override;
 
@@ -54,10 +54,10 @@ struct Operation final : Token {
 
     explicit Operation(op operation);
 
-    std::shared_ptr<Token> simplify() override;
+    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
-    std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) override;
+    [[nodiscard]] std::shared_ptr<Token>
+    derivative(Variable const &variable, std::uint32_t order) const override;
 
     static std::shared_ptr<Operation> from_char(char operation);
 
@@ -72,10 +72,10 @@ struct Function final : Token {
     explicit
     Function(std::string function, std::shared_ptr<Token> const &parameter);
 
-    std::shared_ptr<Token> simplify() override;
+    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
-    std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) override;
+    [[nodiscard]] std::shared_ptr<Token>
+    derivative(Variable const &variable, std::uint32_t order) const override;
 
     explicit operator std::string() const override;
 };
@@ -96,10 +96,10 @@ struct Term final : Token {
         std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
     );
 
-    std::shared_ptr<Token> simplify() override;
+    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
-    std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) override;
+    [[nodiscard]] std::shared_ptr<Token>
+    derivative(Variable const &variable, std::uint32_t order) const override;
 
     explicit operator std::string() const override;
 };
@@ -111,10 +111,10 @@ struct Terms final : Token {
 
     Terms() = default;
 
-    std::shared_ptr<Token> simplify() override;
+    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
-    std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) override;
+    [[nodiscard]] std::shared_ptr<Token>
+    derivative(Variable const &variable, std::uint32_t order) const override;
 
     explicit operator std::string() const override;
 
@@ -126,12 +126,12 @@ struct Expression final : Token {
 
     Expression() = default;
 
-    std::shared_ptr<Token> simplify() override;
+    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
     explicit operator std::string() const override;
 
-    std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) override;
+    [[nodiscard]] std::shared_ptr<Token>
+    derivative(Variable const &variable, std::uint32_t order) const override;
 
     void add_token(std::shared_ptr<Token> const &token);
 

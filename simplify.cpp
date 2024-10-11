@@ -4,25 +4,25 @@
 #include <map>
 #include <ranges>
 
-std::shared_ptr<Token> Constant::simplify() {
+std::shared_ptr<Token> Constant::simplified() const {
     return std::make_shared<Constant>(this->value);
 }
 
-std::shared_ptr<Token> Variable::simplify() {
+std::shared_ptr<Token> Variable::simplified() const {
     return std::make_shared<Variable>(this->var);
 }
 
-std::shared_ptr<Token> Operation::simplify() {
+std::shared_ptr<Token> Operation::simplified() const {
     throw std::runtime_error("Cannot simplify an operation!");
 }
 
-std::shared_ptr<Token> Function::simplify() {
+std::shared_ptr<Token> Function::simplified() const {
     return std::make_shared<Function>(
-        this->function, this->parameter->simplify()
+        this->function, this->parameter->simplified()
     );
 }
 
-std::shared_ptr<Token> Term::simplify() {
+std::shared_ptr<Token> Term::simplified() const {
     auto term = std::make_shared<Term>(
         this->coefficient.value, this->base, this->power
     );
@@ -30,8 +30,8 @@ std::shared_ptr<Token> Term::simplify() {
     if (!term->power)
         term->power = std::make_shared<Constant>(1);
 
-    term->base = term->base->simplify();
-    term->power = term->power->simplify();
+    term->base = term->base->simplified();
+    term->power = term->power->simplified();
 
     if (typeid(*term->power) == typeid(Constant)) {
         if (term->coefficient.value == 1 &&
@@ -65,13 +65,13 @@ std::shared_ptr<Token> Term::simplify() {
         }
     }
 
-    term->base = term->base->simplify();
-    term->power = term->power->simplify();
+    term->base = term->base->simplified();
+    term->power = term->power->simplified();
 
     return term;
 }
 
-std::shared_ptr<Token> Terms::simplify() {
+std::shared_ptr<Token> Terms::simplified() const {
     auto terms = std::make_shared<Terms>();
     terms->coefficient = this->coefficient;
     terms->terms = this->terms;
@@ -92,13 +92,13 @@ std::shared_ptr<Token> Terms::simplify() {
             std::dynamic_pointer_cast<Term>(term)->coefficient.value *=
                 terms->coefficient.value;
 
-            return term->simplify();
+            return term->simplified();
         }
 
         return std::make_shared<Term>(
                    terms->coefficient.value, term, std::make_shared<Constant>(1)
         )
-            ->simplify();
+            ->simplified();
     }
 
     std::map<Variable, std::shared_ptr<Token> *> variable_powers;
@@ -106,7 +106,7 @@ std::shared_ptr<Token> Terms::simplify() {
     std::int32_t i = 0;
 
     while (i < terms->terms.size()) {
-        auto token = terms->terms[i]->simplify();
+        auto token = terms->terms[i]->simplified();
 
         if (typeid(*token) == typeid(Constant)) {
             auto const constant = std::dynamic_pointer_cast<Constant>(token);
@@ -200,7 +200,7 @@ std::shared_ptr<Token> Terms::simplify() {
             continue;
         }
 
-        *token = (*token)->simplify();
+        *token = (*token)->simplified();
     }
 
     if (terms->terms.size() == 1) {
@@ -216,29 +216,29 @@ std::shared_ptr<Token> Terms::simplify() {
             std::dynamic_pointer_cast<Term>(term)->coefficient.value *=
                 terms->coefficient.value;
 
-            return term->simplify();
+            return term->simplified();
         }
 
         return std::make_shared<Term>(
                    terms->coefficient.value, term, std::make_shared<Constant>(1)
         )
-            ->simplify();
+            ->simplified();
     }
 
     return terms;
 }
 
-std::shared_ptr<Token> Expression::simplify() {
+std::shared_ptr<Token> Expression::simplified() const {
     auto expression = std::make_shared<Expression>(*this);
 
     std::vector<std::shared_ptr<Token>> &tokens = expression->tokens;
 
     if (tokens.size() == 1)
-        return expression->pop_token()->simplify();
+        return expression->pop_token()->simplified();
 
     for (std::shared_ptr<Token> &token : tokens)
         if (typeid(*token) != typeid(Operation))
-            token = token->simplify();
+            token = token->simplified();
 
     int i;
 
@@ -368,7 +368,7 @@ std::shared_ptr<Token> Expression::simplify() {
 
     for (std::shared_ptr<Token> &token : tokens)
         if (typeid(*token) != typeid(Operation))
-            token = token->simplify();
+            token = token->simplified();
 
     if (tokens.size() == 1)
         return expression->pop_token();

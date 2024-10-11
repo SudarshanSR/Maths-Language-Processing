@@ -24,13 +24,15 @@ std::map<
     };
 } // namespace
 
-std::shared_ptr<Token>
-Constant::derivative(Variable const &variable, std::uint32_t const order) {
+std::shared_ptr<Token> Constant::derivative(
+    Variable const &variable, std::uint32_t const order
+) const {
     return std::make_shared<Constant>(0);
 }
 
-std::shared_ptr<Token>
-Variable::derivative(Variable const &variable, std::uint32_t const order) {
+std::shared_ptr<Token> Variable::derivative(
+    Variable const &variable, std::uint32_t const order
+) const {
     if (!order)
         return std::make_shared<Variable>(this->var);
 
@@ -38,12 +40,13 @@ Variable::derivative(Variable const &variable, std::uint32_t const order) {
 }
 
 std::shared_ptr<Token>
-Operation::derivative(Variable const &variable, std::uint32_t order) {
+Operation::derivative(Variable const &variable, std::uint32_t order) const {
     throw std::runtime_error("Operator cannot be differentiated!");
 }
 
-std::shared_ptr<Token>
-Function::derivative(Variable const &variable, std::uint32_t const order) {
+std::shared_ptr<Token> Function::derivative(
+    Variable const &variable, std::uint32_t const order
+) const {
     auto function = std::make_shared<Function>(*this);
 
     if (!order)
@@ -76,16 +79,16 @@ Function::derivative(Variable const &variable, std::uint32_t const order) {
 
     result->add_term(function->parameter->derivative(variable, 1));
 
-    auto derivative = result->simplify();
+    auto derivative = result->simplified();
 
     if (order > 1)
-        return derivative->derivative(variable, order - 1)->simplify();
+        return derivative->derivative(variable, order - 1)->simplified();
 
     return derivative;
 }
 
 std::shared_ptr<Token>
-Term::derivative(Variable const &variable, std::uint32_t const order) {
+Term::derivative(Variable const &variable, std::uint32_t const order) const {
     auto term = std::make_shared<Term>(*this);
 
     if (!order)
@@ -103,10 +106,10 @@ Term::derivative(Variable const &variable, std::uint32_t const order) {
                               c.value, term->base->derivative(variable, 1),
                               std::make_shared<Constant>(1)
         )
-                              ->simplify();
+                              ->simplified();
 
         if (order > 1)
-            return derivative->derivative(variable, order - 1)->simplify();
+            return derivative->derivative(variable, order - 1)->simplified();
 
         return derivative;
     }
@@ -126,10 +129,10 @@ Term::derivative(Variable const &variable, std::uint32_t const order) {
         ));
         terms->add_term(term->base->derivative(variable, 1));
 
-        auto derivative = terms->simplify();
+        auto derivative = terms->simplified();
 
         if (order > 1)
-            return derivative->derivative(variable, order - 1)->simplify();
+            return derivative->derivative(variable, order - 1)->simplified();
 
         return derivative;
     }
@@ -144,10 +147,10 @@ Term::derivative(Variable const &variable, std::uint32_t const order) {
         result->add_term(std::make_shared<Function>("ln", base));
         result->add_term(term->power->derivative(variable, 1));
 
-        auto derivative = result->simplify();
+        auto derivative = result->simplified();
 
         if (order > 1)
-            return derivative->derivative(variable, order - 1)->simplify();
+            return derivative->derivative(variable, order - 1)->simplified();
 
         return derivative;
     }
@@ -170,16 +173,16 @@ Term::derivative(Variable const &variable, std::uint32_t const order) {
 
     result->add_term(expression);
 
-    auto derivative = result->simplify();
+    auto derivative = result->simplified();
 
     if (order > 1)
-        return derivative->derivative(variable, order - 1)->simplify();
+        return derivative->derivative(variable, order - 1)->simplified();
 
     return derivative;
 }
 
 std::shared_ptr<Token>
-Terms::derivative(Variable const &variable, std::uint32_t const order) {
+Terms::derivative(Variable const &variable, std::uint32_t const order) const {
     auto terms = std::make_shared<Terms>(*this);
 
     if (!order)
@@ -232,16 +235,17 @@ Terms::derivative(Variable const &variable, std::uint32_t const order) {
     end->coefficient = terms->coefficient;
     end->add_term(result);
 
-    auto derivative = end->simplify();
+    auto derivative = end->simplified();
 
     if (order > 1)
-        return derivative->derivative(variable, order - 1)->simplify();
+        return derivative->derivative(variable, order - 1)->simplified();
 
     return derivative;
 }
 
-std::shared_ptr<Token>
-Expression::derivative(Variable const &variable, std::uint32_t const order) {
+std::shared_ptr<Token> Expression::derivative(
+    Variable const &variable, std::uint32_t const order
+) const {
     auto expression = std::make_shared<Expression>(*this);
 
     if (!order)
@@ -262,10 +266,10 @@ Expression::derivative(Variable const &variable, std::uint32_t const order) {
         result->add_token(term->derivative(variable, 1));
     }
 
-    auto derivative = result->simplify();
+    auto derivative = result->simplified();
 
     if (order > 1)
-        return derivative->derivative(variable, order - 1)->simplify();
+        return derivative->derivative(variable, order - 1)->simplified();
 
     return derivative;
 }

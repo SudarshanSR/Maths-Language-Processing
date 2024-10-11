@@ -414,7 +414,7 @@ std::shared_ptr<Token> tokenise(std::string expression) {
     if (!terms->terms.empty())
         result->add_token(terms);
 
-    return result->simplify();
+    return result->simplified();
 }
 
 std::ostream &operator<<(std::ostream &os, Token const &token) {
