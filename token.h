@@ -39,9 +39,9 @@ struct Variable final : Token {
 
     explicit Variable(char var);
 
-    std::shared_ptr<Token> simplified() const override;
+    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
-    std::shared_ptr<Token>
+    [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
 
     explicit operator std::string() const override;
