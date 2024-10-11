@@ -1,5 +1,4 @@
 #include "token.h"
-#include "simplify.h"
 
 #include <algorithm>
 #include <map>
@@ -239,16 +238,12 @@ Terms::operator std::string() const {
 
     result << '(';
 
-    for (auto const &term : this->terms |
-                                std::views::transform(
-                                    [](std::shared_ptr<Token> const &token
-                                    ) -> std::vector<std::string> {
-                                        return {static_cast<std::string>(*token)
-                                        };
-                                    }
-                                ) |
-                                std::views::join_with("*"))
-        result << term;
+    for (int i = 0; i < this->terms.size(); ++i) {
+        result << static_cast<std::string>(*this->terms[i]);
+
+        if (i != this->terms.size() - 1)
+            result << '*';
+    }
 
     result << ')';
 
@@ -419,11 +414,15 @@ std::shared_ptr<Token> tokenise(std::string expression) {
     if (!terms->terms.empty())
         result->add_token(terms);
 
-    return simplify(result);
+    return result->simplify();
 }
 
 std::ostream &operator<<(std::ostream &os, Token const &token) {
     os << static_cast<std::string>(token);
 
     return os;
+}
+
+bool operator<(Variable const &lhs, Variable const &rhs) {
+    return lhs.var < rhs.var;
 }

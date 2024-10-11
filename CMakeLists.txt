@@ -12,8 +12,7 @@ target_sources(token PUBLIC token.h)
 target_link_libraries(token simplify)
 
 add_library(simplify simplify.cpp)
-target_sources(simplify PUBLIC simplify.h)
+target_link_libraries(simplify PRIVATE differentiate)
 
 add_library(differentiate differentiate.cpp)
-target_sources(differentiate PUBLIC differentiate.h)
 target_link_libraries(differentiate PRIVATE token simplify)
