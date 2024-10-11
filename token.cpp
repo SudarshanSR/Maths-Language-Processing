@@ -9,7 +9,8 @@
 
 namespace {
 std::map<char, char> const k_parenthesis_map{
-    {'(', ')'}, {'[', ']'}, {'{', '}'}};
+    {'(', ')'}, {'[', ']'}, {'{', '}'}
+};
 
 std::set<std::string> k_functions{
     "sin",  "cos",  "tan",  "sec",  "csc",  "cot", "sinh",
@@ -172,8 +173,9 @@ Operation::operator std::string() const {
     return "";
 }
 
-Function::Function(std::string function,
-                   std::shared_ptr<Token> const &parameter)
+Function::Function(
+    std::string function, std::shared_ptr<Token> const &parameter
+)
     : function(std::move(function)), parameter(parameter) {}
 
 Function::operator std::string() const {
@@ -185,12 +187,15 @@ Function::operator std::string() const {
     return result.str();
 }
 
-Term::Term(long double const coefficient, std::shared_ptr<Token> const &base,
-           std::shared_ptr<Token> const &power)
+Term::Term(
+    long double const coefficient, std::shared_ptr<Token> const &base,
+    std::shared_ptr<Token> const &power
+)
     : coefficient(coefficient), base(base), power(power) {}
 
-Term::Term(std::shared_ptr<Token> const &base,
-           std::shared_ptr<Token> const &power)
+Term::Term(
+    std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
+)
     : base(base), power(power) {}
 
 Term::operator std::string() const {
@@ -234,13 +239,15 @@ Terms::operator std::string() const {
 
     result << '(';
 
-    for (auto const term :
-         this->terms |
-             std::views::transform([](std::shared_ptr<Token> const &token)
-                                       -> std::vector<std::string> {
-                 return {static_cast<std::string>(*token)};
-             }) |
-             std::views::join_with("*"))
+    for (auto const &term : this->terms |
+                                std::views::transform(
+                                    [](std::shared_ptr<Token> const &token
+                                    ) -> std::vector<std::string> {
+                                        return {static_cast<std::string>(*token)
+                                        };
+                                    }
+                                ) |
+                                std::views::join_with("*"))
         result << term;
 
     result << ')';
@@ -346,7 +353,8 @@ std::shared_ptr<Token> tokenise(std::string expression) {
                         std::dynamic_pointer_cast<Constant>(next)->value;
                 } else {
                     terms->add_term(std::make_shared<Term>(
-                        1, next, std::make_shared<Constant>(-1)));
+                        1, next, std::make_shared<Constant>(-1)
+                    ));
                 }
 
                 continue;
@@ -375,7 +383,8 @@ std::shared_ptr<Token> tokenise(std::string expression) {
                     powers.push_back(std::dynamic_pointer_cast<Term>(next));
                 } else {
                     powers.push_back(std::make_shared<Term>(
-                        1, next, std::make_shared<Constant>(1)));
+                        1, next, std::make_shared<Constant>(1)
+                    ));
                 }
             }
 

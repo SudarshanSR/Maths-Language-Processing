@@ -49,8 +49,8 @@ struct Function final : Token {
 
     std::shared_ptr<Token> parameter = nullptr;
 
-    explicit Function(std::string function,
-                      std::shared_ptr<Token> const &parameter);
+    explicit
+    Function(std::string function, std::shared_ptr<Token> const &parameter);
 
     explicit operator std::string() const override;
 };
@@ -62,11 +62,14 @@ struct Term final : Token {
 
     Term() = default;
 
-    Term(long double coefficient, std::shared_ptr<Token> const &base,
-         std::shared_ptr<Token> const &power);
+    Term(
+        long double coefficient, std::shared_ptr<Token> const &base,
+        std::shared_ptr<Token> const &power
+    );
 
-    Term(std::shared_ptr<Token> const &base,
-         std::shared_ptr<Token> const &power);
+    Term(
+        std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
+    );
 
     explicit operator std::string() const override;
 };
@@ -83,13 +86,10 @@ struct Terms final : Token {
     void add_term(std::shared_ptr<Token> const &term);
 };
 
-class Expression final : public Token {
-  public:
+struct Expression final : Token {
     std::vector<std::shared_ptr<Token>> tokens;
 
     Expression() = default;
-
-    ~Expression() noexcept override = default;
 
     explicit operator std::string() const override;
 

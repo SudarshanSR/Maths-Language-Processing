@@ -6,8 +6,8 @@
 #include <vector>
 
 namespace {
-std::map<std::string,
-         std::vector<std::tuple<std::string, long double, long double>>>
+std::map<
+    std::string, std::vector<std::tuple<std::string, long double, long double>>>
     k_function_map{
         {"sin", {{"cos", 1, 1}}},
         {"cos", {{"sin", -1, 1}}},
@@ -25,18 +25,20 @@ std::map<std::string,
         {"e^", {{"e^", 1, 1}}},
     };
 
-std::shared_ptr<Token> differentiate(std::shared_ptr<Variable> const &param,
-                                     Variable const &variable,
-                                     std::uint32_t const order = 1) {
+std::shared_ptr<Token> differentiate(
+    std::shared_ptr<Variable> const &param, Variable const &variable,
+    std::uint32_t const order = 1
+) {
     if (!order)
         return param;
 
     return std::make_shared<Constant>(*param == variable && order == 1 ? 1 : 0);
 }
 
-std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
-                                     Variable const &variable,
-                                     std::uint32_t const order = 1) {
+std::shared_ptr<Token> differentiate(
+    std::shared_ptr<Term> const &term, Variable const &variable,
+    std::uint32_t const order = 1
+) {
     if (!order)
         return term;
 
@@ -49,10 +51,12 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
 
     if (!term->power) {
         return simplify(differentiate(
-            simplify(std::make_shared<Term>(c.value,
-                                            differentiate(term->base, variable),
-                                            std::make_shared<Constant>(1))),
-            variable, order - 1));
+            simplify(std::make_shared<Term>(
+                c.value, differentiate(term->base, variable),
+                std::make_shared<Constant>(1)
+            )),
+            variable, order - 1
+        ));
     }
 
     if (auto const &power_type = typeid(*term->power);
@@ -66,7 +70,8 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
         auto const terms = std::make_shared<Terms>();
         terms->coefficient.value *= c.value * power;
         terms->add_term(std::make_shared<Term>(
-            1, term->base, std::make_shared<Constant>(power - 1)));
+            1, term->base, std::make_shared<Constant>(power - 1)
+        ));
         terms->add_term(differentiate(term->base, variable));
 
         return simplify(differentiate(simplify(terms), variable, order - 1));
@@ -89,7 +94,8 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
     terms_1->add_term(term->power);
     terms_1->add_term(differentiate(term->base, variable));
     terms_1->add_term(
-        std::make_shared<Term>(term->base, std::make_shared<Constant>(-1)));
+        std::make_shared<Term>(term->base, std::make_shared<Constant>(-1))
+    );
 
     auto const terms_2 = std::make_shared<Terms>();
     terms_2->add_term(differentiate(term->power, variable));
@@ -105,9 +111,10 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
     return simplify(differentiate(simplify(result), variable, order - 1));
 }
 
-std::shared_ptr<Token> differentiate(std::shared_ptr<Function> const &function,
-                                     Variable const &variable,
-                                     std::uint32_t const order = 1) {
+std::shared_ptr<Token> differentiate(
+    std::shared_ptr<Function> const &function, Variable const &variable,
+    std::uint32_t const order = 1
+) {
     if (!order)
         return function;
 
@@ -124,14 +131,15 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Function> const &function,
 
         result->add_term(std::make_shared<Term>(
             coefficient, std::make_shared<Function>(name, function->parameter),
-            std::make_shared<Constant>(power)));
+            std::make_shared<Constant>(power)
+        ));
     } else {
         for (auto const &[name, coefficient, power] : functions) {
-            result->coefficient.value *= coefficient;
-
             result->add_term(std::make_shared<Term>(
+                coefficient,
                 std::make_shared<Function>(name, function->parameter),
-                std::make_shared<Constant>(power)));
+                std::make_shared<Constant>(power)
+            ));
         }
     }
 
@@ -140,9 +148,10 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Function> const &function,
     return simplify(differentiate(simplify(result), variable, order - 1));
 }
 
-std::shared_ptr<Token>
-differentiate(std::shared_ptr<Expression> const &expression,
-              Variable const &variable, std::uint32_t const order = 1) {
+std::shared_ptr<Token> differentiate(
+    std::shared_ptr<Expression> const &expression, Variable const &variable,
+    std::uint32_t const order = 1
+) {
     if (!order)
         return expression;
 
@@ -152,7 +161,8 @@ differentiate(std::shared_ptr<Expression> const &expression,
         if (auto const &token_type = typeid(*term);
             token_type == typeid(Operation)) {
             result->add_token(std::make_shared<Operation>(
-                std::dynamic_pointer_cast<Operation>(term)->operation));
+                std::dynamic_pointer_cast<Operation>(term)->operation
+            ));
 
             continue;
         }
@@ -163,9 +173,10 @@ differentiate(std::shared_ptr<Expression> const &expression,
     return simplify(differentiate(simplify(result), variable, order - 1));
 }
 
-std::shared_ptr<Token> differentiate(std::shared_ptr<Terms> const &terms,
-                                     Variable const &variable,
-                                     std::uint32_t const order = 1) {
+std::shared_ptr<Token> differentiate(
+    std::shared_ptr<Terms> const &terms, Variable const &variable,
+    std::uint32_t const order = 1
+) {
     if (!order)
         return terms;
 
@@ -220,31 +231,37 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Terms> const &terms,
 }
 } // namespace
 
-std::shared_ptr<Token> differentiate(std::shared_ptr<Token> const &param,
-                                     Variable const &variable,
-                                     std::uint32_t const order) {
+std::shared_ptr<Token> differentiate(
+    std::shared_ptr<Token> const &param, Variable const &variable,
+    std::uint32_t const order
+) {
     if (!order)
         return param;
 
     if (typeid(*param) == typeid(Expression))
-        return differentiate(std::dynamic_pointer_cast<Expression>(param),
-                             variable, order);
+        return differentiate(
+            std::dynamic_pointer_cast<Expression>(param), variable, order
+        );
 
     if (typeid(*param) == typeid(Terms))
-        return differentiate(std::dynamic_pointer_cast<Terms>(param), variable,
-                             order);
+        return differentiate(
+            std::dynamic_pointer_cast<Terms>(param), variable, order
+        );
 
     if (typeid(*param) == typeid(Function))
-        return differentiate(std::dynamic_pointer_cast<Function>(param),
-                             variable, order);
+        return differentiate(
+            std::dynamic_pointer_cast<Function>(param), variable, order
+        );
 
     if (typeid(*param) == typeid(Term))
-        return differentiate(std::dynamic_pointer_cast<Term>(param), variable,
-                             order);
+        return differentiate(
+            std::dynamic_pointer_cast<Term>(param), variable, order
+        );
 
     if (typeid(*param) == typeid(Variable))
-        return differentiate(std::dynamic_pointer_cast<Variable>(param),
-                             variable, order);
+        return differentiate(
+            std::dynamic_pointer_cast<Variable>(param), variable, order
+        );
 
     if (typeid(*param) == typeid(Constant))
         return std::make_shared<Constant>(0);
