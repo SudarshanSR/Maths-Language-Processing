@@ -365,31 +365,65 @@ std::shared_ptr<Token> Expression::simplified() const {
         }
     }
 
-    for (std::shared_ptr<Token> &token : tokens)
-        if (typeid(*token) != typeid(Operation))
-            token = token->simplified();
-
     if (tokens.size() == 1)
         return expression->pop_token();
 
-    i = 0;
+    std::map<Variable, std::shared_ptr<Token> *> variable_multiples;
 
-    while (i < tokens.size()) {
+    for (i = 0; i < tokens.size(); ++i) {
         std::shared_ptr<Token> &token = tokens[i];
 
-        if (auto const &token_type = typeid(*token);
-            token_type == typeid(Operation)) {
+        auto const &token_type = typeid(*token);
+
+        if (token_type == typeid(Variable)) {
+            auto variable = std::dynamic_pointer_cast<Variable>(token);
+
+            if (variable_multiples.contains(*variable)) {
+                auto terms = std::dynamic_pointer_cast<Terms>(
+                    *variable_multiples[*variable]
+                );
+
+                auto const multiple =
+                    std::dynamic_pointer_cast<Expression>(terms->terms[0]);
+                multiple->add_token(tokens[i - 1]);
+                multiple->add_token(std::make_shared<Constant>(1));
+
+                --i;
+
+                tokens.erase(tokens.begin() + i);
+                tokens.erase(tokens.begin() + i);
+
+                --i;
+
+                continue;
+            }
+
+            auto const multiple = std::make_shared<Expression>();
+
+            if (i != 0)
+                multiple->add_token(tokens[i - 1]);
+
+            multiple->add_token(std::make_shared<Constant>(1));
+
+            auto const terms = std::make_shared<Terms>();
+            terms->add_term(multiple);
+            terms->add_term(variable);
+
+            tokens[i] = terms;
+            variable_multiples[*variable] = &tokens[i];
+
+            continue;
+        }
+
+        if (token_type == typeid(Operation)) {
             auto const operation = std::dynamic_pointer_cast<Operation>(token);
 
             if (i == tokens.size() - 1)
                 throw std::invalid_argument("Expression is not valid!");
 
             if (operation->operation == Operation::sub) {
-                if (i != 0) {
-                    ++i;
-
+                if (i != 0)
                     continue;
-                }
 
                 if (std::shared_ptr<Token> next = tokens[i + 1];
                     typeid(*next) == typeid(Constant)) {
@@ -402,16 +436,25 @@ std::shared_ptr<Token> Expression::simplified() const {
 
                     term->coefficient.value = -term->coefficient.value;
                 }
-            }
 
-            if (i == 0) {
-                tokens.erase(tokens.begin());
+                --i;
+            } else if (i == 0)
+                --i;
 
-                continue;
-            }
+            continue;
+        }
+    }
+
+    for (auto const token : variable_multiples | std::views::values) {
+        if (auto const terms = std::dynamic_pointer_cast<Terms>(*token);
+            std::dynamic_pointer_cast<Expression>(terms->terms[0])
+                ->tokens.empty()) {
+            *token = terms->terms[1];
+
+            continue;
         }
 
-        ++i;
+        *token = (*token)->simplified();
     }
 
     if (tokens.size() == 1)
