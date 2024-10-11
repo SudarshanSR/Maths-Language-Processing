@@ -64,12 +64,13 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
         return std::make_shared<Function>(fn, get_next_token(expression, i));
     }
 
-    if (character == 'e' && i < expression.size() - 1 &&
-        expression[i + 1] == '^') {
-        i += 2;
-
-        return std::make_shared<Function>("e^", get_next_token(expression, i));
-    }
+    // if (character == 'e' && i < expression.size() - 1 &&
+    //     expression[i + 1] == '^') {
+    //     i += 2;
+    //
+    //     return std::make_shared<Function>("e^", get_next_token(expression,
+    //     i));
+    // }
 
     if (auto op = Operation::from_char(character))
         return op;
@@ -332,7 +333,7 @@ std::shared_ptr<Token> tokenise(std::string expression) {
                     terms->coefficient.value *=
                         std::dynamic_pointer_cast<Constant>(next)->value;
                 } else {
-                    terms->terms.push_back(next);
+                    terms->add_term(next);
                 }
 
                 continue;
@@ -344,7 +345,7 @@ std::shared_ptr<Token> tokenise(std::string expression) {
                     terms->coefficient.value /=
                         std::dynamic_pointer_cast<Constant>(next)->value;
                 } else {
-                    terms->terms.emplace_back(std::make_shared<Term>(
+                    terms->add_term(std::make_shared<Term>(
                         1, next, std::make_shared<Constant>(-1)));
                 }
 
@@ -355,7 +356,7 @@ std::shared_ptr<Token> tokenise(std::string expression) {
 
             std::shared_ptr<Token> next;
 
-            while (operation->operation == Operation::pow) {
+            while (true) {
                 next = get_next_token(expression, ++i);
 
                 if (!next)
@@ -364,7 +365,10 @@ std::shared_ptr<Token> tokenise(std::string expression) {
                 if (typeid(*next) == typeid(Operation)) {
                     operation = std::dynamic_pointer_cast<Operation>(next);
 
-                    continue;
+                    if (operation->operation == Operation::pow)
+                        continue;
+
+                    break;
                 }
 
                 if (typeid(*next) == typeid(Term)) {
@@ -375,8 +379,7 @@ std::shared_ptr<Token> tokenise(std::string expression) {
                 }
             }
 
-            auto power = std::make_shared<Term>(
-                1, std::make_shared<Constant>(1), nullptr);
+            std::shared_ptr<Token> power = std::make_shared<Constant>(1);
 
             for (std::shared_ptr<Term> const &p :
                  powers | std::views::reverse) {
@@ -398,9 +401,9 @@ std::shared_ptr<Token> tokenise(std::string expression) {
             terms->coefficient.value *= term->coefficient.value;
             term->coefficient.value = 1;
 
-            terms->terms.push_back(term);
+            terms->add_term(term);
         } else {
-            terms->terms.push_back(token);
+            terms->add_term(token);
         }
     }
 

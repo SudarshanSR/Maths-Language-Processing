@@ -45,10 +45,6 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Term> const &term,
 
     auto const &base_type = typeid(*term->base);
 
-    if (base_type == typeid(Variable) &&
-        *std::dynamic_pointer_cast<Variable>(term->base) != variable)
-        return std::make_shared<Constant>(0);
-
     Constant c = term->coefficient;
 
     if (!term->power) {
@@ -183,7 +179,7 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Terms> const &terms,
 
         for (int j = 0; j < terms->terms.size(); ++j) {
             if (i != j) {
-                term->terms.push_back(terms->terms[j]);
+                term->add_term(terms->terms[j]);
 
                 continue;
             }
@@ -197,15 +193,15 @@ std::shared_ptr<Token> differentiate(std::shared_ptr<Terms> const &terms,
                 term->coefficient.value *= t->coefficient.value;
                 t->coefficient.value = 1;
 
-                term->terms.push_back(t);
+                term->add_term(t);
             } else if (typeid(*derivative) == typeid(Terms)) {
                 auto t = std::dynamic_pointer_cast<Terms>(derivative);
                 term->coefficient.value *= t->coefficient.value;
                 t->coefficient.value = 1;
 
-                term->terms.push_back(t);
+                term->add_term(t);
             } else {
-                term->terms.push_back(derivative);
+                term->add_term(derivative);
             }
         }
 

@@ -68,8 +68,6 @@ struct Term final : Token {
     Term(std::shared_ptr<Token> const &base,
          std::shared_ptr<Token> const &power);
 
-    Term(Term const &term) = default;
-
     explicit operator std::string() const override;
 };
 
