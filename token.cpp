@@ -199,7 +199,7 @@ Term::operator std::string() const {
             result << "-";
 
         else
-            result << this->coefficient;
+            result << this->coefficient << '*';
     }
 
     result << *this->base;
@@ -227,7 +227,7 @@ Terms::operator std::string() const {
             result << "-";
 
         else
-            result << this->coefficient;
+            result << this->coefficient << '*';
     }
 
     result << '(';
@@ -244,27 +244,38 @@ Terms::operator std::string() const {
     return result.str();
 }
 
-void Terms::add_term(std::shared_ptr<Token> const &term) {
-    auto const &term_type = typeid(*term);
+void Terms::add_term(std::shared_ptr<Token> const &token) {
+    auto const &term_type = typeid(*token);
 
     if (term_type == typeid(Constant)) {
         this->coefficient.value *=
-            std::dynamic_pointer_cast<Constant>(term)->value;
+            std::dynamic_pointer_cast<Constant>(token)->value;
 
         return;
     }
 
     if (term_type == typeid(Term)) {
-        auto const t = std::dynamic_pointer_cast<Term>(term);
-        this->coefficient.value *= t->coefficient.value;
-        t->coefficient.value = 1;
+        auto const term = std::dynamic_pointer_cast<Term>(token);
+        this->coefficient.value *= term->coefficient.value;
+        term->coefficient.value = 1;
 
-        this->terms.push_back(t);
+        this->terms.push_back(term);
 
         return;
     }
 
-    this->terms.push_back(term);
+    if (term_type == typeid(Terms)) {
+        auto const terms = std::dynamic_pointer_cast<Terms>(token);
+        this->coefficient.value *= terms->coefficient.value;
+        terms->coefficient.value = 1;
+
+        for (std::shared_ptr<Token> const &term : terms->terms)
+            this->add_term(term);
+
+        return;
+    }
+
+    this->terms.push_back(token);
 }
 
 Expression::operator std::string() const {
@@ -401,12 +412,8 @@ std::shared_ptr<Token> tokenise(std::string expression) {
             continue;
         }
 
-        if (typeid(*token) == typeid(Term)) {
-            auto term = std::dynamic_pointer_cast<Term>(token);
-            terms->coefficient.value *= term->coefficient.value;
-            term->coefficient.value = 1;
-
-            terms->add_term(term);
+        if (typeid(*token) == typeid(Constant)) {
+            terms->terms.push_back(token);
         } else {
             terms->add_term(token);
         }

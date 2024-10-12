@@ -139,7 +139,7 @@ struct Terms final : Token {
 
     explicit operator std::string() const override;
 
-    void add_term(std::shared_ptr<Token> const &term);
+    void add_term(std::shared_ptr<Token> const &token);
 };
 
 struct Expression final : Token {

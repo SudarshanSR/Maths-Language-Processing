@@ -96,6 +96,23 @@ std::shared_ptr<Token> Term::integral(Variable const &variable) const {
         );
     }
 
+    if (base_type == typeid(Constant) && power_type == typeid(Variable)) {
+        auto const terms = std::make_shared<Terms>();
+        terms->coefficient = this->coefficient;
+        terms->add_term(std::make_shared<Term>(*this));
+
+        if (*std::dynamic_pointer_cast<Variable>(this->power) != variable) {
+            terms->add_term(std::make_shared<Variable>(variable));
+        } else {
+            terms->add_term(std::make_shared<Term>(
+                1, std::make_shared<Function>("ln", this->base),
+                std::make_shared<Constant>(-1)
+            ));
+        }
+
+        return terms->simplified();
+    }
+
     throw std::runtime_error("Expression is not integrable!");
 }
 

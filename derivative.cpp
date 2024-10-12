@@ -136,9 +136,7 @@ Term::derivative(Variable const &variable, std::uint32_t const order) const {
     result->add_term(term);
 
     if (base_type == typeid(Constant)) {
-        auto const base = std::dynamic_pointer_cast<Constant>(term->base);
-
-        result->add_term(std::make_shared<Function>("ln", base));
+        result->add_term(std::make_shared<Function>("ln", term->base));
         result->add_term(term->power->derivative(variable, 1));
 
         auto derivative = result->simplified();
