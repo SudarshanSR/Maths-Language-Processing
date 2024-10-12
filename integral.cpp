@@ -27,7 +27,27 @@ std::shared_ptr<Token> Operation::integral(Variable const &variable) const {
 
 std::shared_ptr<Token> Function::integral(Variable const &variable) const {}
 
-std::shared_ptr<Token> Term::integral(Variable const &variable) const {}
+std::shared_ptr<Token> Term::integral(Variable const &variable) const {
+    auto const &base_type = typeid(*this->base);
+    auto const &power_type = typeid(*this->power);
+
+    if (base_type == typeid(Variable) && power_type == typeid(Constant)) {
+        auto power = std::dynamic_pointer_cast<Constant>(this->power);
+
+        if (power->value == -1) {
+            return std::make_shared<Term>(
+                this->coefficient.value,
+                std::make_shared<Function>("ln", this->base),
+                std::make_shared<Constant>(1)
+            );
+        }
+
+        return std::make_shared<Term>(
+            this->coefficient.value / (power->value + 1), this->base,
+            std::make_shared<Constant>(power->value + 1)
+        );
+    }
+}
 
 std::shared_ptr<Token> Terms::integral(Variable const &variable) const {}
 
