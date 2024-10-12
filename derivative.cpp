@@ -113,7 +113,7 @@ Term::derivative(Variable const &variable, std::uint32_t const order) const {
         if (base_type == typeid(Constant))
             return std::make_shared<Constant>(0);
 
-        long double const power =
+        double const power =
             std::dynamic_pointer_cast<Constant>(term->power)->value;
 
         auto const terms = std::make_shared<Terms>();

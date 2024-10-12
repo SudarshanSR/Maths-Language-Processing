@@ -11,11 +11,32 @@ std::map<char, char> const k_parenthesis_map{
     {'(', ')'}, {'[', ']'}, {'{', '}'}
 };
 
-std::set<std::string> k_functions{
-    "sin",   "cos",   "tan",   "sec",  "csc",   "cot",   "sinh",
-    "cosh",  "tanh",  "sech",  "csch", "coth",  "asin",  "acos",
-    "atan",  "asec",  "acsc",  "acot", "asinh", "acosh", "atanh",
-    "asech", "acsch", "acoth", "ln",
+std::map<std::string, double (*)(double)> k_functions{
+    {"sin", std::sin},
+    {"cos", std::cos},
+    {"tan", std::tan},
+    {"sec", [](double const val) -> double { return 1 / std::cos(val); }},
+    {"csc", [](double const val) -> double { return 1 / std::sin(val); }},
+    {"cot", [](double const val) -> double { return 1 / std::tan(val); }},
+    {"sinh", std::sinh},
+    {"cosh", std::cosh},
+    {"tanh", std::tanh},
+    {"sech", [](double const val) -> double { return 1 / std::cosh(val); }},
+    {"csch", [](double const val) -> double { return 1 / std::sinh(val); }},
+    {"coth", [](double const val) -> double { return 1 / std::tanh(val); }},
+    {"asin", std::asin},
+    {"acos", std::acos},
+    {"atan", std::atan},
+    {"asec", [](double const val) -> double { return std::acos(1 / val); }},
+    {"acsc", [](double const val) -> double { return std::asin(1 / val); }},
+    {"acot", [](double const val) -> double { return std::atan(1 / val); }},
+    {"asinh", std::asinh},
+    {"acosh", std::acosh},
+    {"atanh", std::atanh},
+    {"asech", [](double const val) -> double { return std::acosh(1 / val); }},
+    {"acsch", [](double const val) -> double { return std::asinh(1 / val); }},
+    {"acoth", [](double const val) -> double { return std::atanh(1 / val); }},
+    {"ln", std::log},
 };
 
 std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
@@ -109,7 +130,12 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
 }
 } // namespace
 
-Constant::Constant(long double const value) : value(value) {}
+Constant::Constant(double const value) : value(value) {}
+
+std::shared_ptr<Token>
+Constant::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
+    return std::make_shared<Constant>(*this);
+}
 
 Constant::operator std::string() const { return std::to_string(this->value); }
 
@@ -118,6 +144,12 @@ bool Constant::operator==(Constant const &constant) const {
 }
 
 Variable::Variable(char const var) : var(var) {}
+
+std::shared_ptr<Token>
+Variable::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
+    return values.contains(*this) ? values.at(*this)
+                                  : std::make_shared<Variable>(*this);
+}
 
 Variable::operator std::string() const { return {this->var}; }
 
@@ -149,6 +181,11 @@ std::shared_ptr<Operation> Operation::from_char(char const operation) {
     }
 }
 
+std::shared_ptr<Token>
+Operation::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
+    throw std::runtime_error("Cannot evaluate operator at coordinates");
+}
+
 Operation::operator std::string() const {
     switch (this->operation) {
     case add:
@@ -171,6 +208,18 @@ Function::Function(
 )
     : function(std::move(function)), parameter(parameter) {}
 
+std::shared_ptr<Token>
+Function::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
+    auto param = this->parameter->at(values);
+
+    if (typeid(*param) == typeid(Constant))
+        return std::make_shared<Constant>(k_functions.at(this->function)(
+            std::dynamic_pointer_cast<Constant>(param)->value
+        ));
+
+    return std::make_shared<Function>(this->function, param);
+}
+
 Function::operator std::string() const {
     std::stringstream result;
 
@@ -181,7 +230,7 @@ Function::operator std::string() const {
 }
 
 Term::Term(
-    long double const coefficient, std::shared_ptr<Token> const &base,
+    double const coefficient, std::shared_ptr<Token> const &base,
     std::shared_ptr<Token> const &power
 )
     : coefficient(coefficient), base(base), power(power) {}
@@ -191,6 +240,15 @@ Term::Term(
 )
     : base(base), power(power) {}
 
+std::shared_ptr<Token>
+Term::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
+    auto const term = std::make_shared<Term>(*this);
+    term->base = term->base->at(values);
+    term->power = term->power->at(values);
+
+    return term->simplified();
+}
+
 Term::operator std::string() const {
     std::stringstream result;
 
@@ -199,8 +257,10 @@ Term::operator std::string() const {
             result << "-";
 
         else
-            result << this->coefficient << '*';
+            result << this->coefficient;
     }
+
+    result << '(';
 
     result << *this->base;
 
@@ -214,29 +274,6 @@ Term::operator std::string() const {
             result << '^';
             result << *this->power;
         }
-    }
-
-    return result.str();
-}
-
-Terms::operator std::string() const {
-    std::stringstream result;
-
-    if (this->coefficient.value != 1) {
-        if (this->coefficient.value == -1)
-            result << "-";
-
-        else
-            result << this->coefficient << '*';
-    }
-
-    result << '(';
-
-    for (int i = 0; i < this->terms.size(); ++i) {
-        result << static_cast<std::string>(*this->terms[i]);
-
-        if (i != this->terms.size() - 1)
-            result << '*';
     }
 
     result << ')';
@@ -278,6 +315,64 @@ void Terms::add_term(std::shared_ptr<Token> const &token) {
     this->terms.push_back(token);
 }
 
+std::shared_ptr<Token>
+Terms::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
+    auto const terms = std::make_shared<Terms>(*this);
+
+    for (auto &term : terms->terms)
+        term = term->at(values);
+
+    return terms->simplified();
+}
+
+Terms::operator std::string() const {
+    std::stringstream result;
+
+    if (this->coefficient.value != 1) {
+        if (this->coefficient.value == -1)
+            result << "-";
+
+        else
+            result << this->coefficient;
+    }
+
+    result << '(';
+
+    for (int i = 0; i < this->terms.size(); ++i) {
+        result << static_cast<std::string>(*this->terms[i]);
+
+        if (i != this->terms.size() - 1)
+            result << '*';
+    }
+
+    result << ')';
+
+    return result.str();
+}
+
+void Expression::add_token(std::shared_ptr<Token> const &token) {
+    this->tokens.push_back(token);
+}
+
+std::shared_ptr<Token> Expression::pop_token() {
+    std::shared_ptr<Token> token = this->tokens.back();
+
+    this->tokens.pop_back();
+
+    return token;
+}
+
+std::shared_ptr<Token>
+Expression::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
+    auto const expression = std::make_shared<Expression>(*this);
+
+    for (auto &term : expression->tokens)
+        if (typeid(*term) != typeid(Operation))
+            term = term->at(values);
+
+    return expression->simplified();
+}
+
 Expression::operator std::string() const {
     std::stringstream result;
 
@@ -293,18 +388,6 @@ Expression::operator std::string() const {
     }
 
     return result.str();
-}
-
-void Expression::add_token(std::shared_ptr<Token> const &token) {
-    this->tokens.push_back(token);
-}
-
-std::shared_ptr<Token> Expression::pop_token() {
-    std::shared_ptr<Token> token = this->tokens.back();
-
-    this->tokens.pop_back();
-
-    return token;
 }
 
 std::shared_ptr<Token> tokenise(std::string expression) {

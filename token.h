@@ -1,6 +1,7 @@
 #ifndef TOKENISE_H
 #define TOKENISE_H
 
+#include <map>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -14,6 +15,9 @@ struct Token {
     [[nodiscard]] virtual std::shared_ptr<Token> simplified() const = 0;
 
     [[nodiscard]] virtual std::shared_ptr<Token>
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) = 0;
+
+    [[nodiscard]] virtual std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const = 0;
 
     [[nodiscard]] virtual std::shared_ptr<Token>
@@ -23,11 +27,14 @@ struct Token {
 };
 
 struct Constant final : Token {
-    long double value;
+    double value;
 
-    explicit Constant(long double value);
+    explicit Constant(double value);
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+
+    [[nodiscard]] std::shared_ptr<Token>
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
@@ -50,6 +57,9 @@ struct Variable final : Token {
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
 
+    [[nodiscard]] std::shared_ptr<Token>
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
+
     [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
     ) const override;
 
@@ -63,15 +73,18 @@ struct Operation final : Token {
 
     explicit Operation(op operation);
 
+    static std::shared_ptr<Operation> from_char(char operation);
+
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+
+    [[nodiscard]] std::shared_ptr<Token>
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
 
     [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
     ) const override;
-
-    static std::shared_ptr<Operation> from_char(char operation);
 
     explicit operator std::string() const override;
 };
@@ -83,6 +96,9 @@ struct Function final : Token {
 
     explicit
     Function(std::string function, std::shared_ptr<Token> const &parameter);
+
+    [[nodiscard]] std::shared_ptr<Token>
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
@@ -103,13 +119,16 @@ struct Term final : Token {
     Term() = default;
 
     Term(
-        long double coefficient, std::shared_ptr<Token> const &base,
+        double coefficient, std::shared_ptr<Token> const &base,
         std::shared_ptr<Token> const &power
     );
 
     Term(
         std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
     );
+
+    [[nodiscard]] std::shared_ptr<Token>
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
@@ -129,7 +148,12 @@ struct Terms final : Token {
 
     Terms() = default;
 
+    void add_term(std::shared_ptr<Token> const &token);
+
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+
+    [[nodiscard]] std::shared_ptr<Token>
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
@@ -138,8 +162,6 @@ struct Terms final : Token {
     ) const override;
 
     explicit operator std::string() const override;
-
-    void add_term(std::shared_ptr<Token> const &token);
 };
 
 struct Expression final : Token {
@@ -147,7 +169,14 @@ struct Expression final : Token {
 
     Expression() = default;
 
+    void add_token(std::shared_ptr<Token> const &token);
+
+    [[nodiscard]] std::shared_ptr<Token> pop_token();
+
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+
+    [[nodiscard]] std::shared_ptr<Token>
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
 
     explicit operator std::string() const override;
 
@@ -156,10 +185,6 @@ struct Expression final : Token {
 
     [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
     ) const override;
-
-    void add_token(std::shared_ptr<Token> const &token);
-
-    [[nodiscard]] std::shared_ptr<Token> pop_token();
 };
 
 std::shared_ptr<Token> tokenise(std::string expression);

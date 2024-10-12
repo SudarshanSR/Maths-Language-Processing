@@ -101,32 +101,35 @@ std::shared_ptr<Token> Term::simplified() const {
 }
 
 std::shared_ptr<Token> Terms::simplified() const {
-    auto terms = std::make_shared<Terms>(*this);
-
-    if (!terms->coefficient.value)
+    if (!this->coefficient.value)
         return std::make_shared<Constant>(0);
 
-    if (terms->terms.size() == 1) {
-        auto term = terms->terms[0];
+    if (this->terms.empty())
+        return std::make_shared<Constant>(this->coefficient);
+
+    if (this->terms.size() == 1) {
+        auto term = this->terms[0];
 
         if (typeid(*term) == typeid(Constant))
             return std::make_shared<Constant>(
-                terms->coefficient.value *
+                this->coefficient.value *
                 std::dynamic_pointer_cast<Constant>(term)->value
             );
 
         if (typeid(*term) == typeid(Term)) {
             std::dynamic_pointer_cast<Term>(term)->coefficient.value *=
-                terms->coefficient.value;
+                this->coefficient.value;
 
             return term->simplified();
         }
 
         return std::make_shared<Term>(
-                   terms->coefficient.value, term, std::make_shared<Constant>(1)
+                   this->coefficient.value, term, std::make_shared<Constant>(1)
         )
             ->simplified();
     }
+
+    auto terms = std::make_shared<Terms>(*this);
 
     std::map<Variable, std::shared_ptr<Token> *> variable_powers;
 
@@ -139,7 +142,7 @@ std::shared_ptr<Token> Terms::simplified() const {
             auto const constant = std::dynamic_pointer_cast<Constant>(token);
 
             if (!constant->value)
-                return std::make_shared<Constant>(0);
+                return constant;
 
             terms->coefficient.value *= constant->value;
             terms->terms.erase(terms->terms.begin() + i);
@@ -229,6 +232,9 @@ std::shared_ptr<Token> Terms::simplified() const {
 
         *token = (*token)->simplified();
     }
+
+    if (terms->terms.empty())
+        return std::make_shared<Constant>(terms->coefficient);
 
     if (terms->terms.size() == 1) {
         auto term = terms->terms[0];
