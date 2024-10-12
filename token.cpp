@@ -400,6 +400,8 @@ std::shared_ptr<Token> tokenise(std::string expression) {
     auto terms = std::make_shared<Terms>();
 
     for (int i = 0; i < expression.size(); ++i) {
+        std::int32_t const copy = i;
+
         std::shared_ptr<Token> token = get_next_token(expression, i);
 
         if (!token)
@@ -413,7 +415,7 @@ std::shared_ptr<Token> tokenise(std::string expression) {
                 if (!terms->terms.empty())
                     result->add_token(terms);
 
-                else
+                else if (copy != 0)
                     result->add_token(
                         std::make_shared<Constant>(terms->coefficient)
                     );

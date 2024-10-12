@@ -33,6 +33,13 @@ std::map<std::string, std::string> k_function_map{
 };
 } // namespace
 
+std::shared_ptr<Token> Token::derivative(
+    Variable const &variable, std::uint32_t const order,
+    std::map<Variable, std::shared_ptr<Token>> const &values
+) const {
+    return this->derivative(variable, order)->at(values);
+}
+
 std::shared_ptr<Token> Constant::derivative(
     Variable const &variable, std::uint32_t const order
 ) const {

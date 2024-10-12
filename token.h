@@ -20,8 +20,18 @@ struct Token {
     [[nodiscard]] virtual std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const = 0;
 
+    [[nodiscard]] std::shared_ptr<Token> derivative(
+        Variable const &variable, std::uint32_t order,
+        std::map<Variable, std::shared_ptr<Token>> const &values
+    ) const;
+
     [[nodiscard]] virtual std::shared_ptr<Token>
     integral(Variable const &variable) const = 0;
+
+    [[nodiscard]] std::shared_ptr<Token> integral(
+        Variable const &variable, std::shared_ptr<Token> const &from,
+        std::shared_ptr<Token> const &to
+    ) const;
 
     explicit virtual operator std::string() const = 0;
 };

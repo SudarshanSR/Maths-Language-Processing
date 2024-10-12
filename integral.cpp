@@ -26,6 +26,20 @@ std::map<std::string, std::string> k_function_map{
 };
 } // namespace
 
+std::shared_ptr<Token> Token::integral(
+    Variable const &variable, std::shared_ptr<Token> const &from,
+    std::shared_ptr<Token> const &to
+) const {
+    auto const integral = this->integral(variable);
+
+    auto const result = std::make_shared<Expression>();
+    result->add_token(integral->at({{variable, to}}));
+    result->add_token(std::make_shared<Operation>(Operation::sub));
+    result->add_token(integral->at({{variable, from}}));
+
+    return result->simplified();
+}
+
 std::shared_ptr<Token> Constant::integral(Variable const &variable) const {
     return std::make_shared<Term>(
         this->value, std::make_shared<Variable>(variable),
