@@ -4,24 +4,33 @@
 #include <vector>
 
 namespace {
-std::map<
-    std::string, std::vector<std::tuple<std::string, long double, long double>>>
-    k_function_map{
-        {"sin", {{"cos", 1, 1}}},
-        {"cos", {{"sin", -1, 1}}},
-        {"tan", {{"sec", 1, 2}}},
-        {"sec", {{"sec", 1, 1}, {"tan", 1, 1}}},
-        {"csc", {{"csc", -1, 1}, {"cot", 1, 1}}},
-        {"cot", {{"csc", -1, 2}}},
-        {"sinh", {{"cosh", 1, 1}}},
-        {"cosh", {{"sinh", 1, 1}}},
-        {"tanh", {{"sech", 1, 2}}},
-        {"sech", {{"sech", 1, 1}, {"tanh", 1, 1}}},
-        {"csch", {{"csch", -1, 1}, {"coth", 1, 1}}},
-        {"coth", {{"csch", -1, 2}}},
-        {"ln", {{"", 1, -1}}},
-        {"e^", {{"e^", 1, 1}}},
-    };
+std::map<std::string, std::string> k_function_map{
+    {"sin", "cos({0})"},
+    {"cos", "-sin({0})"},
+    {"tan", "sec({0})^2"},
+    {"sec", "sec({0})*tan({0})"},
+    {"csc", "-csc({0})*cot({0})"},
+    {"cot", "-csc({0})^2"},
+    {"sinh", "cosh({0})"},
+    {"cosh", "sinh({0})"},
+    {"tanh", "sech({0})^2"},
+    {"sech", "sech({0})*tanh({0})"},
+    {"csch", "-csch({0})*cot({0})"},
+    {"coth", "-csch({0})^2"},
+    {"asin", "1/((1 - ({0})^2)^0.5)"},
+    {"acos", "-1/((1 - ({0})^2)^0.5)"},
+    {"atan", "1/(1 + ({0})^2)"},
+    // {"asec", "1/(({0})*(({0})^2 - 1)^0.5"},
+    // {"acsc", "-1/(({0})*(({0})^2 - 1)^0.5"},
+    {"acot", "-1/(1 + ({0})^2)"},
+    {"asinh", "1/((1 + ({0})^2)^0.5)"},
+    {"acosh", "-1/((1 + ({0})^2)^0.5)"},
+    {"atanh", "1/(1 - ({0})^2)"},
+    {"asech", "-1/(({0})*(1 - ({0})^2)^0.5"},
+    // {"acsch", "1/(({0})*(1 - ({0})^2)^0.5"},
+    {"acoth", "1/(1 - ({0})^2)"},
+    {"ln", "1/({0})"}
+};
 } // namespace
 
 std::shared_ptr<Token> Constant::derivative(
@@ -47,37 +56,22 @@ Operation::derivative(Variable const &variable, std::uint32_t order) const {
 std::shared_ptr<Token> Function::derivative(
     Variable const &variable, std::uint32_t const order
 ) const {
-    auto function = std::make_shared<Function>(*this);
-
     if (!order)
-        return function;
+        return std::make_shared<Function>(*this);
 
-    if (typeid(*function->parameter) == typeid(Variable))
-        if (*std::dynamic_pointer_cast<Variable>(function->parameter) !=
-            variable)
+    if (typeid(*this->parameter) == typeid(Variable))
+        if (*std::dynamic_pointer_cast<Variable>(this->parameter) != variable)
             return std::make_shared<Constant>(0);
 
     auto const result = std::make_shared<Terms>();
 
-    if (auto functions = k_function_map[function->function];
-        functions.size() == 1) {
-        auto const &[name, coefficient, power] = functions[0];
+    auto parameter = static_cast<std::string>(*this->parameter);
 
-        result->add_term(std::make_shared<Term>(
-            coefficient, std::make_shared<Function>(name, function->parameter),
-            std::make_shared<Constant>(power)
-        ));
-    } else {
-        for (auto const &[name, coefficient, power] : functions) {
-            result->add_term(std::make_shared<Term>(
-                coefficient,
-                std::make_shared<Function>(name, function->parameter),
-                std::make_shared<Constant>(power)
-            ));
-        }
-    }
+    result->add_term(tokenise(std::vformat(
+        k_function_map.at(this->function), std::make_format_args(parameter)
+    )));
 
-    result->add_term(function->parameter->derivative(variable, 1));
+    result->add_term(this->parameter->derivative(variable, 1));
 
     auto derivative = result->simplified();
 

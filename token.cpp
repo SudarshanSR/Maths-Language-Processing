@@ -12,8 +12,10 @@ std::map<char, char> const k_parenthesis_map{
 };
 
 std::set<std::string> k_functions{
-    "sin",  "cos",  "tan",  "sec",  "csc",  "cot", "sinh",
-    "cosh", "tanh", "sech", "csch", "coth", "ln",
+    "sin",   "cos",   "tan",   "sec",  "csc",   "cot",   "sinh",
+    "cosh",  "tanh",  "sech",  "csch", "coth",  "asin",  "acos",
+    "atan",  "asec",  "acsc",  "acot", "asinh", "acosh", "atanh",
+    "asech", "acsch", "acoth", "ln",
 };
 
 std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
@@ -21,6 +23,41 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
         return nullptr;
 
     char character = expression[i];
+
+    if (auto op = Operation::from_char(character))
+        return op;
+
+    if ('0' <= character && character <= '9') {
+        std::string number;
+
+        while (i < expression.size() && '0' <= character && character < '9') {
+            number.push_back(character);
+
+            character = expression[++i];
+        }
+
+        if (i < expression.size()) {
+            if (character != '.') {
+                --i;
+
+                return std::make_shared<Constant>(std::stoull(number));
+            }
+
+            do {
+                number.push_back(character);
+
+                character = expression[++i];
+            } while (i < expression.size() && '0' <= character &&
+                     character <= '9');
+
+            if (i < expression.size())
+                --i;
+
+            return std::make_shared<Constant>(std::stold(number));
+        }
+
+        return std::make_shared<Constant>(std::stoull(number));
+    }
 
     if (k_parenthesis_map.contains(character)) {
         int count = 1;
@@ -50,7 +87,7 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
         return tokenise(expression.substr(start, end));
     }
 
-    for (int const offset : {4, 3, 2}) {
+    for (int const offset : {5, 4, 3, 2}) {
         if (i + offset >= expression.size())
             continue;
 
@@ -62,49 +99,6 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
         i += offset;
 
         return std::make_shared<Function>(fn, get_next_token(expression, i));
-    }
-
-    // if (character == 'e' && i < expression.size() - 1 &&
-    //     expression[i + 1] == '^') {
-    //     i += 2;
-    //
-    //     return std::make_shared<Function>("e^", get_next_token(expression,
-    //     i));
-    // }
-
-    if (auto op = Operation::from_char(character))
-        return op;
-
-    if ('0' <= character && character <= '9') {
-        std::string number;
-
-        while (i < expression.size() && '0' < character && character < '9') {
-            number.push_back(character);
-
-            character = expression[++i];
-        }
-
-        if (i < expression.size()) {
-            if (character != '.') {
-                --i;
-
-                return std::make_shared<Constant>(std::stoull(number));
-            }
-
-            do {
-                number.push_back(character);
-
-                character = expression[++i];
-            } while (i < expression.size() && '0' <= character &&
-                     character <= '9');
-
-            if (i < expression.size())
-                --i;
-
-            return std::make_shared<Constant>(std::stold(number));
-        }
-
-        return std::make_shared<Constant>(std::stoull(number));
     }
 
     if (('A' <= character && character <= 'Z') ||
@@ -322,7 +316,14 @@ std::shared_ptr<Token> tokenise(std::string expression) {
 
             if (operation->operation == Operation::add ||
                 operation->operation == Operation::sub) {
-                result->add_token(terms);
+                if (!terms->terms.empty())
+                    result->add_token(terms);
+
+                else
+                    result->add_token(
+                        std::make_shared<Constant>(terms->coefficient)
+                    );
+
                 terms = std::make_shared<Terms>();
                 result->add_token(operation);
 
@@ -413,6 +414,9 @@ std::shared_ptr<Token> tokenise(std::string expression) {
 
     if (!terms->terms.empty())
         result->add_token(terms);
+
+    else
+        result->add_token(std::make_shared<Constant>(terms->coefficient));
 
     return result->simplified();
 }
