@@ -248,9 +248,7 @@ std::shared_ptr<Token> Expression::derivative(
     for (std::shared_ptr<Token> const &term : this->tokens) {
         if (auto const &token_type = typeid(*term);
             token_type == typeid(Operation)) {
-            result->add_token(std::make_shared<Operation>(
-                std::dynamic_pointer_cast<Operation>(term)->operation
-            ));
+            result->add_token(term);
 
             continue;
         }
