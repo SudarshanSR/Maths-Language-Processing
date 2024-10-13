@@ -64,9 +64,8 @@ std::shared_ptr<Token> Function::derivative(
     if (!order)
         return std::make_shared<Function>(*this);
 
-    if (typeid(*this->parameter) == typeid(Variable))
-        if (*std::dynamic_pointer_cast<Variable>(this->parameter) != variable)
-            return std::make_shared<Constant>(0);
+    if (!this->is_dependent_on(variable))
+        return std::make_shared<Constant>(0);
 
     auto const result = std::make_shared<Terms>();
 
@@ -98,7 +97,7 @@ Term::derivative(Variable const &variable, std::uint32_t const order) const {
     if (!order)
         return term;
 
-    if (!term->base)
+    if (!term->base || !term->is_dependent_on(variable))
         return std::make_shared<Constant>(0);
 
     auto const &base_type = typeid(*term->base);
@@ -213,7 +212,7 @@ Terms::derivative(Variable const &variable, std::uint32_t const order) const {
     if (!order)
         return terms;
 
-    if (terms->coefficient.value == 0)
+    if (terms->coefficient.value == 0 || !terms->is_dependent_on(variable))
         return std::make_shared<Constant>(0);
 
     auto const result = std::make_shared<Expression>();
@@ -279,6 +278,9 @@ std::shared_ptr<Token> Expression::derivative(
 ) const {
     if (!order)
         return std::make_shared<Expression>(*this);
+
+    if (!this->is_dependent_on(variable))
+        return std::make_shared<Constant>(0);
 
     auto const result = std::make_shared<Expression>();
 

@@ -144,7 +144,7 @@ bool Constant::operator==(Constant const &constant) const {
 
 Variable::Variable(char const var) : var(var) {}
 
-bool Variable::is_function_of(Variable const &variable) const {
+bool Variable::is_dependent_on(Variable const &variable) const {
     return *this == variable;
 }
 
@@ -206,12 +206,12 @@ Function::Function(
 )
     : function(std::move(function)), parameter(parameter) {}
 
-bool Function::is_function_of(Variable const &variable) const {
+bool Function::is_dependent_on(Variable const &variable) const {
     if (typeid(*this->parameter) == typeid(Constant))
         return false;
 
     return std::dynamic_pointer_cast<Dependent>(this->parameter)
-        ->is_function_of(variable);
+        ->is_dependent_on(variable);
 }
 
 std::shared_ptr<Token>
@@ -247,15 +247,15 @@ Term::Term(
 )
     : base(base), power(power) {}
 
-bool Term::is_function_of(Variable const &variable) const {
+bool Term::is_dependent_on(Variable const &variable) const {
     if (typeid(*this->base) == typeid(Constant) &&
         typeid(*this->power) == typeid(Constant))
         return false;
 
     return std::dynamic_pointer_cast<Dependent>(this->base)
-               ->is_function_of(variable) ||
+               ->is_dependent_on(variable) ||
            std::dynamic_pointer_cast<Dependent>(this->power)
-               ->is_function_of(variable);
+               ->is_dependent_on(variable);
 }
 
 std::shared_ptr<Token>
@@ -334,12 +334,12 @@ void Terms::add_term(std::shared_ptr<Token> const &token) {
     this->terms.push_back(token);
 }
 
-bool Terms::is_function_of(Variable const &variable) const {
+bool Terms::is_dependent_on(Variable const &variable) const {
     return std::ranges::any_of(
         this->terms,
         [variable](std::shared_ptr<Token> const &token) -> bool {
             return typeid(*token) != typeid(Constant) &&
-                   std::dynamic_pointer_cast<Dependent>(token)->is_function_of(
+                   std::dynamic_pointer_cast<Dependent>(token)->is_dependent_on(
                        variable
                    );
         }
@@ -393,13 +393,13 @@ std::shared_ptr<Token> Expression::pop_token() {
     return token;
 }
 
-bool Expression::is_function_of(Variable const &variable) const {
+bool Expression::is_dependent_on(Variable const &variable) const {
     return std::ranges::any_of(
         this->tokens,
         [variable](std::shared_ptr<Token> const &token) -> bool {
             return typeid(*token) != typeid(Constant) &&
                    typeid(*token) != typeid(Operation) &&
-                   std::dynamic_pointer_cast<Dependent>(token)->is_function_of(
+                   std::dynamic_pointer_cast<Dependent>(token)->is_dependent_on(
                        variable
                    );
         }

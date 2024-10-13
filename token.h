@@ -28,7 +28,7 @@ struct Evaluatable {
 struct Dependent {
     virtual ~Dependent() = default;
 
-    [[nodiscard]] virtual bool is_function_of(Variable const &variable
+    [[nodiscard]] virtual bool is_dependent_on(Variable const &variable
     ) const = 0;
 };
 
@@ -67,7 +67,7 @@ struct Variable final : Token,
 
     explicit Variable(char var);
 
-    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
@@ -108,7 +108,7 @@ struct Function final : Token,
     explicit
     Function(std::string function, std::shared_ptr<Token> const &parameter);
 
-    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token>
     at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
@@ -145,7 +145,7 @@ struct Term final : Token,
         std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
     );
 
-    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token>
     at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
@@ -175,7 +175,7 @@ struct Terms final : Token,
 
     void add_term(std::shared_ptr<Token> const &token);
 
-    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
@@ -205,7 +205,7 @@ struct Expression final : Token,
 
     [[nodiscard]] std::shared_ptr<Token> pop_token();
 
-    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 

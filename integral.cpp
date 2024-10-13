@@ -63,7 +63,7 @@ std::shared_ptr<Token> Variable::integral(Variable const &variable) const {
 }
 
 std::shared_ptr<Token> Function::integral(Variable const &variable) const {
-    if (!this->is_function_of(variable)) {
+    if (!this->is_dependent_on(variable)) {
         auto terms = std::make_shared<Terms>();
         terms->add_term(std::make_shared<Variable>(variable));
         terms->add_term(std::make_shared<Function>(*this));
@@ -90,7 +90,7 @@ std::shared_ptr<Token> Function::integral(Variable const &variable) const {
 }
 
 std::shared_ptr<Token> Term::integral(Variable const &variable) const {
-    if (!this->is_function_of(variable)) {
+    if (!this->is_dependent_on(variable)) {
         auto terms = std::make_shared<Terms>();
         terms->add_term(std::make_shared<Variable>(variable));
         terms->add_term(std::make_shared<Term>(*this));
@@ -139,7 +139,7 @@ std::shared_ptr<Token> Term::integral(Variable const &variable) const {
 }
 
 std::shared_ptr<Token> Terms::integral(Variable const &variable) const {
-    if (!this->is_function_of(variable)) {
+    if (!this->is_dependent_on(variable)) {
         auto terms = std::make_shared<Terms>();
         terms->add_term(std::make_shared<Variable>(variable));
         terms->add_term(std::make_shared<Terms>(*this));
@@ -151,7 +151,7 @@ std::shared_ptr<Token> Terms::integral(Variable const &variable) const {
 }
 
 std::shared_ptr<Token> Expression::integral(Variable const &variable) const {
-    if (!this->is_function_of(variable)) {
+    if (!this->is_dependent_on(variable)) {
         auto terms = std::make_shared<Terms>();
         terms->add_term(std::make_shared<Variable>(variable));
         terms->add_term(std::make_shared<Expression>(*this));
