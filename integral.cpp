@@ -66,22 +66,25 @@ std::shared_ptr<Token> Operation::integral(Variable const &variable) const {
 }
 
 std::shared_ptr<Token> Function::integral(Variable const &variable) const {
+    if (!this->is_function_of(variable)) {
+        auto terms = std::make_shared<Terms>();
+        terms->add_term(std::make_shared<Variable>(variable));
+        terms->add_term(std::make_shared<Function>(*this));
+
+        return terms;
+    }
+
     if (typeid(*this->parameter) == typeid(Variable)) {
         auto const parameter =
             std::dynamic_pointer_cast<Variable>(this->parameter);
 
         auto const terms = std::make_shared<Terms>();
 
-        if (*parameter != variable) {
-            terms->add_term(std::make_shared<Variable>(variable));
-            terms->add_term(std::make_shared<Function>(*this));
-        } else {
-            auto string = static_cast<std::string>(*this->parameter);
+        auto string = static_cast<std::string>(*this->parameter);
 
-            terms->add_term(tokenise(std::vformat(
-                k_function_map.at(this->function), std::make_format_args(string)
-            )));
-        }
+        terms->add_term(tokenise(std::vformat(
+            k_function_map.at(this->function), std::make_format_args(string)
+        )));
 
         return terms->simplified();
     }
@@ -90,6 +93,14 @@ std::shared_ptr<Token> Function::integral(Variable const &variable) const {
 }
 
 std::shared_ptr<Token> Term::integral(Variable const &variable) const {
+    if (!this->is_function_of(variable)) {
+        auto terms = std::make_shared<Terms>();
+        terms->add_term(std::make_shared<Variable>(variable));
+        terms->add_term(std::make_shared<Term>(*this));
+
+        return terms;
+    }
+
     auto const &base_type = typeid(*this->base);
     auto const &power_type = typeid(*this->power);
 
@@ -131,10 +142,26 @@ std::shared_ptr<Token> Term::integral(Variable const &variable) const {
 }
 
 std::shared_ptr<Token> Terms::integral(Variable const &variable) const {
+    if (!this->is_function_of(variable)) {
+        auto terms = std::make_shared<Terms>();
+        terms->add_term(std::make_shared<Variable>(variable));
+        terms->add_term(std::make_shared<Terms>(*this));
+
+        return terms;
+    }
+
     throw std::runtime_error("Expression is not integrable!");
 }
 
 std::shared_ptr<Token> Expression::integral(Variable const &variable) const {
+    if (!this->is_function_of(variable)) {
+        auto terms = std::make_shared<Terms>();
+        terms->add_term(std::make_shared<Variable>(variable));
+        terms->add_term(std::make_shared<Expression>(*this));
+
+        return terms;
+    }
+
     auto const result = std::make_shared<Expression>();
 
     for (std::shared_ptr<Token> const &term : this->tokens) {
