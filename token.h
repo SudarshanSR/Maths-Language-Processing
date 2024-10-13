@@ -1,50 +1,45 @@
 #ifndef TOKENISE_H
 #define TOKENISE_H
 
+#include "derivative.h"
+#include "integral.h"
+#include "simplify.h"
+
 #include <map>
-#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
 
-struct Variable;
-
 struct Token {
     virtual ~Token() = default;
-
-    [[nodiscard]] virtual bool is_function_of(Variable const &variable
-    ) const = 0;
-
-    [[nodiscard]] virtual std::shared_ptr<Token> simplified() const = 0;
-
-    [[nodiscard]] virtual std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) = 0;
-
-    [[nodiscard]] virtual std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) const = 0;
-
-    [[nodiscard]] std::shared_ptr<Token> derivative(
-        Variable const &variable, std::uint32_t order,
-        std::map<Variable, std::shared_ptr<Token>> const &values
-    ) const;
-
-    [[nodiscard]] virtual std::shared_ptr<Token>
-    integral(Variable const &variable) const = 0;
-
-    [[nodiscard]] std::shared_ptr<Token> integral(
-        Variable const &variable, std::shared_ptr<Token> const &from,
-        std::shared_ptr<Token> const &to
-    ) const;
 
     explicit virtual operator std::string() const = 0;
 };
 
-struct Constant final : Token {
+struct Variable;
+
+struct Evaluatable {
+    virtual ~Evaluatable() = default;
+
+    [[nodiscard]] virtual std::shared_ptr<Token>
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) = 0;
+};
+
+struct Dependent {
+    virtual ~Dependent() = default;
+
+    [[nodiscard]] virtual bool is_function_of(Variable const &variable
+    ) const = 0;
+};
+
+struct Constant final : Token,
+                        Evaluatable,
+                        Simplifiable,
+                        Differentiable,
+                        Integrable {
     double value;
 
     explicit Constant(double value);
-
-    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
@@ -62,7 +57,12 @@ struct Constant final : Token {
     bool operator==(Constant const &) const;
 };
 
-struct Variable final : Token {
+struct Variable final : Token,
+                        Dependent,
+                        Evaluatable,
+                        Simplifiable,
+                        Differentiable,
+                        Integrable {
     char var;
 
     explicit Variable(char var);
@@ -92,23 +92,15 @@ struct Operation final : Token {
 
     static std::shared_ptr<Operation> from_char(char operation);
 
-    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
-
-    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
-
-    [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
-
-    [[nodiscard]] std::shared_ptr<Token>
-    derivative(Variable const &variable, std::uint32_t order) const override;
-
-    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
-    ) const override;
-
     explicit operator std::string() const override;
 };
 
-struct Function final : Token {
+struct Function final : Token,
+                        Dependent,
+                        Evaluatable,
+                        Simplifiable,
+                        Differentiable,
+                        Integrable {
     std::string function;
 
     std::shared_ptr<Token> parameter = nullptr;
@@ -132,7 +124,12 @@ struct Function final : Token {
     explicit operator std::string() const override;
 };
 
-struct Term final : Token {
+struct Term final : Token,
+                    Dependent,
+                    Evaluatable,
+                    Simplifiable,
+                    Differentiable,
+                    Integrable {
     Constant coefficient{1};
     std::shared_ptr<Token> base = nullptr;
     std::shared_ptr<Token> power = nullptr;
@@ -164,7 +161,12 @@ struct Term final : Token {
     explicit operator std::string() const override;
 };
 
-struct Terms final : Token {
+struct Terms final : Token,
+                     Dependent,
+                     Evaluatable,
+                     Simplifiable,
+                     Differentiable,
+                     Integrable {
     Constant coefficient{1};
 
     std::vector<std::shared_ptr<Token>> terms;
@@ -189,7 +191,12 @@ struct Terms final : Token {
     explicit operator std::string() const override;
 };
 
-struct Expression final : Token {
+struct Expression final : Token,
+                          Dependent,
+                          Evaluatable,
+                          Simplifiable,
+                          Differentiable,
+                          Integrable {
     std::vector<std::shared_ptr<Token>> tokens;
 
     Expression() = default;

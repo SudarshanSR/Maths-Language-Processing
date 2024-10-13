@@ -131,8 +131,6 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
 
 Constant::Constant(double const value) : value(value) {}
 
-bool Constant::is_function_of(Variable const &variable) const { return false; }
-
 std::shared_ptr<Token>
 Constant::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
     return std::make_shared<Constant>(*this);
@@ -186,15 +184,6 @@ std::shared_ptr<Operation> Operation::from_char(char const operation) {
     }
 }
 
-bool Operation::is_function_of(Variable const &variable) const {
-    throw std::runtime_error("Operator cannot be a function of a variable!");
-}
-
-std::shared_ptr<Token>
-Operation::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
-    throw std::runtime_error("Cannot evaluate operator at coordinates");
-}
-
 Operation::operator std::string() const {
     switch (this->operation) {
     case add:
@@ -218,12 +207,17 @@ Function::Function(
     : function(std::move(function)), parameter(parameter) {}
 
 bool Function::is_function_of(Variable const &variable) const {
-    return this->parameter->is_function_of(variable);
+    if (typeid(*this->parameter) == typeid(Constant))
+        return false;
+
+    return std::dynamic_pointer_cast<Dependent>(this->parameter)
+        ->is_function_of(variable);
 }
 
 std::shared_ptr<Token>
 Function::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
-    auto param = this->parameter->at(values);
+    auto param =
+        std::dynamic_pointer_cast<Evaluatable>(this->parameter)->at(values);
 
     if (typeid(*param) == typeid(Constant))
         return std::make_shared<Constant>(k_functions.at(this->function)(
@@ -254,15 +248,22 @@ Term::Term(
     : base(base), power(power) {}
 
 bool Term::is_function_of(Variable const &variable) const {
-    return this->base->is_function_of(variable) ||
-           this->power->is_function_of(variable);
+    if (typeid(*this->base) == typeid(Constant) &&
+        typeid(*this->power) == typeid(Constant))
+        return false;
+
+    return std::dynamic_pointer_cast<Dependent>(this->base)
+               ->is_function_of(variable) ||
+           std::dynamic_pointer_cast<Dependent>(this->power)
+               ->is_function_of(variable);
 }
 
 std::shared_ptr<Token>
 Term::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
     auto const term = std::make_shared<Term>(*this);
-    term->base = term->base->at(values);
-    term->power = term->power->at(values);
+    term->base = std::dynamic_pointer_cast<Evaluatable>(term->base)->at(values);
+    term->power =
+        std::dynamic_pointer_cast<Evaluatable>(term->power)->at(values);
 
     return term->simplified();
 }
@@ -334,11 +335,15 @@ void Terms::add_term(std::shared_ptr<Token> const &token) {
 }
 
 bool Terms::is_function_of(Variable const &variable) const {
-    for (std::shared_ptr<Token> const &token : this->terms)
-        if (!token->is_function_of(variable))
-            return false;
-
-    return !this->terms.empty();
+    return std::ranges::any_of(
+        this->terms,
+        [variable](std::shared_ptr<Token> const &token) -> bool {
+            return typeid(*token) != typeid(Constant) &&
+                   std::dynamic_pointer_cast<Dependent>(token)->is_function_of(
+                       variable
+                   );
+        }
+    );
 }
 
 std::shared_ptr<Token>
@@ -346,7 +351,7 @@ Terms::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
     auto const terms = std::make_shared<Terms>(*this);
 
     for (auto &term : terms->terms)
-        term = term->at(values);
+        term = std::dynamic_pointer_cast<Evaluatable>(term)->at(values);
 
     return terms->simplified();
 }
@@ -389,15 +394,16 @@ std::shared_ptr<Token> Expression::pop_token() {
 }
 
 bool Expression::is_function_of(Variable const &variable) const {
-    for (std::shared_ptr<Token> const &token : this->tokens) {
-        if (typeid(*token) == typeid(Operation))
-            continue;
-
-        if (!token->is_function_of(variable))
-            return false;
-    }
-
-    return !this->tokens.empty();
+    return std::ranges::any_of(
+        this->tokens,
+        [variable](std::shared_ptr<Token> const &token) -> bool {
+            return typeid(*token) != typeid(Constant) &&
+                   typeid(*token) != typeid(Operation) &&
+                   std::dynamic_pointer_cast<Dependent>(token)->is_function_of(
+                       variable
+                   );
+        }
+    );
 }
 
 std::shared_ptr<Token>
@@ -406,7 +412,7 @@ Expression::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
 
     for (auto &term : expression->tokens)
         if (typeid(*term) != typeid(Operation))
-            term = term->at(values);
+            term = std::dynamic_pointer_cast<Evaluatable>(term)->at(values);
 
     return expression->simplified();
 }

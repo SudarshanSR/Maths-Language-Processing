@@ -12,13 +12,10 @@ std::shared_ptr<Token> Variable::simplified() const {
     return std::make_shared<Variable>(this->var);
 }
 
-std::shared_ptr<Token> Operation::simplified() const {
-    throw std::runtime_error("Cannot simplify an operation!");
-}
-
 std::shared_ptr<Token> Function::simplified() const {
     return std::make_shared<Function>(
-        this->function, this->parameter->simplified()
+        this->function,
+        std::dynamic_pointer_cast<Simplifiable>(this->parameter)->simplified()
     );
 }
 
@@ -30,8 +27,10 @@ std::shared_ptr<Token> Term::simplified() const {
     if (!term->power)
         term->power = std::make_shared<Constant>(1);
 
-    term->base = term->base->simplified();
-    term->power = term->power->simplified();
+    term->base =
+        std::dynamic_pointer_cast<Simplifiable>(term->base)->simplified();
+    term->power =
+        std::dynamic_pointer_cast<Simplifiable>(term->power)->simplified();
 
     if (typeid(*term->power) == typeid(Constant)) {
         auto const power = std::dynamic_pointer_cast<Constant>(term->power);
@@ -45,7 +44,7 @@ std::shared_ptr<Token> Term::simplified() const {
         if (typeid(*term->base) == typeid(Term)) {
             auto const base = std::dynamic_pointer_cast<Term>(term->base);
             base->coefficient.value =
-                std::powl(base->coefficient.value, power->value);
+                std::pow(base->coefficient.value, power->value);
 
             if (typeid(*base->power) == typeid(Constant)) {
                 std::dynamic_pointer_cast<Constant>(base->power)->value *=
@@ -94,8 +93,10 @@ std::shared_ptr<Token> Term::simplified() const {
         }
     }
 
-    term->base = term->base->simplified();
-    term->power = term->power->simplified();
+    term->base =
+        std::dynamic_pointer_cast<Simplifiable>(term->base)->simplified();
+    term->power =
+        std::dynamic_pointer_cast<Simplifiable>(term->power)->simplified();
 
     return term;
 }
@@ -120,7 +121,7 @@ std::shared_ptr<Token> Terms::simplified() const {
             std::dynamic_pointer_cast<Term>(term)->coefficient.value *=
                 this->coefficient.value;
 
-            return term->simplified();
+            return std::dynamic_pointer_cast<Simplifiable>(term)->simplified();
         }
 
         return std::make_shared<Term>(
@@ -136,7 +137,8 @@ std::shared_ptr<Token> Terms::simplified() const {
     std::int32_t i = 0;
 
     while (i < terms->terms.size()) {
-        auto token = terms->terms[i]->simplified();
+        auto token = std::dynamic_pointer_cast<Simplifiable>(terms->terms[i])
+                         ->simplified();
 
         if (typeid(*token) == typeid(Constant)) {
             auto const constant = std::dynamic_pointer_cast<Constant>(token);
@@ -230,7 +232,7 @@ std::shared_ptr<Token> Terms::simplified() const {
             continue;
         }
 
-        *token = (*token)->simplified();
+        *token = std::dynamic_pointer_cast<Simplifiable>(*token)->simplified();
     }
 
     if (terms->terms.empty())
@@ -249,7 +251,7 @@ std::shared_ptr<Token> Terms::simplified() const {
             std::dynamic_pointer_cast<Term>(term)->coefficient.value *=
                 terms->coefficient.value;
 
-            return term->simplified();
+            return std::dynamic_pointer_cast<Simplifiable>(term)->simplified();
         }
 
         return std::make_shared<Term>(
@@ -267,11 +269,13 @@ std::shared_ptr<Token> Expression::simplified() const {
     std::vector<std::shared_ptr<Token>> &tokens = expression->tokens;
 
     if (tokens.size() == 1)
-        return expression->pop_token()->simplified();
+        return std::dynamic_pointer_cast<Simplifiable>(expression->pop_token())
+            ->simplified();
 
     for (std::shared_ptr<Token> &token : tokens)
         if (typeid(*token) != typeid(Operation))
-            token = token->simplified();
+            token =
+                std::dynamic_pointer_cast<Simplifiable>(token)->simplified();
 
     for (int i = 1; i < tokens.size(); ++i) {
         std::shared_ptr<Token> &token = tokens[i];
@@ -499,7 +503,7 @@ std::shared_ptr<Token> Expression::simplified() const {
             continue;
         }
 
-        *token = (*token)->simplified();
+        *token = std::dynamic_pointer_cast<Simplifiable>(*token)->simplified();
     }
 
     if (tokens.size() == 1)

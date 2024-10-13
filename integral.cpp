@@ -26,11 +26,12 @@ std::map<std::string, std::string> k_function_map{
 };
 } // namespace
 
-std::shared_ptr<Token> Token::integral(
+std::shared_ptr<Token> Integrable::integral(
     Variable const &variable, std::shared_ptr<Token> const &from,
     std::shared_ptr<Token> const &to
 ) const {
-    auto const integral = this->integral(variable);
+    auto const integral =
+        std::dynamic_pointer_cast<Evaluatable>(this->integral(variable));
 
     auto const result = std::make_shared<Expression>();
     result->add_token(integral->at({{variable, to}}));
@@ -59,10 +60,6 @@ std::shared_ptr<Token> Variable::integral(Variable const &variable) const {
     terms->add_term(std::make_shared<Variable>(*this));
 
     return terms;
-}
-
-std::shared_ptr<Token> Operation::integral(Variable const &variable) const {
-    throw std::runtime_error("Operator cannot be integrated!");
 }
 
 std::shared_ptr<Token> Function::integral(Variable const &variable) const {
@@ -172,7 +169,9 @@ std::shared_ptr<Token> Expression::integral(Variable const &variable) const {
             continue;
         }
 
-        result->add_token(term->integral(variable));
+        result->add_token(
+            std::dynamic_pointer_cast<Integrable>(term)->integral(variable)
+        );
     }
 
     return result->simplified();

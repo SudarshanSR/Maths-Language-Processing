@@ -12,10 +12,13 @@ target_sources(token PUBLIC token.h)
 target_link_libraries(token simplify)
 
 add_library(simplify simplify.cpp)
+target_sources(simplify PUBLIC simplify.h)
 target_link_libraries(simplify PRIVATE derivative integral)
 
 add_library(derivative derivative.cpp)
+target_sources(derivative PUBLIC derivative.h)
 target_link_libraries(derivative PRIVATE token simplify)
 
 add_library(integral integral.cpp)
+target_sources(integral PUBLIC integral.h)
 target_link_libraries(integral PRIVATE token simplify)
