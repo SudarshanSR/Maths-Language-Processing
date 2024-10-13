@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <map>
 #include <ranges>
-#include <set>
 #include <sstream>
 
 namespace {
@@ -132,6 +131,8 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
 
 Constant::Constant(double const value) : value(value) {}
 
+bool Constant::is_function_of(Variable const &variable) const { return false; }
+
 std::shared_ptr<Token>
 Constant::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
     return std::make_shared<Constant>(*this);
@@ -144,6 +145,10 @@ bool Constant::operator==(Constant const &constant) const {
 }
 
 Variable::Variable(char const var) : var(var) {}
+
+bool Variable::is_function_of(Variable const &variable) const {
+    return *this == variable;
+}
 
 std::shared_ptr<Token>
 Variable::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
@@ -181,6 +186,10 @@ std::shared_ptr<Operation> Operation::from_char(char const operation) {
     }
 }
 
+bool Operation::is_function_of(Variable const &variable) const {
+    throw std::runtime_error("Operator cannot be a function of a variable!");
+}
+
 std::shared_ptr<Token>
 Operation::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
     throw std::runtime_error("Cannot evaluate operator at coordinates");
@@ -207,6 +216,10 @@ Function::Function(
     std::string function, std::shared_ptr<Token> const &parameter
 )
     : function(std::move(function)), parameter(parameter) {}
+
+bool Function::is_function_of(Variable const &variable) const {
+    return this->parameter->is_function_of(variable);
+}
 
 std::shared_ptr<Token>
 Function::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
@@ -239,6 +252,11 @@ Term::Term(
     std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
 )
     : base(base), power(power) {}
+
+bool Term::is_function_of(Variable const &variable) const {
+    return this->base->is_function_of(variable) ||
+           this->power->is_function_of(variable);
+}
 
 std::shared_ptr<Token>
 Term::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
@@ -315,6 +333,14 @@ void Terms::add_term(std::shared_ptr<Token> const &token) {
     this->terms.push_back(token);
 }
 
+bool Terms::is_function_of(Variable const &variable) const {
+    for (std::shared_ptr<Token> const &token : this->terms)
+        if (!token->is_function_of(variable))
+            return false;
+
+    return !this->terms.empty();
+}
+
 std::shared_ptr<Token>
 Terms::at(std::map<Variable, std::shared_ptr<Token>> const &values) {
     auto const terms = std::make_shared<Terms>(*this);
@@ -360,6 +386,18 @@ std::shared_ptr<Token> Expression::pop_token() {
     this->tokens.pop_back();
 
     return token;
+}
+
+bool Expression::is_function_of(Variable const &variable) const {
+    for (std::shared_ptr<Token> const &token : this->tokens) {
+        if (typeid(*token) == typeid(Operation))
+            continue;
+
+        if (!token->is_function_of(variable))
+            return false;
+    }
+
+    return !this->tokens.empty();
 }
 
 std::shared_ptr<Token>

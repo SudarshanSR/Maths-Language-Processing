@@ -12,6 +12,9 @@ struct Variable;
 struct Token {
     virtual ~Token() = default;
 
+    [[nodiscard]] virtual bool is_function_of(Variable const &variable
+    ) const = 0;
+
     [[nodiscard]] virtual std::shared_ptr<Token> simplified() const = 0;
 
     [[nodiscard]] virtual std::shared_ptr<Token>
@@ -41,6 +44,8 @@ struct Constant final : Token {
 
     explicit Constant(double value);
 
+    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
+
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
     [[nodiscard]] std::shared_ptr<Token>
@@ -61,6 +66,8 @@ struct Variable final : Token {
     char var;
 
     explicit Variable(char var);
+
+    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
@@ -85,6 +92,8 @@ struct Operation final : Token {
 
     static std::shared_ptr<Operation> from_char(char operation);
 
+    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
+
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
     [[nodiscard]] std::shared_ptr<Token>
@@ -106,6 +115,8 @@ struct Function final : Token {
 
     explicit
     Function(std::string function, std::shared_ptr<Token> const &parameter);
+
+    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token>
     at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
@@ -137,6 +148,8 @@ struct Term final : Token {
         std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
     );
 
+    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
+
     [[nodiscard]] std::shared_ptr<Token>
     at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
 
@@ -160,6 +173,8 @@ struct Terms final : Token {
 
     void add_term(std::shared_ptr<Token> const &token);
 
+    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
+
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
     [[nodiscard]] std::shared_ptr<Token>
@@ -182,6 +197,8 @@ struct Expression final : Token {
     void add_token(std::shared_ptr<Token> const &token);
 
     [[nodiscard]] std::shared_ptr<Token> pop_token();
+
+    [[nodiscard]] bool is_function_of(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
