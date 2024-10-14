@@ -4,13 +4,9 @@
 #include <map>
 #include <ranges>
 
-std::shared_ptr<Token> Constant::simplified() const {
-    return std::make_shared<Constant>(this->value);
-}
+std::shared_ptr<Token> Constant::simplified() const { return this->clone(); }
 
-std::shared_ptr<Token> Variable::simplified() const {
-    return std::make_shared<Variable>(this->var);
-}
+std::shared_ptr<Token> Variable::simplified() const { return this->clone(); }
 
 std::shared_ptr<Token> Function::simplified() const {
     return std::make_shared<Function>(
@@ -20,9 +16,7 @@ std::shared_ptr<Token> Function::simplified() const {
 }
 
 std::shared_ptr<Token> Term::simplified() const {
-    auto term = std::make_shared<Term>(
-        this->coefficient.value, this->base, this->power
-    );
+    auto term = std::dynamic_pointer_cast<Term>(this->clone());
 
     if (!term->power)
         term->power = std::make_shared<Constant>(1);
@@ -102,14 +96,14 @@ std::shared_ptr<Token> Term::simplified() const {
 }
 
 std::shared_ptr<Token> Terms::simplified() const {
-    if (!this->coefficient.value)
+    if (this->coefficient.value == 0)
         return std::make_shared<Constant>(0);
 
     if (this->terms.empty())
-        return std::make_shared<Constant>(this->coefficient);
+        return this->coefficient.clone();
 
     if (this->terms.size() == 1) {
-        auto term = this->terms[0];
+        auto term = this->terms[0]->clone();
 
         if (typeid(*term) == typeid(Constant))
             return std::make_shared<Constant>(
@@ -130,7 +124,7 @@ std::shared_ptr<Token> Terms::simplified() const {
             ->simplified();
     }
 
-    auto terms = std::make_shared<Terms>(*this);
+    auto terms = std::dynamic_pointer_cast<Terms>(this->clone());
 
     std::map<Variable, std::shared_ptr<Token> *> variable_powers;
 
@@ -143,7 +137,7 @@ std::shared_ptr<Token> Terms::simplified() const {
         if (typeid(*token) == typeid(Constant)) {
             auto const constant = std::dynamic_pointer_cast<Constant>(token);
 
-            if (!constant->value)
+            if (constant->value == 0)
                 return constant;
 
             terms->coefficient.value *= constant->value;
@@ -264,7 +258,7 @@ std::shared_ptr<Token> Terms::simplified() const {
 }
 
 std::shared_ptr<Token> Expression::simplified() const {
-    auto expression = std::make_shared<Expression>(*this);
+    auto expression = std::dynamic_pointer_cast<Expression>(this->clone());
 
     std::vector<std::shared_ptr<Token>> &tokens = expression->tokens;
 

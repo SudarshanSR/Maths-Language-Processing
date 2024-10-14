@@ -13,6 +13,8 @@
 struct Token {
     virtual ~Token() = default;
 
+    [[nodiscard]] virtual std::shared_ptr<Token> clone() const = 0;
+
     explicit virtual operator std::string() const = 0;
 };
 
@@ -22,7 +24,7 @@ struct Evaluatable {
     virtual ~Evaluatable() = default;
 
     [[nodiscard]] virtual std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) = 0;
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) const = 0;
 };
 
 struct Dependent {
@@ -41,10 +43,12 @@ struct Constant final : Token,
 
     explicit Constant(double value);
 
+    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
     [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
@@ -67,6 +71,8 @@ struct Variable final : Token,
 
     explicit Variable(char var);
 
+    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
@@ -75,7 +81,7 @@ struct Variable final : Token,
     derivative(Variable const &variable, std::uint32_t order) const override;
 
     [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
 
     [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
     ) const override;
@@ -89,6 +95,8 @@ struct Operation final : Token {
     enum op { add, sub, mul, div, pow } operation;
 
     explicit Operation(op operation);
+
+    [[nodiscard]] std::shared_ptr<Token> clone() const override;
 
     static std::shared_ptr<Operation> from_char(char operation);
 
@@ -108,10 +116,12 @@ struct Function final : Token,
     explicit
     Function(std::string function, std::shared_ptr<Token> const &parameter);
 
+    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
@@ -145,10 +155,12 @@ struct Term final : Token,
         std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
     );
 
+    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
     [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
 
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
@@ -173,6 +185,8 @@ struct Terms final : Token,
 
     Terms() = default;
 
+    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+
     void add_term(std::shared_ptr<Token> const &token);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
@@ -180,7 +194,7 @@ struct Terms final : Token,
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
     [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
 
     [[nodiscard]] std::shared_ptr<Token>
     derivative(Variable const &variable, std::uint32_t order) const override;
@@ -201,6 +215,8 @@ struct Expression final : Token,
 
     Expression() = default;
 
+    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+
     void add_token(std::shared_ptr<Token> const &token);
 
     [[nodiscard]] std::shared_ptr<Token> pop_token();
@@ -210,7 +226,7 @@ struct Expression final : Token,
     [[nodiscard]] std::shared_ptr<Token> simplified() const override;
 
     [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) override;
+    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
 
     explicit operator std::string() const override;
 

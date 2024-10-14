@@ -43,21 +43,19 @@ std::shared_ptr<Token> Integrable::integral(
 
 std::shared_ptr<Token> Constant::integral(Variable const &variable) const {
     return std::make_shared<Term>(
-        this->value, std::make_shared<Variable>(variable),
-        std::make_shared<Constant>(1)
+        this->value, variable.clone(), std::make_shared<Constant>(1)
     );
 }
 
 std::shared_ptr<Token> Variable::integral(Variable const &variable) const {
     if (*this == variable)
         return std::make_shared<Term>(
-            0.5, std::make_shared<Variable>(variable),
-            std::make_shared<Constant>(2)
+            0.5, variable.clone(), std::make_shared<Constant>(2)
         );
 
     auto terms = std::make_shared<Terms>();
-    terms->add_term(std::make_shared<Variable>(variable));
-    terms->add_term(std::make_shared<Variable>(*this));
+    terms->add_term(variable.clone());
+    terms->add_term(this->clone());
 
     return terms;
 }
@@ -65,16 +63,13 @@ std::shared_ptr<Token> Variable::integral(Variable const &variable) const {
 std::shared_ptr<Token> Function::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_shared<Terms>();
-        terms->add_term(std::make_shared<Variable>(variable));
-        terms->add_term(std::make_shared<Function>(*this));
+        terms->add_term(variable.clone());
+        terms->add_term(this->clone());
 
         return terms;
     }
 
     if (typeid(*this->parameter) == typeid(Variable)) {
-        auto const parameter =
-            std::dynamic_pointer_cast<Variable>(this->parameter);
-
         auto const terms = std::make_shared<Terms>();
 
         auto string = static_cast<std::string>(*this->parameter);
@@ -92,8 +87,8 @@ std::shared_ptr<Token> Function::integral(Variable const &variable) const {
 std::shared_ptr<Token> Term::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_shared<Terms>();
-        terms->add_term(std::make_shared<Variable>(variable));
-        terms->add_term(std::make_shared<Term>(*this));
+        terms->add_term(variable.clone());
+        terms->add_term(this->clone());
 
         return terms;
     }
@@ -107,27 +102,26 @@ std::shared_ptr<Token> Term::integral(Variable const &variable) const {
         if (power->value == -1) {
             return std::make_shared<Term>(
                 this->coefficient.value,
-                std::make_shared<Function>("ln", this->base),
+                std::make_shared<Function>("ln", this->base->clone()),
                 std::make_shared<Constant>(1)
             );
         }
 
         return std::make_shared<Term>(
-            this->coefficient.value / (power->value + 1), this->base,
+            this->coefficient.value / (power->value + 1), this->base->clone(),
             std::make_shared<Constant>(power->value + 1)
         );
     }
 
     if (base_type == typeid(Constant) && power_type == typeid(Variable)) {
         auto const terms = std::make_shared<Terms>();
-        terms->coefficient = this->coefficient;
-        terms->add_term(std::make_shared<Term>(*this));
+        terms->add_term(this->clone());
 
         if (*std::dynamic_pointer_cast<Variable>(this->power) != variable) {
-            terms->add_term(std::make_shared<Variable>(variable));
+            terms->add_term(variable.clone());
         } else {
             terms->add_term(std::make_shared<Term>(
-                1, std::make_shared<Function>("ln", this->base),
+                1, std::make_shared<Function>("ln", this->base->clone()),
                 std::make_shared<Constant>(-1)
             ));
         }
@@ -141,8 +135,8 @@ std::shared_ptr<Token> Term::integral(Variable const &variable) const {
 std::shared_ptr<Token> Terms::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_shared<Terms>();
-        terms->add_term(std::make_shared<Variable>(variable));
-        terms->add_term(std::make_shared<Terms>(*this));
+        terms->add_term(variable.clone());
+        terms->add_term(this->clone());
 
         return terms;
     }
@@ -153,8 +147,8 @@ std::shared_ptr<Token> Terms::integral(Variable const &variable) const {
 std::shared_ptr<Token> Expression::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_shared<Terms>();
-        terms->add_term(std::make_shared<Variable>(variable));
-        terms->add_term(std::make_shared<Expression>(*this));
+        terms->add_term(variable.clone());
+        terms->add_term(this->clone());
 
         return terms;
     }
@@ -164,7 +158,7 @@ std::shared_ptr<Token> Expression::integral(Variable const &variable) const {
     for (std::shared_ptr<Token> const &term : this->tokens) {
         if (auto const &token_type = typeid(*term);
             token_type == typeid(Operation)) {
-            result->add_token(term);
+            result->add_token(term->clone());
 
             continue;
         }

@@ -62,7 +62,7 @@ std::shared_ptr<Token> Function::derivative(
     Variable const &variable, std::uint32_t const order
 ) const {
     if (!order)
-        return std::make_shared<Function>(*this);
+        return this->clone();
 
     if (!this->is_dependent_on(variable))
         return std::make_shared<Constant>(0);
@@ -92,23 +92,21 @@ std::shared_ptr<Token> Function::derivative(
 
 std::shared_ptr<Token>
 Term::derivative(Variable const &variable, std::uint32_t const order) const {
-    auto term = std::make_shared<Term>(*this);
-
     if (!order)
-        return term;
+        return this->clone();
 
-    if (!term->base || !term->is_dependent_on(variable))
+    if (!this->base || !this->is_dependent_on(variable))
         return std::make_shared<Constant>(0);
 
-    auto const &base_type = typeid(*term->base);
+    auto const &base_type = typeid(*this->base);
 
-    Constant c = term->coefficient;
+    Constant c = this->coefficient;
 
-    if (!term->power) {
+    if (!this->power) {
         auto derivative =
             std::make_shared<Term>(
                 c.value,
-                std::dynamic_pointer_cast<Differentiable>(term->base)
+                std::dynamic_pointer_cast<Differentiable>(this->base)
                     ->derivative(variable, 1),
                 std::make_shared<Constant>(1)
             )
@@ -124,20 +122,20 @@ Term::derivative(Variable const &variable, std::uint32_t const order) const {
         return derivative;
     }
 
-    if (auto const &power_type = typeid(*term->power);
+    if (auto const &power_type = typeid(*this->power);
         power_type == typeid(Constant)) {
         if (base_type == typeid(Constant))
             return std::make_shared<Constant>(0);
 
         double const power =
-            std::dynamic_pointer_cast<Constant>(term->power)->value;
+            std::dynamic_pointer_cast<Constant>(this->power)->value;
 
         auto const terms = std::make_shared<Terms>();
         terms->coefficient.value *= c.value * power;
         terms->add_term(std::make_shared<Term>(
-            1, term->base, std::make_shared<Constant>(power - 1)
+            1, this->base->clone(), std::make_shared<Constant>(power - 1)
         ));
-        terms->add_term(std::dynamic_pointer_cast<Differentiable>(term->base)
+        terms->add_term(std::dynamic_pointer_cast<Differentiable>(this->base)
                             ->derivative(variable, 1));
 
         auto derivative = terms->simplified();
@@ -154,11 +152,11 @@ Term::derivative(Variable const &variable, std::uint32_t const order) const {
 
     auto const result = std::make_shared<Terms>();
 
-    result->add_term(term);
+    result->add_term(this->clone());
 
     if (base_type == typeid(Constant)) {
-        result->add_term(std::make_shared<Function>("ln", term->base));
-        result->add_term(std::dynamic_pointer_cast<Differentiable>(term->power)
+        result->add_term(std::make_shared<Function>("ln", this->base));
+        result->add_term(std::dynamic_pointer_cast<Differentiable>(this->power)
                              ->derivative(variable, 1));
 
         auto derivative = result->simplified();
@@ -174,17 +172,17 @@ Term::derivative(Variable const &variable, std::uint32_t const order) const {
     }
 
     auto const terms_1 = std::make_shared<Terms>();
-    terms_1->add_term(term->power);
-    terms_1->add_term(std::dynamic_pointer_cast<Differentiable>(term->base)
+    terms_1->add_term(this->power->clone());
+    terms_1->add_term(std::dynamic_pointer_cast<Differentiable>(this->base)
                           ->derivative(variable, 1));
-    terms_1->add_term(
-        std::make_shared<Term>(term->base, std::make_shared<Constant>(-1))
-    );
+    terms_1->add_term(std::make_shared<Term>(
+        this->base->clone(), std::make_shared<Constant>(-1)
+    ));
 
     auto const terms_2 = std::make_shared<Terms>();
-    terms_2->add_term(std::dynamic_pointer_cast<Differentiable>(term->power)
+    terms_2->add_term(std::dynamic_pointer_cast<Differentiable>(this->power)
                           ->derivative(variable, 1));
-    terms_2->add_term(std::make_shared<Function>("ln", term->base));
+    terms_2->add_term(std::make_shared<Function>("ln", this->base));
 
     auto const expression = std::make_shared<Expression>();
     expression->add_token(terms_1);
@@ -277,7 +275,7 @@ std::shared_ptr<Token> Expression::derivative(
     Variable const &variable, std::uint32_t const order
 ) const {
     if (!order)
-        return std::make_shared<Expression>(*this);
+        return this->clone();
 
     if (!this->is_dependent_on(variable))
         return std::make_shared<Constant>(0);
@@ -287,7 +285,7 @@ std::shared_ptr<Token> Expression::derivative(
     for (std::shared_ptr<Token> const &term : this->tokens) {
         if (auto const &token_type = typeid(*term);
             token_type == typeid(Operation)) {
-            result->add_token(term);
+            result->add_token(term->clone());
 
             continue;
         }
