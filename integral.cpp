@@ -26,43 +26,43 @@ std::map<std::string, std::string> k_function_map{
 };
 } // namespace
 
-std::shared_ptr<Token> Integrable::integral(
-    Variable const &variable, std::shared_ptr<Token> const &from,
-    std::shared_ptr<Token> const &to
+OwnedToken Integrable::integral(
+    Variable const &variable, SharedToken const &from, SharedToken const &to
 ) const {
-    auto const integral =
-        std::dynamic_pointer_cast<Evaluatable>(this->integral(variable));
+    auto const token = this->integral(variable);
 
-    auto const result = std::make_shared<Expression>();
-    result->add_token(integral->at({{variable, to}}));
-    result->add_token(std::make_shared<Operation>(Operation::sub));
-    result->add_token(integral->at({{variable, from}}));
+    auto const &integral = dynamic_cast<Evaluatable &>(*token);
 
-    return result->simplified();
+    Expression result{};
+    result.add_token(integral.at({{variable, to}}));
+    result.add_token(std::make_unique<Operation>(Operation::sub));
+    result.add_token(integral.at({{variable, from}}));
+
+    return result.simplified();
 }
 
-std::shared_ptr<Token> Constant::integral(Variable const &variable) const {
-    return std::make_shared<Term>(
-        this->value, variable.clone(), std::make_shared<Constant>(1)
+OwnedToken Constant::integral(Variable const &variable) const {
+    return std::make_unique<Term>(
+        this->value, variable.clone(), std::make_unique<Constant>(1)
     );
 }
 
-std::shared_ptr<Token> Variable::integral(Variable const &variable) const {
+OwnedToken Variable::integral(Variable const &variable) const {
     if (*this == variable)
-        return std::make_shared<Term>(
-            0.5, variable.clone(), std::make_shared<Constant>(2)
+        return std::make_unique<Term>(
+            0.5, variable.clone(), std::make_unique<Constant>(2)
         );
 
-    auto terms = std::make_shared<Terms>();
+    auto terms = std::make_unique<Terms>();
     terms->add_term(variable.clone());
     terms->add_term(this->clone());
 
     return terms;
 }
 
-std::shared_ptr<Token> Function::integral(Variable const &variable) const {
+OwnedToken Function::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
-        auto terms = std::make_shared<Terms>();
+        auto terms = std::make_unique<Terms>();
         terms->add_term(variable.clone());
         terms->add_term(this->clone());
 
@@ -70,23 +70,23 @@ std::shared_ptr<Token> Function::integral(Variable const &variable) const {
     }
 
     if (typeid(*this->parameter) == typeid(Variable)) {
-        auto const terms = std::make_shared<Terms>();
+        Terms terms{};
 
         auto string = static_cast<std::string>(*this->parameter);
 
-        terms->add_term(tokenise(std::vformat(
+        terms.add_term(tokenise(std::vformat(
             k_function_map.at(this->function), std::make_format_args(string)
         )));
 
-        return terms->simplified();
+        return terms.simplified();
     }
 
     throw std::runtime_error("Expression is not integrable!");
 }
 
-std::shared_ptr<Token> Term::integral(Variable const &variable) const {
+OwnedToken Term::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
-        auto terms = std::make_shared<Terms>();
+        auto terms = std::make_unique<Terms>();
         terms->add_term(variable.clone());
         terms->add_term(this->clone());
 
@@ -97,44 +97,44 @@ std::shared_ptr<Token> Term::integral(Variable const &variable) const {
     auto const &power_type = typeid(*this->power);
 
     if (base_type == typeid(Variable) && power_type == typeid(Constant)) {
-        auto const power = std::dynamic_pointer_cast<Constant>(this->power);
+        auto const &power = dynamic_cast<Constant &>(*this->power);
 
-        if (power->value == -1) {
-            return std::make_shared<Term>(
+        if (power.value == -1) {
+            return std::make_unique<Term>(
                 this->coefficient.value,
-                std::make_shared<Function>("ln", this->base->clone()),
-                std::make_shared<Constant>(1)
+                std::make_unique<Function>("ln", this->base->clone()),
+                std::make_unique<Constant>(1)
             );
         }
 
-        return std::make_shared<Term>(
-            this->coefficient.value / (power->value + 1), this->base->clone(),
-            std::make_shared<Constant>(power->value + 1)
+        return std::make_unique<Term>(
+            this->coefficient.value / (power.value + 1), this->base->clone(),
+            std::make_unique<Constant>(power.value + 1)
         );
     }
 
     if (base_type == typeid(Constant) && power_type == typeid(Variable)) {
-        auto const terms = std::make_shared<Terms>();
-        terms->add_term(this->clone());
+        Terms terms{};
+        terms.add_term(this->clone());
 
-        if (*std::dynamic_pointer_cast<Variable>(this->power) != variable) {
-            terms->add_term(variable.clone());
+        if (dynamic_cast<Variable &>(*this->power) != variable) {
+            terms.add_term(variable.clone());
         } else {
-            terms->add_term(std::make_shared<Term>(
-                1, std::make_shared<Function>("ln", this->base->clone()),
-                std::make_shared<Constant>(-1)
+            terms.add_term(std::make_unique<Term>(
+                1, std::make_unique<Function>("ln", this->base->clone()),
+                std::make_unique<Constant>(-1)
             ));
         }
 
-        return terms->simplified();
+        return terms.simplified();
     }
 
     throw std::runtime_error("Expression is not integrable!");
 }
 
-std::shared_ptr<Token> Terms::integral(Variable const &variable) const {
+OwnedToken Terms::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
-        auto terms = std::make_shared<Terms>();
+        auto terms = std::make_unique<Terms>();
         terms->add_term(variable.clone());
         terms->add_term(this->clone());
 
@@ -144,29 +144,27 @@ std::shared_ptr<Token> Terms::integral(Variable const &variable) const {
     throw std::runtime_error("Expression is not integrable!");
 }
 
-std::shared_ptr<Token> Expression::integral(Variable const &variable) const {
+OwnedToken Expression::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
-        auto terms = std::make_shared<Terms>();
+        auto terms = std::make_unique<Terms>();
         terms->add_term(variable.clone());
         terms->add_term(this->clone());
 
         return terms;
     }
 
-    auto const result = std::make_shared<Expression>();
+    Expression result{};
 
-    for (std::shared_ptr<Token> const &term : this->tokens) {
+    for (OwnedToken const &term : this->tokens) {
         if (auto const &token_type = typeid(*term);
             token_type == typeid(Operation)) {
-            result->add_token(term->clone());
+            result.add_token(term->clone());
 
             continue;
         }
 
-        result->add_token(
-            std::dynamic_pointer_cast<Integrable>(term)->integral(variable)
-        );
+        result.add_token(dynamic_cast<Integrable &>(*term).integral(variable));
     }
 
-    return result->simplified();
+    return result.simplified();
 }

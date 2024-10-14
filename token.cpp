@@ -4,6 +4,7 @@
 #include <map>
 #include <ranges>
 #include <sstream>
+#include <utility>
 
 namespace {
 std::map<char, char> const k_parenthesis_map{
@@ -38,7 +39,7 @@ std::map<std::string, double (*)(double)> k_functions{
     {"ln", std::log},
 };
 
-std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
+OwnedToken get_next_token(std::string const &expression, int &i) {
     if (i >= expression.size())
         return nullptr;
 
@@ -60,7 +61,7 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
             if (character != '.') {
                 --i;
 
-                return std::make_shared<Constant>(std::stoull(number));
+                return std::make_unique<Constant>(std::stoull(number));
             }
 
             do {
@@ -73,10 +74,10 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
             if (i < expression.size())
                 --i;
 
-            return std::make_shared<Constant>(std::stold(number));
+            return std::make_unique<Constant>(std::stold(number));
         }
 
-        return std::make_shared<Constant>(std::stoull(number));
+        return std::make_unique<Constant>(std::stoull(number));
     }
 
     if (k_parenthesis_map.contains(character)) {
@@ -118,12 +119,12 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
 
         i += offset;
 
-        return std::make_shared<Function>(fn, get_next_token(expression, i));
+        return std::make_unique<Function>(fn, get_next_token(expression, i));
     }
 
     if (('A' <= character && character <= 'Z') ||
         ('a' <= character && character <= 'z'))
-        return std::make_shared<Variable>(character);
+        return std::make_unique<Variable>(character);
 
     return nullptr;
 }
@@ -131,12 +132,11 @@ std::shared_ptr<Token> get_next_token(std::string const &expression, int &i) {
 
 Constant::Constant(double const value) : value(value) {}
 
-std::shared_ptr<Token> Constant::clone() const {
-    return std::make_shared<Constant>(this->value);
+OwnedToken Constant::clone() const {
+    return std::make_unique<Constant>(this->value);
 }
 
-std::shared_ptr<Token>
-Constant::at(std::map<Variable, std::shared_ptr<Token>> const &values) const {
+OwnedToken Constant::at(std::map<Variable, SharedToken> const &values) const {
     return this->clone();
 }
 
@@ -148,17 +148,16 @@ bool Constant::operator==(Constant const &constant) const {
 
 Variable::Variable(char const var) : var(var) {}
 
-std::shared_ptr<Token> Variable::clone() const {
-    return std::make_shared<Variable>(this->var);
+OwnedToken Variable::clone() const {
+    return std::make_unique<Variable>(this->var);
 }
 
 bool Variable::is_dependent_on(Variable const &variable) const {
     return *this == variable;
 }
 
-std::shared_ptr<Token>
-Variable::at(std::map<Variable, std::shared_ptr<Token>> const &values) const {
-    return values.contains(*this) ? values.at(*this) : this->clone();
+OwnedToken Variable::at(std::map<Variable, SharedToken> const &values) const {
+    return values.contains(*this) ? values.at(*this)->clone() : this->clone();
 }
 
 Variable::operator std::string() const { return {this->var}; }
@@ -169,26 +168,26 @@ bool Variable::operator==(Variable const &variable) const {
 
 Operation::Operation(op const operation) : operation(operation) {}
 
-std::shared_ptr<Token> Operation::clone() const {
-    return std::make_shared<Operation>(this->operation);
+OwnedToken Operation::clone() const {
+    return std::make_unique<Operation>(this->operation);
 }
 
-std::shared_ptr<Operation> Operation::from_char(char const operation) {
+std::unique_ptr<Operation> Operation::from_char(char const operation) {
     switch (operation) {
     case '+':
-        return std::make_shared<Operation>(add);
+        return std::make_unique<Operation>(add);
 
     case '-':
-        return std::make_shared<Operation>(sub);
+        return std::make_unique<Operation>(sub);
 
     case '*':
-        return std::make_shared<Operation>(mul);
+        return std::make_unique<Operation>(mul);
 
     case '/':
-        return std::make_shared<Operation>(div);
+        return std::make_unique<Operation>(div);
 
     case '^':
-        return std::make_shared<Operation>(pow);
+        return std::make_unique<Operation>(pow);
 
     default:
         return nullptr;
@@ -212,34 +211,30 @@ Operation::operator std::string() const {
     return "";
 }
 
-Function::Function(
-    std::string function, std::shared_ptr<Token> const &parameter
-)
-    : function(std::move(function)), parameter(parameter) {}
+Function::Function(std::string function, OwnedToken &&parameter)
+    : function(std::move(function)), parameter(std::move(parameter)) {}
 
-std::shared_ptr<Token> Function::clone() const {
-    return std::make_shared<Function>(this->function, this->parameter->clone());
+OwnedToken Function::clone() const {
+    return std::make_unique<Function>(this->function, this->parameter->clone());
 }
 
 bool Function::is_dependent_on(Variable const &variable) const {
     if (typeid(*this->parameter) == typeid(Constant))
         return false;
 
-    return std::dynamic_pointer_cast<Dependent>(this->parameter)
-        ->is_dependent_on(variable);
+    return dynamic_cast<Dependent &>(*this->parameter)
+        .is_dependent_on(variable);
 }
 
-std::shared_ptr<Token>
-Function::at(std::map<Variable, std::shared_ptr<Token>> const &values) const {
-    auto param =
-        std::dynamic_pointer_cast<Evaluatable>(this->parameter)->at(values);
+OwnedToken Function::at(std::map<Variable, SharedToken> const &values) const {
+    auto param = dynamic_cast<Evaluatable &>(*this->parameter).at(values);
 
     if (typeid(*param) == typeid(Constant))
-        return std::make_shared<Constant>(k_functions.at(this->function)(
-            std::dynamic_pointer_cast<Constant>(param)->value
+        return std::make_unique<Constant>(k_functions.at(this->function)(
+            dynamic_cast<Constant &>(*param).value
         ));
 
-    return std::make_shared<Function>(this->function, param);
+    return std::make_unique<Function>(this->function, std::move(param));
 }
 
 Function::operator std::string() const {
@@ -251,19 +246,15 @@ Function::operator std::string() const {
     return result.str();
 }
 
-Term::Term(
-    double const coefficient, std::shared_ptr<Token> const &base,
-    std::shared_ptr<Token> const &power
-)
-    : coefficient(coefficient), base(base), power(power) {}
+Term::Term(double const coefficient, OwnedToken &&base, OwnedToken &&power)
+    : coefficient(coefficient), base(std::move(base)), power(std::move(power)) {
+}
 
-Term::Term(
-    std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
-)
-    : base(base), power(power) {}
+Term::Term(OwnedToken &&base, OwnedToken &&power)
+    : base(std::move(base)), power(std::move(power)) {}
 
-std::shared_ptr<Token> Term::clone() const {
-    return std::make_shared<Term>(
+OwnedToken Term::clone() const {
+    return std::make_unique<Term>(
         this->coefficient.value, this->base->clone(), this->power->clone()
     );
 }
@@ -273,20 +264,17 @@ bool Term::is_dependent_on(Variable const &variable) const {
         typeid(*this->power) == typeid(Constant))
         return false;
 
-    return std::dynamic_pointer_cast<Dependent>(this->base)
-               ->is_dependent_on(variable) ||
-           std::dynamic_pointer_cast<Dependent>(this->power)
-               ->is_dependent_on(variable);
+    return dynamic_cast<Dependent &>(*this->base).is_dependent_on(variable) ||
+           dynamic_cast<Dependent &>(*this->power).is_dependent_on(variable);
 }
 
-std::shared_ptr<Token>
-Term::at(std::map<Variable, std::shared_ptr<Token>> const &values) const {
-    auto const term = std::dynamic_pointer_cast<Term>(this->clone());
-    term->base = std::dynamic_pointer_cast<Evaluatable>(term->base)->at(values);
-    term->power =
-        std::dynamic_pointer_cast<Evaluatable>(term->power)->at(values);
+OwnedToken Term::at(std::map<Variable, SharedToken> const &values) const {
+    auto const clone = this->clone();
+    auto &term = dynamic_cast<Term &>(*clone);
+    term.base = dynamic_cast<Evaluatable &>(*term.base).at(values);
+    term.power = dynamic_cast<Evaluatable &>(*term.power).at(values);
 
-    return term->simplified();
+    return term.simplified();
 }
 
 Term::operator std::string() const {
@@ -306,7 +294,7 @@ Term::operator std::string() const {
 
     if (this->power) {
         if (typeid(*this->power) == typeid(Constant)) {
-            if (std::dynamic_pointer_cast<Constant>(this->power)->value != 1) {
+            if (dynamic_cast<Constant &>(*this->power).value != 1) {
                 result << '^';
                 result << *this->power;
             }
@@ -321,8 +309,8 @@ Term::operator std::string() const {
     return result.str();
 }
 
-std::shared_ptr<Token> Terms::clone() const {
-    auto terms = std::make_shared<Terms>();
+OwnedToken Terms::clone() const {
+    auto terms = std::make_unique<Terms>();
     terms->coefficient = this->coefficient;
 
     for (auto const &term : this->terms)
@@ -331,60 +319,57 @@ std::shared_ptr<Token> Terms::clone() const {
     return terms;
 }
 
-void Terms::add_term(std::shared_ptr<Token> const &token) {
+void Terms::add_term(OwnedToken &&token) {
     auto const &term_type = typeid(*token);
 
     if (term_type == typeid(Constant)) {
-        this->coefficient.value *=
-            std::dynamic_pointer_cast<Constant>(token)->value;
+        this->coefficient.value *= dynamic_cast<Constant &>(*token).value;
 
         return;
     }
 
     if (term_type == typeid(Term)) {
-        auto const term = std::dynamic_pointer_cast<Term>(token);
-        this->coefficient.value *= term->coefficient.value;
-        term->coefficient.value = 1;
+        auto &term = dynamic_cast<Term &>(*token);
+        this->coefficient.value *= term.coefficient.value;
+        term.coefficient.value = 1;
 
-        this->terms.push_back(term);
+        this->terms.push_back(std::move(token));
 
         return;
     }
 
     if (term_type == typeid(Terms)) {
-        auto const terms = std::dynamic_pointer_cast<Terms>(token);
-        this->coefficient.value *= terms->coefficient.value;
-        terms->coefficient.value = 1;
+        auto &terms = dynamic_cast<Terms &>(*token);
+        this->coefficient.value *= terms.coefficient.value;
+        terms.coefficient.value = 1;
 
-        for (std::shared_ptr<Token> const &term : terms->terms)
-            this->add_term(term);
+        for (OwnedToken &term : terms.terms)
+            this->add_term(std::move(term));
 
         return;
     }
 
-    this->terms.push_back(token);
+    this->terms.push_back(std::move(token));
 }
 
 bool Terms::is_dependent_on(Variable const &variable) const {
     return std::ranges::any_of(
         this->terms,
-        [variable](std::shared_ptr<Token> const &token) -> bool {
+        [variable](OwnedToken const &token) -> bool {
             return typeid(*token) != typeid(Constant) &&
-                   std::dynamic_pointer_cast<Dependent>(token)->is_dependent_on(
-                       variable
-                   );
+                   dynamic_cast<Dependent &>(*token).is_dependent_on(variable);
         }
     );
 }
 
-std::shared_ptr<Token>
-Terms::at(std::map<Variable, std::shared_ptr<Token>> const &values) const {
-    auto const terms = std::dynamic_pointer_cast<Terms>(this->clone());
+OwnedToken Terms::at(std::map<Variable, SharedToken> const &values) const {
+    auto const clone = this->clone();
+    auto &terms = dynamic_cast<Terms &>(*clone);
 
-    for (auto &term : terms->terms)
-        term = std::dynamic_pointer_cast<Evaluatable>(term)->at(values);
+    for (auto &term : terms.terms)
+        term = dynamic_cast<Evaluatable &>(*term).at(values);
 
-    return terms->simplified();
+    return terms.simplified();
 }
 
 Terms::operator std::string() const {
@@ -412,8 +397,8 @@ Terms::operator std::string() const {
     return result.str();
 }
 
-std::shared_ptr<Token> Expression::clone() const {
-    auto expression = std::make_shared<Expression>();
+OwnedToken Expression::clone() const {
+    auto expression = std::make_unique<Expression>();
 
     for (auto const &token : this->tokens)
         expression->add_token(token->clone());
@@ -421,12 +406,12 @@ std::shared_ptr<Token> Expression::clone() const {
     return expression;
 }
 
-void Expression::add_token(std::shared_ptr<Token> const &token) {
-    this->tokens.push_back(token);
+void Expression::add_token(OwnedToken &&token) {
+    this->tokens.push_back(std::move(token));
 }
 
-std::shared_ptr<Token> Expression::pop_token() {
-    std::shared_ptr<Token> token = this->tokens.back();
+OwnedToken Expression::pop_token() {
+    OwnedToken token = std::move(this->tokens.back());
 
     this->tokens.pop_back();
 
@@ -436,25 +421,23 @@ std::shared_ptr<Token> Expression::pop_token() {
 bool Expression::is_dependent_on(Variable const &variable) const {
     return std::ranges::any_of(
         this->tokens,
-        [variable](std::shared_ptr<Token> const &token) -> bool {
+        [variable](OwnedToken const &token) -> bool {
             return typeid(*token) != typeid(Constant) &&
                    typeid(*token) != typeid(Operation) &&
-                   std::dynamic_pointer_cast<Dependent>(token)->is_dependent_on(
-                       variable
-                   );
+                   dynamic_cast<Dependent &>(*token).is_dependent_on(variable);
         }
     );
 }
 
-std::shared_ptr<Token>
-Expression::at(std::map<Variable, std::shared_ptr<Token>> const &values) const {
-    auto const expression = std::make_shared<Expression>(*this);
+OwnedToken Expression::at(std::map<Variable, SharedToken> const &values) const {
+    auto const clone = this->clone();
+    auto &expression = dynamic_cast<Expression &>(*clone);
 
-    for (auto &term : expression->tokens)
+    for (auto &term : expression.tokens)
         if (typeid(*term) != typeid(Operation))
-            term = std::dynamic_pointer_cast<Evaluatable>(term)->at(values);
+            term = dynamic_cast<Evaluatable &>(*term).at(values);
 
-    return expression->simplified();
+    return expression.simplified();
 }
 
 Expression::operator std::string() const {
@@ -465,7 +448,7 @@ Expression::operator std::string() const {
     } else {
         result << '(';
 
-        for (std::shared_ptr<Token> const &token : this->tokens)
+        for (OwnedToken const &token : this->tokens)
             result << static_cast<std::string>(*token);
 
         result << ')';
@@ -474,71 +457,71 @@ Expression::operator std::string() const {
     return result.str();
 }
 
-std::shared_ptr<Token> tokenise(std::string expression) {
-    auto const result = std::make_shared<Expression>();
+OwnedToken tokenise(std::string expression) {
+    Expression result{};
 
     auto e = std::ranges::remove(expression, ' ');
 
     expression.erase(e.begin(), e.end());
 
-    auto terms = std::make_shared<Terms>();
+    auto terms = std::make_unique<Terms>();
 
     for (int i = 0; i < expression.size(); ++i) {
         std::int32_t const copy = i;
 
-        std::shared_ptr<Token> token = get_next_token(expression, i);
+        OwnedToken token = get_next_token(expression, i);
 
         if (!token)
             continue;
 
         if (typeid(*token) == typeid(Operation)) {
-            auto operation = std::dynamic_pointer_cast<Operation>(token);
+            auto &operation = dynamic_cast<Operation &>(*token);
 
-            if (operation->operation == Operation::add ||
-                operation->operation == Operation::sub) {
+            if (operation.operation == Operation::add ||
+                operation.operation == Operation::sub) {
                 if (!terms->terms.empty())
-                    result->add_token(terms);
+                    result.add_token(std::move(terms));
 
                 else if (copy != 0)
-                    result->add_token(
-                        std::make_shared<Constant>(terms->coefficient)
+                    result.add_token(
+                        std::make_unique<Constant>(terms->coefficient)
                     );
 
-                terms = std::make_shared<Terms>();
-                result->add_token(operation);
+                terms = std::make_unique<Terms>();
+                result.add_token(std::move(token));
 
                 continue;
             }
 
-            if (operation->operation == Operation::mul) {
+            if (operation.operation == Operation::mul) {
                 if (auto next = get_next_token(expression, ++i);
                     typeid(*next) == typeid(Constant)) {
                     terms->coefficient.value *=
-                        std::dynamic_pointer_cast<Constant>(next)->value;
+                        dynamic_cast<Constant &>(*next).value;
                 } else {
-                    terms->add_term(next);
+                    terms->add_term(std::move(next));
                 }
 
                 continue;
             }
 
-            if (operation->operation == Operation::div) {
+            if (operation.operation == Operation::div) {
                 if (auto next = get_next_token(expression, ++i);
                     typeid(*next) == typeid(Constant)) {
                     terms->coefficient.value /=
-                        std::dynamic_pointer_cast<Constant>(next)->value;
+                        dynamic_cast<Constant &>(*next).value;
                 } else {
-                    terms->add_term(std::make_shared<Term>(
-                        1, next, std::make_shared<Constant>(-1)
+                    terms->add_term(std::make_unique<Term>(
+                        1, std::move(next), std::make_unique<Constant>(-1)
                     ));
                 }
 
                 continue;
             }
 
-            std::vector<std::shared_ptr<Term>> powers;
+            std::vector<OwnedToken> powers;
 
-            std::shared_ptr<Token> next;
+            OwnedToken next;
 
             while (true) {
                 next = get_next_token(expression, ++i);
@@ -547,32 +530,33 @@ std::shared_ptr<Token> tokenise(std::string expression) {
                     break;
 
                 if (typeid(*next) == typeid(Operation)) {
-                    operation = std::dynamic_pointer_cast<Operation>(next);
+                    operation = dynamic_cast<Operation &>(*next);
 
-                    if (operation->operation == Operation::pow)
+                    if (operation.operation == Operation::pow)
                         continue;
 
                     break;
                 }
 
                 if (typeid(*next) == typeid(Term)) {
-                    powers.push_back(std::dynamic_pointer_cast<Term>(next));
+                    powers.push_back(std::move(next));
                 } else {
-                    powers.push_back(std::make_shared<Term>(
-                        1, next, std::make_shared<Constant>(1)
+                    powers.push_back(std::make_unique<Term>(
+                        1, std::move(next), std::make_unique<Constant>(1)
                     ));
                 }
             }
 
-            std::shared_ptr<Token> power = std::make_shared<Constant>(1);
+            OwnedToken power = std::make_unique<Constant>(1);
 
-            for (std::shared_ptr<Term> const &p :
-                 powers | std::views::reverse) {
-                power = std::make_shared<Term>(1, p, power);
+            for (OwnedToken &p : powers | std::views::reverse) {
+                power =
+                    std::make_unique<Term>(1, std::move(p), std::move(power));
             }
 
-            terms->terms.back() =
-                std::make_shared<Term>(1, terms->terms.back(), power);
+            terms->terms.back() = std::make_unique<Term>(
+                1, std::move(terms->terms.back()), std::move(power)
+            );
 
             if (next) {
                 --i;
@@ -582,19 +566,19 @@ std::shared_ptr<Token> tokenise(std::string expression) {
         }
 
         if (typeid(*token) == typeid(Constant)) {
-            terms->terms.push_back(token);
+            terms->terms.push_back(std::move(token));
         } else {
-            terms->add_term(token);
+            terms->add_term(std::move(token));
         }
     }
 
     if (!terms->terms.empty())
-        result->add_token(terms);
+        result.add_token(std::move(terms));
 
     else
-        result->add_token(terms->coefficient.clone());
+        result.add_token(terms->coefficient.clone());
 
-    return result->simplified();
+    return result.simplified();
 }
 
 std::ostream &operator<<(std::ostream &os, Token const &token) {

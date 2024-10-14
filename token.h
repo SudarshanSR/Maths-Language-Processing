@@ -10,10 +10,13 @@
 #include <string>
 #include <vector>
 
+using SharedToken = std::shared_ptr<Token>;
+using OwnedToken = std::unique_ptr<Token>;
+
 struct Token {
     virtual ~Token() = default;
 
-    [[nodiscard]] virtual std::shared_ptr<Token> clone() const = 0;
+    [[nodiscard]] virtual OwnedToken clone() const = 0;
 
     explicit virtual operator std::string() const = 0;
 };
@@ -23,8 +26,8 @@ struct Variable;
 struct Evaluatable {
     virtual ~Evaluatable() = default;
 
-    [[nodiscard]] virtual std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) const = 0;
+    [[nodiscard]] virtual OwnedToken
+    at(std::map<Variable, SharedToken> const &values) const = 0;
 };
 
 struct Dependent {
@@ -43,18 +46,17 @@ struct Constant final : Token,
 
     explicit Constant(double value);
 
-    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+    [[nodiscard]] OwnedToken clone() const override;
 
-    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+    [[nodiscard]] OwnedToken simplified() const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
+    [[nodiscard]] OwnedToken at(std::map<Variable, SharedToken> const &values
+    ) const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
+    [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
-    ) const override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 
     explicit operator std::string() const override;
 
@@ -71,20 +73,19 @@ struct Variable final : Token,
 
     explicit Variable(char var);
 
-    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+    [[nodiscard]] OwnedToken clone() const override;
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+    [[nodiscard]] OwnedToken simplified() const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
+    [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
-
-    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
+    [[nodiscard]] OwnedToken at(std::map<Variable, SharedToken> const &values
     ) const override;
+
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 
     explicit operator std::string() const override;
 
@@ -96,9 +97,9 @@ struct Operation final : Token {
 
     explicit Operation(op operation);
 
-    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+    [[nodiscard]] OwnedToken clone() const override;
 
-    static std::shared_ptr<Operation> from_char(char operation);
+    static std::unique_ptr<Operation> from_char(char operation);
 
     explicit operator std::string() const override;
 };
@@ -111,25 +112,23 @@ struct Function final : Token,
                         Integrable {
     std::string function;
 
-    std::shared_ptr<Token> parameter = nullptr;
+    OwnedToken parameter = nullptr;
 
-    explicit
-    Function(std::string function, std::shared_ptr<Token> const &parameter);
+    explicit Function(std::string function, OwnedToken &&parameter);
 
-    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+    [[nodiscard]] OwnedToken clone() const override;
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
+    [[nodiscard]] OwnedToken at(std::map<Variable, SharedToken> const &values
+    ) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+    [[nodiscard]] OwnedToken simplified() const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
+    [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
-    ) const override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 
     explicit operator std::string() const override;
 };
@@ -141,34 +140,28 @@ struct Term final : Token,
                     Differentiable,
                     Integrable {
     Constant coefficient{1};
-    std::shared_ptr<Token> base = nullptr;
-    std::shared_ptr<Token> power = nullptr;
+    OwnedToken base = nullptr;
+    OwnedToken power = nullptr;
 
     Term() = default;
 
-    Term(
-        double coefficient, std::shared_ptr<Token> const &base,
-        std::shared_ptr<Token> const &power
-    );
+    Term(double coefficient, OwnedToken &&base, OwnedToken &&power);
 
-    Term(
-        std::shared_ptr<Token> const &base, std::shared_ptr<Token> const &power
-    );
+    Term(OwnedToken &&base, OwnedToken &&power);
 
-    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+    [[nodiscard]] OwnedToken clone() const override;
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
+    [[nodiscard]] OwnedToken at(std::map<Variable, SharedToken> const &values
+    ) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+    [[nodiscard]] OwnedToken simplified() const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
+    [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
-    ) const override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 
     explicit operator std::string() const override;
 };
@@ -181,26 +174,25 @@ struct Terms final : Token,
                      Integrable {
     Constant coefficient{1};
 
-    std::vector<std::shared_ptr<Token>> terms;
+    std::vector<OwnedToken> terms;
 
     Terms() = default;
 
-    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+    [[nodiscard]] OwnedToken clone() const override;
 
-    void add_term(std::shared_ptr<Token> const &token);
+    void add_term(OwnedToken &&token);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+    [[nodiscard]] OwnedToken simplified() const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
+    [[nodiscard]] OwnedToken at(std::map<Variable, SharedToken> const &values
+    ) const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
+    [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
-    ) const override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 
     explicit operator std::string() const override;
 };
@@ -211,33 +203,32 @@ struct Expression final : Token,
                           Simplifiable,
                           Differentiable,
                           Integrable {
-    std::vector<std::shared_ptr<Token>> tokens;
+    std::vector<OwnedToken> tokens;
 
     Expression() = default;
 
-    [[nodiscard]] std::shared_ptr<Token> clone() const override;
+    [[nodiscard]] OwnedToken clone() const override;
 
-    void add_token(std::shared_ptr<Token> const &token);
+    void add_token(OwnedToken &&token);
 
-    [[nodiscard]] std::shared_ptr<Token> pop_token();
+    [[nodiscard]] OwnedToken pop_token();
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> simplified() const override;
+    [[nodiscard]] OwnedToken simplified() const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
-    at(std::map<Variable, std::shared_ptr<Token>> const &values) const override;
+    [[nodiscard]] OwnedToken at(std::map<Variable, SharedToken> const &values
+    ) const override;
 
     explicit operator std::string() const override;
 
-    [[nodiscard]] std::shared_ptr<Token>
+    [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] std::shared_ptr<Token> integral(Variable const &variable
-    ) const override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 };
 
-std::shared_ptr<Token> tokenise(std::string expression);
+OwnedToken tokenise(std::string expression);
 
 std::ostream &operator<<(std::ostream &os, Token const &token);
 

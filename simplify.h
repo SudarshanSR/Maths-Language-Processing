@@ -5,10 +5,12 @@
 
 struct Token;
 
+using OwnedToken = std::unique_ptr<Token>;
+
 struct Simplifiable {
     virtual ~Simplifiable() = default;
 
-    [[nodiscard]] virtual std::shared_ptr<Token> simplified() const = 0;
+    [[nodiscard]] virtual OwnedToken simplified() const = 0;
 };
 
 #endif // SIMPIFY_H

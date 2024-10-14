@@ -7,15 +7,18 @@
 struct Token;
 struct Variable;
 
+using OwnedToken = std::unique_ptr<Token>;
+using SharedToken = std::shared_ptr<Token>;
+
 struct Differentiable {
     virtual ~Differentiable() = default;
 
-    [[nodiscard]] virtual std::shared_ptr<Token>
+    [[nodiscard]] virtual OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const = 0;
 
-    [[nodiscard]] std::shared_ptr<Token> derivative(
+    [[nodiscard]] OwnedToken derivative(
         Variable const &variable, std::uint32_t order,
-        std::map<Variable, std::shared_ptr<Token>> const &values
+        std::map<Variable, SharedToken> const &values
     ) const;
 };
 

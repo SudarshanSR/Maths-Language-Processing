@@ -6,15 +6,17 @@
 struct Token;
 struct Variable;
 
+using OwnedToken = std::unique_ptr<Token>;
+using SharedToken = std::shared_ptr<Token>;
+
 struct Integrable {
     virtual ~Integrable() = default;
 
-    [[nodiscard]] virtual std::shared_ptr<Token>
-    integral(Variable const &variable) const = 0;
+    [[nodiscard]] virtual OwnedToken integral(Variable const &variable
+    ) const = 0;
 
-    [[nodiscard]] std::shared_ptr<Token> integral(
-        Variable const &variable, std::shared_ptr<Token> const &from,
-        std::shared_ptr<Token> const &to
+    [[nodiscard]] OwnedToken integral(
+        Variable const &variable, SharedToken const &from, SharedToken const &to
     ) const;
 };
 

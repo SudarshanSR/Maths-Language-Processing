@@ -33,91 +33,89 @@ std::map<std::string, std::string> k_function_map{
 };
 } // namespace
 
-std::shared_ptr<Token> Differentiable::derivative(
+OwnedToken Differentiable::derivative(
     Variable const &variable, std::uint32_t const order,
-    std::map<Variable, std::shared_ptr<Token>> const &values
+    std::map<Variable, SharedToken> const &values
 ) const {
-    return std::dynamic_pointer_cast<Evaluatable>(
-               this->derivative(variable, order)
-    )
-        ->at(values);
+    return dynamic_cast<Evaluatable &>(*this->derivative(variable, order))
+        .at(values);
 }
 
-std::shared_ptr<Token> Constant::derivative(
+OwnedToken Constant::derivative(
     Variable const &variable, std::uint32_t const order
 ) const {
-    return std::make_shared<Constant>(0);
+    return std::make_unique<Constant>(0);
 }
 
-std::shared_ptr<Token> Variable::derivative(
+OwnedToken Variable::derivative(
     Variable const &variable, std::uint32_t const order
 ) const {
     if (!order)
-        return std::make_shared<Variable>(this->var);
+        return this->clone();
 
-    return std::make_shared<Constant>(*this == variable && order == 1 ? 1 : 0);
+    return std::make_unique<Constant>(*this == variable && order == 1 ? 1 : 0);
 }
 
-std::shared_ptr<Token> Function::derivative(
+OwnedToken Function::derivative(
     Variable const &variable, std::uint32_t const order
 ) const {
     if (!order)
         return this->clone();
 
     if (!this->is_dependent_on(variable))
-        return std::make_shared<Constant>(0);
+        return std::make_unique<Constant>(0);
 
-    auto const result = std::make_shared<Terms>();
+    Terms result{};
 
     auto parameter = static_cast<std::string>(*this->parameter);
 
-    result->add_term(tokenise(std::vformat(
+    result.add_term(tokenise(std::vformat(
         k_function_map.at(this->function), std::make_format_args(parameter)
     )));
 
-    result->add_term(std::dynamic_pointer_cast<Differentiable>(this->parameter)
-                         ->derivative(variable, 1));
+    result.add_term(
+        dynamic_cast<Differentiable &>(*this->parameter).derivative(variable, 1)
+    );
 
-    auto derivative = result->simplified();
+    auto derivative = result.simplified();
 
     if (order > 1)
-        return std::dynamic_pointer_cast<Simplifiable>(
-                   std::dynamic_pointer_cast<Differentiable>(derivative)
-                       ->derivative(variable, order - 1)
+        return dynamic_cast<Simplifiable &>(
+                   *dynamic_cast<Differentiable &>(*derivative)
+                        .derivative(variable, order - 1)
         )
-            ->simplified();
+            .simplified();
 
     return derivative;
 }
 
-std::shared_ptr<Token>
+OwnedToken
 Term::derivative(Variable const &variable, std::uint32_t const order) const {
     if (!order)
         return this->clone();
 
     if (!this->base || !this->is_dependent_on(variable))
-        return std::make_shared<Constant>(0);
+        return std::make_unique<Constant>(0);
 
     auto const &base_type = typeid(*this->base);
 
-    Constant c = this->coefficient;
+    Constant const c = this->coefficient;
 
     if (!this->power) {
-        auto derivative =
-            std::make_shared<Term>(
-                c.value,
-                std::dynamic_pointer_cast<Differentiable>(this->base)
-                    ->derivative(variable, 1),
-                std::make_shared<Constant>(1)
-            )
-                ->simplified();
+        auto derivative = Term(
+                              c.value,
+                              dynamic_cast<Differentiable &>(*this->base)
+                                  .derivative(variable, 1),
+                              std::make_unique<Constant>(1)
+        )
+                              .simplified();
 
         if (order > 1)
-            return std::dynamic_pointer_cast<Simplifiable>(
-                       std::dynamic_pointer_cast<Differentiable>(derivative)
-                           ->derivative(variable, order - 1)
+            return dynamic_cast<Simplifiable &>(
+                       *dynamic_cast<Differentiable &>(*derivative)
+                            .derivative(variable, order - 1)
             )
-                ->simplified();
+                .simplified();
 
         return derivative;
     }
@@ -125,183 +123,175 @@ Term::derivative(Variable const &variable, std::uint32_t const order) const {
     if (auto const &power_type = typeid(*this->power);
         power_type == typeid(Constant)) {
         if (base_type == typeid(Constant))
-            return std::make_shared<Constant>(0);
+            return std::make_unique<Constant>(0);
 
-        double const power =
-            std::dynamic_pointer_cast<Constant>(this->power)->value;
+        double const power = dynamic_cast<Constant &>(*this->power).value;
 
-        auto const terms = std::make_shared<Terms>();
-        terms->coefficient.value *= c.value * power;
-        terms->add_term(std::make_shared<Term>(
-            1, this->base->clone(), std::make_shared<Constant>(power - 1)
+        Terms terms{};
+        terms.coefficient.value *= c.value * power;
+        terms.add_term(std::make_unique<Term>(
+            1, this->base->clone(), std::make_unique<Constant>(power - 1)
         ));
-        terms->add_term(std::dynamic_pointer_cast<Differentiable>(this->base)
-                            ->derivative(variable, 1));
+        terms.add_term(
+            dynamic_cast<Differentiable &>(*this->base).derivative(variable, 1)
+        );
 
-        auto derivative = terms->simplified();
+        auto derivative = terms.simplified();
 
         if (order > 1)
-            return std::dynamic_pointer_cast<Simplifiable>(
-                       std::dynamic_pointer_cast<Differentiable>(derivative)
-                           ->derivative(variable, order - 1)
+            return dynamic_cast<Simplifiable &>(
+                       *dynamic_cast<Differentiable &>(*derivative)
+                            .derivative(variable, order - 1)
             )
-                ->simplified();
+                .simplified();
 
         return derivative;
     }
 
-    auto const result = std::make_shared<Terms>();
+    Terms result{};
 
-    result->add_term(this->clone());
+    result.add_term(this->clone());
 
     if (base_type == typeid(Constant)) {
-        result->add_term(std::make_shared<Function>("ln", this->base));
-        result->add_term(std::dynamic_pointer_cast<Differentiable>(this->power)
-                             ->derivative(variable, 1));
+        result.add_term(std::make_unique<Function>("ln", this->base->clone()));
+        result.add_term(
+            dynamic_cast<Differentiable &>(*this->power).derivative(variable, 1)
+        );
 
-        auto derivative = result->simplified();
+        auto derivative = result.simplified();
 
         if (order > 1)
-            return std::dynamic_pointer_cast<Simplifiable>(
-                       std::dynamic_pointer_cast<Differentiable>(derivative)
-                           ->derivative(variable, order - 1)
+            return dynamic_cast<Simplifiable &>(
+                       *dynamic_cast<Differentiable &>(*derivative)
+                            .derivative(variable, order - 1)
             )
-                ->simplified();
+                .simplified();
 
         return derivative;
     }
 
-    auto const terms_1 = std::make_shared<Terms>();
+    auto terms_1 = std::make_unique<Terms>();
     terms_1->add_term(this->power->clone());
-    terms_1->add_term(std::dynamic_pointer_cast<Differentiable>(this->base)
-                          ->derivative(variable, 1));
-    terms_1->add_term(std::make_shared<Term>(
-        this->base->clone(), std::make_shared<Constant>(-1)
+    terms_1->add_term(
+        dynamic_cast<Differentiable &>(*this->base).derivative(variable, 1)
+    );
+    terms_1->add_term(std::make_unique<Term>(
+        this->base->clone(), std::make_unique<Constant>(-1)
     ));
 
-    auto const terms_2 = std::make_shared<Terms>();
-    terms_2->add_term(std::dynamic_pointer_cast<Differentiable>(this->power)
-                          ->derivative(variable, 1));
-    terms_2->add_term(std::make_shared<Function>("ln", this->base));
+    auto terms_2 = std::make_unique<Terms>();
+    terms_2->add_term(
+        dynamic_cast<Differentiable &>(*this->power).derivative(variable, 1)
+    );
+    terms_2->add_term(std::make_unique<Function>("ln", this->base->clone()));
 
-    auto const expression = std::make_shared<Expression>();
-    expression->add_token(terms_1);
-    expression->add_token(std::make_shared<Operation>(Operation::add));
-    expression->add_token(terms_2);
+    auto expression = std::make_unique<Expression>();
+    expression->add_token(std::move(terms_1));
+    expression->add_token(std::make_unique<Operation>(Operation::add));
+    expression->add_token(std::move(terms_2));
 
-    result->add_term(expression);
+    result.add_term(std::move(expression));
 
-    auto derivative = result->simplified();
+    auto derivative = result.simplified();
 
     if (order > 1)
-        return std::dynamic_pointer_cast<Simplifiable>(
-                   std::dynamic_pointer_cast<Differentiable>(derivative)
-                       ->derivative(variable, order - 1)
+        return dynamic_cast<Simplifiable &>(
+                   *dynamic_cast<Differentiable &>(*derivative)
+                        .derivative(variable, order - 1)
         )
-            ->simplified();
+            .simplified();
 
     return derivative;
 }
 
-std::shared_ptr<Token>
+OwnedToken
 Terms::derivative(Variable const &variable, std::uint32_t const order) const {
-    auto terms = std::make_shared<Terms>(*this);
-
     if (!order)
-        return terms;
+        return this->clone();
 
-    if (terms->coefficient.value == 0 || !terms->is_dependent_on(variable))
-        return std::make_shared<Constant>(0);
+    if (this->coefficient.value == 0 || !this->is_dependent_on(variable))
+        return std::make_unique<Constant>(0);
 
-    auto const result = std::make_shared<Expression>();
+    auto result = std::make_unique<Expression>();
 
-    for (int i = 0; i < terms->terms.size(); ++i) {
-        auto const term = std::make_shared<Terms>();
+    for (int i = 0; i < this->terms.size(); ++i) {
+        auto term = std::make_unique<Terms>();
 
-        for (int j = 0; j < terms->terms.size(); ++j) {
+        for (int j = 0; j < this->terms.size(); ++j) {
             if (i != j) {
-                term->add_term(terms->terms[j]);
+                term->add_term(this->terms[j]->clone());
 
                 continue;
             }
 
-            if (auto derivative =
-                    std::dynamic_pointer_cast<Differentiable>(terms->terms[i])
-                        ->derivative(variable, 1);
-                typeid(*derivative) == typeid(Constant)) {
+            auto derivative = dynamic_cast<Differentiable &>(*this->terms[i])
+                                  .derivative(variable, 1);
+
+            if (typeid(*derivative) == typeid(Constant)) {
                 term->coefficient.value *=
-                    std::dynamic_pointer_cast<Constant>(derivative)->value;
-            } else if (typeid(*derivative) == typeid(Term)) {
-                auto t = std::dynamic_pointer_cast<Term>(derivative);
-                term->coefficient.value *= t->coefficient.value;
-                t->coefficient.value = 1;
+                    dynamic_cast<Constant &>(*derivative).value;
 
-                term->add_term(t);
-            } else if (typeid(*derivative) == typeid(Terms)) {
-                auto t = std::dynamic_pointer_cast<Terms>(derivative);
-                term->coefficient.value *= t->coefficient.value;
-                t->coefficient.value = 1;
-
-                term->add_term(t);
-            } else {
-                term->add_term(derivative);
+                continue;
             }
+
+            term->add_term(std::move(derivative));
         }
 
-        result->add_token(term);
+        result->add_token(std::move(term));
 
-        if (i != terms->terms.size() - 1) {
-            result->add_token(std::make_shared<Operation>(Operation::add));
+        if (i != this->terms.size() - 1) {
+            result->add_token(std::make_unique<Operation>(Operation::add));
         }
     }
 
-    auto const end = std::make_shared<Terms>();
-    end->coefficient = terms->coefficient;
-    end->add_term(result);
+    Terms end{};
+    end.coefficient = this->coefficient;
+    end.add_term(std::move(result));
 
-    auto derivative = end->simplified();
+    auto derivative = end.simplified();
 
     if (order > 1)
-        return std::dynamic_pointer_cast<Simplifiable>(
-                   std::dynamic_pointer_cast<Differentiable>(derivative)
-                       ->derivative(variable, order - 1)
+        return dynamic_cast<Simplifiable &>(
+                   *dynamic_cast<Differentiable &>(*derivative)
+                        .derivative(variable, order - 1)
         )
-            ->simplified();
+            .simplified();
 
     return derivative;
 }
 
-std::shared_ptr<Token> Expression::derivative(
+OwnedToken Expression::derivative(
     Variable const &variable, std::uint32_t const order
 ) const {
     if (!order)
         return this->clone();
 
     if (!this->is_dependent_on(variable))
-        return std::make_shared<Constant>(0);
+        return std::make_unique<Constant>(0);
 
-    auto const result = std::make_shared<Expression>();
+    Expression result{};
 
-    for (std::shared_ptr<Token> const &term : this->tokens) {
+    for (OwnedToken const &term : this->tokens) {
         if (auto const &token_type = typeid(*term);
             token_type == typeid(Operation)) {
-            result->add_token(term->clone());
+            result.add_token(term->clone());
 
             continue;
         }
 
-        result->add_token(std::dynamic_pointer_cast<Differentiable>(term)
-                              ->derivative(variable, 1));
+        result.add_token(
+            dynamic_cast<Differentiable &>(*term).derivative(variable, 1)
+        );
     }
 
-    auto derivative = result->simplified();
+    auto derivative = result.simplified();
 
     if (order > 1)
-        return std::dynamic_pointer_cast<Simplifiable>(
-                   std::dynamic_pointer_cast<Differentiable>(derivative)
-                       ->derivative(variable, order - 1)
+        return dynamic_cast<Simplifiable &>(
+                   *dynamic_cast<Differentiable &>(*derivative)
+                        .derivative(variable, order - 1)
         )
-            ->simplified();
+            .simplified();
 
     return derivative;
 }
