@@ -100,16 +100,19 @@ mlp::OwnedToken get_next_token(std::string const &expression, int &i) {
 
         i += offset;
 
-        return std::make_unique<mlp::Function>(
-            fn, get_next_token(expression, i)
-        );
+        mlp::OwnedToken parameter = get_next_token(expression, i);
+
+        if (!parameter)
+            throw std::runtime_error("Expression is not valid!");
+
+        return std::make_unique<mlp::Function>(fn, std::move(parameter));
     }
 
     if (('A' <= character && character <= 'Z') ||
         ('a' <= character && character <= 'z'))
         return std::make_unique<mlp::Variable>(character);
 
-    return nullptr;
+    throw std::runtime_error("Expression is not valid!");
 }
 } // namespace
 
@@ -388,9 +391,13 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 continue;
             }
 
+            OwnedToken next = get_next_token(expression, ++i);
+
+            if (!next)
+                throw std::runtime_error("Expression is not valid!");
+
             if (operation.operation == Operation::mul) {
-                if (auto next = get_next_token(expression, ++i);
-                    typeid(*next) == typeid(Constant)) {
+                if (typeid(*next) == typeid(Constant)) {
                     terms->coefficient.value *=
                         dynamic_cast<Constant &>(*next).value;
                 } else {
@@ -401,8 +408,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
             }
 
             if (operation.operation == Operation::div) {
-                if (auto next = get_next_token(expression, ++i);
-                    typeid(*next) == typeid(Constant)) {
+                if (typeid(*next) == typeid(Constant)) {
                     terms->coefficient.value /=
                         dynamic_cast<Constant &>(*next).value;
                 } else {
@@ -418,23 +424,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
             std::vector<OwnedToken> powers;
 
-            OwnedToken next;
-
             while (true) {
-                next = get_next_token(expression, ++i);
-
-                if (!next)
-                    break;
-
-                if (typeid(*next) == typeid(Operation)) {
-                    operation = dynamic_cast<Operation &>(*next);
-
-                    if (operation.operation == Operation::pow)
-                        continue;
-
-                    break;
-                }
-
                 if (typeid(*next) == typeid(Term)) {
                     powers.push_back(std::move(next));
                 } else {
@@ -443,6 +433,23 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                             1, std::move(next), std::make_unique<Constant>(1)
                         )
                     );
+                }
+
+                next = get_next_token(expression, ++i);
+
+                if (!next)
+                    break;
+
+                if (typeid(*next) == typeid(Operation)) {
+                    if (i == expression.size() - 1)
+                        throw std::runtime_error("Expression is not valid!");
+
+                    operation = dynamic_cast<Operation &>(*next);
+
+                    if (operation.operation == Operation::pow)
+                        continue;
+
+                    break;
                 }
             }
 
@@ -471,11 +478,10 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         }
     }
 
-    if (!terms->terms.empty())
-        result.add_token(std::move(terms));
+    if (terms->terms.empty())
+        throw std::runtime_error("Expression is not valid!");
 
-    else
-        result.add_token(terms->coefficient.clone());
+    result.add_token(std::move(terms));
 
     return simplified(result);
 }

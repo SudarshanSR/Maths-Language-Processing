@@ -25,8 +25,8 @@ target_link_libraries(simplify PRIVATE token)
 
 add_library(derivative derivative.cpp)
 target_sources(derivative PUBLIC derivative.h)
-target_link_libraries(derivative PRIVATE token simplify evaluate)
+target_link_libraries(derivative PRIVATE token simplify evaluate dependent)
 
 add_library(integral integral.cpp)
 target_sources(integral PUBLIC integral.h)
-target_link_libraries(integral PRIVATE token simplify evaluate)
+target_link_libraries(integral PRIVATE token simplify evaluate dependent)

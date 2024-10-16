@@ -58,7 +58,7 @@ struct Operation final : Token {
 struct Function final : Token {
     std::string function;
 
-    OwnedToken parameter = nullptr;
+    OwnedToken parameter;
 
     explicit Function(std::string function, OwnedToken &&parameter);
 
@@ -69,10 +69,8 @@ struct Function final : Token {
 
 struct Term final : Token {
     Constant coefficient{1};
-    OwnedToken base = nullptr;
-    OwnedToken power = nullptr;
-
-    Term() = default;
+    OwnedToken base;
+    OwnedToken power;
 
     Term(double coefficient, OwnedToken &&base, OwnedToken &&power);
 

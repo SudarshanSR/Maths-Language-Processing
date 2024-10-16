@@ -6,7 +6,7 @@
 #include <numbers>
 
 int main(int argc, char *argv[]) {
-    auto const expression = mlp::tokenise("sin(x)");
+    auto const expression = mlp::tokenise("sin()");
 
     std::cout << *expression << '\n';
 
