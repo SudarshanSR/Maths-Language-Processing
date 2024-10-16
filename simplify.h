@@ -1,16 +1,24 @@
-#ifndef SIMPIFY_H
-#define SIMPIFY_H
+#ifndef SIMPLIFY_H
+#define SIMPLIFY_H
+
+#include "token.h"
 
 #include <memory>
 
-struct Token;
+namespace mlp {
+[[nodiscard]] OwnedToken simplified(Token const &token);
 
-using OwnedToken = std::unique_ptr<Token>;
+[[nodiscard]] OwnedToken simplified(Constant const &token);
 
-struct Simplifiable {
-    virtual ~Simplifiable() = default;
+[[nodiscard]] OwnedToken simplified(Variable const &token);
 
-    [[nodiscard]] virtual OwnedToken simplified() const = 0;
-};
+[[nodiscard]] OwnedToken simplified(Function const &token);
 
-#endif // SIMPIFY_H
+[[nodiscard]] OwnedToken simplified(Term const &token);
+
+[[nodiscard]] OwnedToken simplified(Terms const &token);
+
+[[nodiscard]] OwnedToken simplified(Expression const &token);
+} // namespace mlp
+
+#endif // SIMPLIFY_H

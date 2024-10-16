@@ -1,23 +1,33 @@
 #ifndef INTEGRAL_H
 #define INTEGRAL_H
 
+#include "token.h"
+
 #include <memory>
 
-struct Token;
-struct Variable;
+namespace mlp {
+[[nodiscard]] OwnedToken integral(
+    Token const &token, Variable const &variable, SharedToken const &from,
+    SharedToken const &to
+);
 
-using OwnedToken = std::unique_ptr<Token>;
-using SharedToken = std::shared_ptr<Token>;
+[[nodiscard]] OwnedToken integral(Token const &token, Variable const &variable);
 
-struct Integrable {
-    virtual ~Integrable() = default;
+[[nodiscard]] OwnedToken
+integral(Constant const &token, Variable const &variable);
 
-    [[nodiscard]] virtual OwnedToken integral(Variable const &variable
-    ) const = 0;
+[[nodiscard]] OwnedToken
+integral(Variable const &token, Variable const &variable);
 
-    [[nodiscard]] OwnedToken integral(
-        Variable const &variable, SharedToken const &from, SharedToken const &to
-    ) const;
-};
+[[nodiscard]] OwnedToken
+integral(Function const &token, Variable const &variable);
+
+[[nodiscard]] OwnedToken integral(Term const &token, Variable const &variable);
+
+[[nodiscard]] OwnedToken integral(Terms const &token, Variable const &variable);
+
+[[nodiscard]] OwnedToken
+integral(Expression const &token, Variable const &variable);
+} // namespace mlp
 
 #endif // INTEGRAL_H

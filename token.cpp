@@ -1,8 +1,10 @@
 #include "token.h"
+#include "simplify.h"
 
 #include <algorithm>
 #include <map>
 #include <ranges>
+#include <set>
 #include <sstream>
 #include <utility>
 
@@ -11,41 +13,20 @@ std::map<char, char> const k_parenthesis_map{
     {'(', ')'}, {'[', ']'}, {'{', '}'}
 };
 
-std::map<std::string, double (*)(double)> k_functions{
-    {"sin", std::sin},
-    {"cos", std::cos},
-    {"tan", std::tan},
-    {"sec", [](double const val) -> double { return 1 / std::cos(val); }},
-    {"csc", [](double const val) -> double { return 1 / std::sin(val); }},
-    {"cot", [](double const val) -> double { return 1 / std::tan(val); }},
-    {"sinh", std::sinh},
-    {"cosh", std::cosh},
-    {"tanh", std::tanh},
-    {"sech", [](double const val) -> double { return 1 / std::cosh(val); }},
-    {"csch", [](double const val) -> double { return 1 / std::sinh(val); }},
-    {"coth", [](double const val) -> double { return 1 / std::tanh(val); }},
-    {"asin", std::asin},
-    {"acos", std::acos},
-    {"atan", std::atan},
-    {"asec", [](double const val) -> double { return std::acos(1 / val); }},
-    {"acsc", [](double const val) -> double { return std::asin(1 / val); }},
-    {"acot", [](double const val) -> double { return std::atan(1 / val); }},
-    {"asinh", std::asinh},
-    {"acosh", std::acosh},
-    {"atanh", std::atanh},
-    {"asech", [](double const val) -> double { return std::acosh(1 / val); }},
-    {"acsch", [](double const val) -> double { return std::asinh(1 / val); }},
-    {"acoth", [](double const val) -> double { return std::atanh(1 / val); }},
-    {"ln", std::log},
+std::set<std::string> k_functions{
+    "sin",   "cos",   "tan",   "sec",  "csc",   "cot",   "sinh",
+    "cosh",  "tanh",  "sech",  "csch", "coth",  "asin",  "acos",
+    "atan",  "asec",  "acsc",  "acot", "asinh", "acosh", "atanh",
+    "asech", "acsch", "acoth", "ln",
 };
 
-OwnedToken get_next_token(std::string const &expression, int &i) {
+mlp::OwnedToken get_next_token(std::string const &expression, int &i) {
     if (i >= expression.size())
         return nullptr;
 
     char character = expression[i];
 
-    if (auto op = Operation::from_char(character))
+    if (auto op = mlp::Operation::from_char(character))
         return op;
 
     if ('0' <= character && character <= '9') {
@@ -61,7 +42,7 @@ OwnedToken get_next_token(std::string const &expression, int &i) {
             if (character != '.') {
                 --i;
 
-                return std::make_unique<Constant>(std::stoull(number));
+                return std::make_unique<mlp::Constant>(std::stoull(number));
             }
 
             do {
@@ -74,10 +55,10 @@ OwnedToken get_next_token(std::string const &expression, int &i) {
             if (i < expression.size())
                 --i;
 
-            return std::make_unique<Constant>(std::stold(number));
+            return std::make_unique<mlp::Constant>(std::stold(number));
         }
 
-        return std::make_unique<Constant>(std::stoull(number));
+        return std::make_unique<mlp::Constant>(std::stoull(number));
     }
 
     if (k_parenthesis_map.contains(character)) {
@@ -105,7 +86,7 @@ OwnedToken get_next_token(std::string const &expression, int &i) {
 
         std::size_t const end = i - start;
 
-        return tokenise(expression.substr(start, end));
+        return mlp::tokenise(expression.substr(start, end));
     }
 
     for (int const offset : {5, 4, 3, 2}) {
@@ -119,60 +100,53 @@ OwnedToken get_next_token(std::string const &expression, int &i) {
 
         i += offset;
 
-        return std::make_unique<Function>(fn, get_next_token(expression, i));
+        return std::make_unique<mlp::Function>(
+            fn, get_next_token(expression, i)
+        );
     }
 
     if (('A' <= character && character <= 'Z') ||
         ('a' <= character && character <= 'z'))
-        return std::make_unique<Variable>(character);
+        return std::make_unique<mlp::Variable>(character);
 
     return nullptr;
 }
 } // namespace
 
-Constant::Constant(double const value) : value(value) {}
+mlp::Constant::Constant(double const value) : value(value) {}
 
-OwnedToken Constant::clone() const {
+mlp::OwnedToken mlp::Constant::clone() const {
     return std::make_unique<Constant>(this->value);
 }
 
-OwnedToken Constant::at(std::map<Variable, SharedToken> const &values) const {
-    return this->clone();
+mlp::Constant::operator std::string() const {
+    return std::to_string(this->value);
 }
 
-Constant::operator std::string() const { return std::to_string(this->value); }
-
-bool Constant::operator==(Constant const &constant) const {
+bool mlp::Constant::operator==(Constant const &constant) const {
     return this->value == constant.value;
 }
 
-Variable::Variable(char const var) : var(var) {}
+mlp::Variable::Variable(char const var) : var(var) {}
 
-OwnedToken Variable::clone() const {
+mlp::OwnedToken mlp::Variable::clone() const {
     return std::make_unique<Variable>(this->var);
 }
 
-bool Variable::is_dependent_on(Variable const &variable) const {
-    return *this == variable;
-}
+mlp::Variable::operator std::string() const { return {this->var}; }
 
-OwnedToken Variable::at(std::map<Variable, SharedToken> const &values) const {
-    return values.contains(*this) ? values.at(*this)->clone() : this->clone();
-}
-
-Variable::operator std::string() const { return {this->var}; }
-
-bool Variable::operator==(Variable const &variable) const {
+bool mlp::Variable::operator==(Variable const &variable) const {
     return this->var == variable.var;
 }
 
-Operation::Operation(op const operation) : operation(operation) {}
+mlp::Operation::Operation(op const operation) : operation(operation) {}
 
-OwnedToken Operation::clone() const {
+mlp::OwnedToken mlp::Operation::clone() const {
     return std::make_unique<Operation>(this->operation);
 }
 
-std::unique_ptr<Operation> Operation::from_char(char const operation) {
+std::unique_ptr<mlp::Operation>
+mlp::Operation::from_char(char const operation) {
     switch (operation) {
     case '+':
         return std::make_unique<Operation>(add);
@@ -194,7 +168,7 @@ std::unique_ptr<Operation> Operation::from_char(char const operation) {
     }
 }
 
-Operation::operator std::string() const {
+mlp::Operation::operator std::string() const {
     switch (this->operation) {
     case add:
         return "+";
@@ -211,33 +185,14 @@ Operation::operator std::string() const {
     return "";
 }
 
-Function::Function(std::string function, OwnedToken &&parameter)
+mlp::Function::Function(std::string function, OwnedToken &&parameter)
     : function(std::move(function)), parameter(std::move(parameter)) {}
 
-OwnedToken Function::clone() const {
+mlp::OwnedToken mlp::Function::clone() const {
     return std::make_unique<Function>(this->function, this->parameter->clone());
 }
 
-bool Function::is_dependent_on(Variable const &variable) const {
-    if (typeid(*this->parameter) == typeid(Constant))
-        return false;
-
-    return dynamic_cast<Dependent &>(*this->parameter)
-        .is_dependent_on(variable);
-}
-
-OwnedToken Function::at(std::map<Variable, SharedToken> const &values) const {
-    auto param = dynamic_cast<Evaluatable &>(*this->parameter).at(values);
-
-    if (typeid(*param) == typeid(Constant))
-        return std::make_unique<Constant>(k_functions.at(this->function)(
-            dynamic_cast<Constant &>(*param).value
-        ));
-
-    return std::make_unique<Function>(this->function, std::move(param));
-}
-
-Function::operator std::string() const {
+mlp::Function::operator std::string() const {
     std::stringstream result;
 
     result << this->function << '('
@@ -246,38 +201,20 @@ Function::operator std::string() const {
     return result.str();
 }
 
-Term::Term(double const coefficient, OwnedToken &&base, OwnedToken &&power)
+mlp::Term::Term(double const coefficient, OwnedToken &&base, OwnedToken &&power)
     : coefficient(coefficient), base(std::move(base)), power(std::move(power)) {
 }
 
-Term::Term(OwnedToken &&base, OwnedToken &&power)
+mlp::Term::Term(OwnedToken &&base, OwnedToken &&power)
     : base(std::move(base)), power(std::move(power)) {}
 
-OwnedToken Term::clone() const {
+mlp::OwnedToken mlp::Term::clone() const {
     return std::make_unique<Term>(
         this->coefficient.value, this->base->clone(), this->power->clone()
     );
 }
 
-bool Term::is_dependent_on(Variable const &variable) const {
-    if (typeid(*this->base) == typeid(Constant) &&
-        typeid(*this->power) == typeid(Constant))
-        return false;
-
-    return dynamic_cast<Dependent &>(*this->base).is_dependent_on(variable) ||
-           dynamic_cast<Dependent &>(*this->power).is_dependent_on(variable);
-}
-
-OwnedToken Term::at(std::map<Variable, SharedToken> const &values) const {
-    auto const clone = this->clone();
-    auto &term = dynamic_cast<Term &>(*clone);
-    term.base = dynamic_cast<Evaluatable &>(*term.base).at(values);
-    term.power = dynamic_cast<Evaluatable &>(*term.power).at(values);
-
-    return term.simplified();
-}
-
-Term::operator std::string() const {
+mlp::Term::operator std::string() const {
     std::stringstream result;
 
     if (this->coefficient.value != 1) {
@@ -309,7 +246,7 @@ Term::operator std::string() const {
     return result.str();
 }
 
-OwnedToken Terms::clone() const {
+mlp::OwnedToken mlp::Terms::clone() const {
     auto terms = std::make_unique<Terms>();
     terms->coefficient = this->coefficient;
 
@@ -319,7 +256,7 @@ OwnedToken Terms::clone() const {
     return terms;
 }
 
-void Terms::add_term(OwnedToken &&token) {
+void mlp::Terms::add_term(OwnedToken &&token) {
     auto const &term_type = typeid(*token);
 
     if (term_type == typeid(Constant)) {
@@ -352,27 +289,7 @@ void Terms::add_term(OwnedToken &&token) {
     this->terms.push_back(std::move(token));
 }
 
-bool Terms::is_dependent_on(Variable const &variable) const {
-    return std::ranges::any_of(
-        this->terms,
-        [variable](OwnedToken const &token) -> bool {
-            return typeid(*token) != typeid(Constant) &&
-                   dynamic_cast<Dependent &>(*token).is_dependent_on(variable);
-        }
-    );
-}
-
-OwnedToken Terms::at(std::map<Variable, SharedToken> const &values) const {
-    auto const clone = this->clone();
-    auto &terms = dynamic_cast<Terms &>(*clone);
-
-    for (auto &term : terms.terms)
-        term = dynamic_cast<Evaluatable &>(*term).at(values);
-
-    return terms.simplified();
-}
-
-Terms::operator std::string() const {
+mlp::Terms::operator std::string() const {
     std::stringstream result;
 
     if (this->coefficient.value != 1) {
@@ -397,7 +314,7 @@ Terms::operator std::string() const {
     return result.str();
 }
 
-OwnedToken Expression::clone() const {
+mlp::OwnedToken mlp::Expression::clone() const {
     auto expression = std::make_unique<Expression>();
 
     for (auto const &token : this->tokens)
@@ -406,11 +323,11 @@ OwnedToken Expression::clone() const {
     return expression;
 }
 
-void Expression::add_token(OwnedToken &&token) {
+void mlp::Expression::add_token(OwnedToken &&token) {
     this->tokens.push_back(std::move(token));
 }
 
-OwnedToken Expression::pop_token() {
+mlp::OwnedToken mlp::Expression::pop_token() {
     OwnedToken token = std::move(this->tokens.back());
 
     this->tokens.pop_back();
@@ -418,29 +335,7 @@ OwnedToken Expression::pop_token() {
     return token;
 }
 
-bool Expression::is_dependent_on(Variable const &variable) const {
-    return std::ranges::any_of(
-        this->tokens,
-        [variable](OwnedToken const &token) -> bool {
-            return typeid(*token) != typeid(Constant) &&
-                   typeid(*token) != typeid(Operation) &&
-                   dynamic_cast<Dependent &>(*token).is_dependent_on(variable);
-        }
-    );
-}
-
-OwnedToken Expression::at(std::map<Variable, SharedToken> const &values) const {
-    auto const clone = this->clone();
-    auto &expression = dynamic_cast<Expression &>(*clone);
-
-    for (auto &term : expression.tokens)
-        if (typeid(*term) != typeid(Operation))
-            term = dynamic_cast<Evaluatable &>(*term).at(values);
-
-    return expression.simplified();
-}
-
-Expression::operator std::string() const {
+mlp::Expression::operator std::string() const {
     std::stringstream result;
 
     if (this->tokens.size() == 1) {
@@ -457,7 +352,7 @@ Expression::operator std::string() const {
     return result.str();
 }
 
-OwnedToken tokenise(std::string expression) {
+mlp::OwnedToken mlp::tokenise(std::string expression) {
     Expression result{};
 
     auto e = std::ranges::remove(expression, ' ');
@@ -511,9 +406,11 @@ OwnedToken tokenise(std::string expression) {
                     terms->coefficient.value /=
                         dynamic_cast<Constant &>(*next).value;
                 } else {
-                    terms->add_term(std::make_unique<Term>(
-                        1, std::move(next), std::make_unique<Constant>(-1)
-                    ));
+                    terms->add_term(
+                        std::make_unique<Term>(
+                            1, std::move(next), std::make_unique<Constant>(-1)
+                        )
+                    );
                 }
 
                 continue;
@@ -541,9 +438,11 @@ OwnedToken tokenise(std::string expression) {
                 if (typeid(*next) == typeid(Term)) {
                     powers.push_back(std::move(next));
                 } else {
-                    powers.push_back(std::make_unique<Term>(
-                        1, std::move(next), std::make_unique<Constant>(1)
-                    ));
+                    powers.push_back(
+                        std::make_unique<Term>(
+                            1, std::move(next), std::make_unique<Constant>(1)
+                        )
+                    );
                 }
             }
 
@@ -578,9 +477,10 @@ OwnedToken tokenise(std::string expression) {
     else
         result.add_token(terms->coefficient.clone());
 
-    return result.simplified();
+    return simplified(result);
 }
 
+namespace mlp {
 std::ostream &operator<<(std::ostream &os, Token const &token) {
     os << static_cast<std::string>(token);
 
@@ -590,3 +490,4 @@ std::ostream &operator<<(std::ostream &os, Token const &token) {
 bool operator<(Variable const &lhs, Variable const &rhs) {
     return lhs.var < rhs.var;
 }
+} // namespace mlp

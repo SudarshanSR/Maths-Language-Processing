@@ -1,5 +1,9 @@
-#include "token.h"
+#include "derivative.h"
+#include "dependent.h"
+#include "evaluate.h"
+#include "simplify.h"
 
+#include <format>
 #include <map>
 #include <vector>
 
@@ -33,157 +37,170 @@ std::map<std::string, std::string> k_function_map{
 };
 } // namespace
 
-OwnedToken Differentiable::derivative(
-    Variable const &variable, std::uint32_t const order,
+mlp::OwnedToken mlp::derivative(
+    Token const &token, Variable const &variable, std::uint32_t const order,
     std::map<Variable, SharedToken> const &values
-) const {
-    return dynamic_cast<Evaluatable &>(*this->derivative(variable, order))
-        .at(values);
+) {
+    return evaluate(*derivative(token, variable, order), values);
 }
 
-OwnedToken Constant::derivative(
-    Variable const &variable, std::uint32_t const order
-) const {
+mlp::OwnedToken mlp::derivative(
+    Token const &token, Variable const &variable, std::uint32_t const order
+) {
+    auto const &type = typeid(token);
+
+    if (type == typeid(Constant))
+        return derivative(
+            dynamic_cast<Constant const &>(token), variable, order
+        );
+
+    if (type == typeid(Variable))
+        return derivative(
+            dynamic_cast<Variable const &>(token), variable, order
+        );
+
+    if (type == typeid(Function))
+        return derivative(
+            dynamic_cast<Function const &>(token), variable, order
+        );
+
+    if (type == typeid(Term))
+        return derivative(dynamic_cast<Term const &>(token), variable, order);
+
+    if (type == typeid(Terms))
+        return derivative(dynamic_cast<Terms const &>(token), variable, order);
+
+    if (type == typeid(Expression))
+        return derivative(
+            dynamic_cast<Expression const &>(token), variable, order
+        );
+
+    throw std::invalid_argument("Invalid argument!");
+}
+
+mlp::OwnedToken
+mlp::derivative(Constant const &, Variable const &, std::uint32_t) {
     return std::make_unique<Constant>(0);
 }
 
-OwnedToken Variable::derivative(
-    Variable const &variable, std::uint32_t const order
-) const {
+mlp::OwnedToken mlp::derivative(
+    Variable const &token, Variable const &variable, std::uint32_t const order
+) {
     if (!order)
-        return this->clone();
+        return token.clone();
 
-    return std::make_unique<Constant>(*this == variable && order == 1 ? 1 : 0);
+    return std::make_unique<Constant>(token == variable && order == 1 ? 1 : 0);
 }
 
-OwnedToken Function::derivative(
-    Variable const &variable, std::uint32_t const order
-) const {
+mlp::OwnedToken mlp::derivative(
+    Function const &token, Variable const &variable, std::uint32_t const order
+) {
     if (!order)
-        return this->clone();
+        return token.clone();
 
-    if (!this->is_dependent_on(variable))
+    if (!is_dependent_on(token, variable))
         return std::make_unique<Constant>(0);
 
     Terms result{};
 
-    auto parameter = static_cast<std::string>(*this->parameter);
+    auto parameter = static_cast<std::string>(*token.parameter);
 
-    result.add_term(tokenise(std::vformat(
-        k_function_map.at(this->function), std::make_format_args(parameter)
-    )));
+    result.add_term(tokenise(
+        std::vformat(
+            k_function_map.at(token.function), std::make_format_args(parameter)
+        )
+    ));
 
-    result.add_term(
-        dynamic_cast<Differentiable &>(*this->parameter).derivative(variable, 1)
-    );
+    result.add_term(derivative(*token.parameter, variable, 1));
 
-    auto derivative = result.simplified();
+    auto derivative = simplified(result);
 
     if (order > 1)
-        return dynamic_cast<Simplifiable &>(
-                   *dynamic_cast<Differentiable &>(*derivative)
-                        .derivative(variable, order - 1)
-        )
-            .simplified();
+        return simplified(*mlp::derivative(*derivative, variable, order - 1));
 
     return derivative;
 }
 
-OwnedToken
-Term::derivative(Variable const &variable, std::uint32_t const order) const {
+mlp::OwnedToken mlp::derivative(
+    Term const &token, Variable const &variable, std::uint32_t const order
+) {
     if (!order)
-        return this->clone();
+        return token.clone();
 
-    if (!this->base || !this->is_dependent_on(variable))
+    if (!token.base || !is_dependent_on(token, variable))
         return std::make_unique<Constant>(0);
 
-    auto const &base_type = typeid(*this->base);
+    auto const &base_type = typeid(*token.base);
 
-    Constant const c = this->coefficient;
+    Constant const c = token.coefficient;
 
-    if (!this->power) {
-        auto derivative = Term(
-                              c.value,
-                              dynamic_cast<Differentiable &>(*this->base)
-                                  .derivative(variable, 1),
-                              std::make_unique<Constant>(1)
-        )
-                              .simplified();
+    if (!token.power) {
+        auto derivative = simplified(Term(
+            c.value, mlp::derivative(*token.base, variable, 1),
+            std::make_unique<Constant>(1)
+        ));
 
         if (order > 1)
-            return dynamic_cast<Simplifiable &>(
-                       *dynamic_cast<Differentiable &>(*derivative)
-                            .derivative(variable, order - 1)
-            )
-                .simplified();
+            return simplified(*mlp::derivative(*derivative, variable, order - 1)
+            );
 
         return derivative;
     }
 
-    if (auto const &power_type = typeid(*this->power);
+    if (auto const &power_type = typeid(*token.power);
         power_type == typeid(Constant)) {
         if (base_type == typeid(Constant))
             return std::make_unique<Constant>(0);
 
-        double const power = dynamic_cast<Constant &>(*this->power).value;
+        double const power = dynamic_cast<Constant &>(*token.power).value;
 
         Terms terms{};
         terms.coefficient.value *= c.value * power;
-        terms.add_term(std::make_unique<Term>(
-            1, this->base->clone(), std::make_unique<Constant>(power - 1)
-        ));
         terms.add_term(
-            dynamic_cast<Differentiable &>(*this->base).derivative(variable, 1)
+            std::make_unique<Term>(
+                1, token.base->clone(), std::make_unique<Constant>(power - 1)
+            )
         );
+        terms.add_term(derivative(*token.base, variable, 1));
 
-        auto derivative = terms.simplified();
+        auto derivative = simplified(terms);
 
         if (order > 1)
-            return dynamic_cast<Simplifiable &>(
-                       *dynamic_cast<Differentiable &>(*derivative)
-                            .derivative(variable, order - 1)
-            )
-                .simplified();
+            return simplified(*mlp::derivative(*derivative, variable, order - 1)
+            );
 
         return derivative;
     }
 
     Terms result{};
 
-    result.add_term(this->clone());
+    result.add_term(token.clone());
 
     if (base_type == typeid(Constant)) {
-        result.add_term(std::make_unique<Function>("ln", this->base->clone()));
-        result.add_term(
-            dynamic_cast<Differentiable &>(*this->power).derivative(variable, 1)
-        );
+        result.add_term(std::make_unique<Function>("ln", token.base->clone()));
+        result.add_term(derivative(*token.power, variable, 1));
 
-        auto derivative = result.simplified();
+        auto derivative = simplified(result);
 
         if (order > 1)
-            return dynamic_cast<Simplifiable &>(
-                       *dynamic_cast<Differentiable &>(*derivative)
-                            .derivative(variable, order - 1)
-            )
-                .simplified();
+            return simplified(*mlp::derivative(*derivative, variable, order - 1)
+            );
 
         return derivative;
     }
 
     auto terms_1 = std::make_unique<Terms>();
-    terms_1->add_term(this->power->clone());
+    terms_1->add_term(token.power->clone());
+    terms_1->add_term(derivative(*token.base, variable, 1));
     terms_1->add_term(
-        dynamic_cast<Differentiable &>(*this->base).derivative(variable, 1)
+        std::make_unique<Term>(
+            token.base->clone(), std::make_unique<Constant>(-1)
+        )
     );
-    terms_1->add_term(std::make_unique<Term>(
-        this->base->clone(), std::make_unique<Constant>(-1)
-    ));
 
     auto terms_2 = std::make_unique<Terms>();
-    terms_2->add_term(
-        dynamic_cast<Differentiable &>(*this->power).derivative(variable, 1)
-    );
-    terms_2->add_term(std::make_unique<Function>("ln", this->base->clone()));
+    terms_2->add_term(derivative(*token.power, variable, 1));
+    terms_2->add_term(std::make_unique<Function>("ln", token.base->clone()));
 
     auto expression = std::make_unique<Expression>();
     expression->add_token(std::move(terms_1));
@@ -192,40 +209,36 @@ Term::derivative(Variable const &variable, std::uint32_t const order) const {
 
     result.add_term(std::move(expression));
 
-    auto derivative = result.simplified();
+    auto derivative = simplified(result);
 
     if (order > 1)
-        return dynamic_cast<Simplifiable &>(
-                   *dynamic_cast<Differentiable &>(*derivative)
-                        .derivative(variable, order - 1)
-        )
-            .simplified();
+        return simplified(*mlp::derivative(*derivative, variable, order - 1));
 
     return derivative;
 }
 
-OwnedToken
-Terms::derivative(Variable const &variable, std::uint32_t const order) const {
+mlp::OwnedToken mlp::derivative(
+    Terms const &token, Variable const &variable, std::uint32_t const order
+) {
     if (!order)
-        return this->clone();
+        return token.clone();
 
-    if (this->coefficient.value == 0 || !this->is_dependent_on(variable))
+    if (token.coefficient.value == 0 || !is_dependent_on(token, variable))
         return std::make_unique<Constant>(0);
 
     auto result = std::make_unique<Expression>();
 
-    for (int i = 0; i < this->terms.size(); ++i) {
+    for (int i = 0; i < token.terms.size(); ++i) {
         auto term = std::make_unique<Terms>();
 
-        for (int j = 0; j < this->terms.size(); ++j) {
+        for (int j = 0; j < token.terms.size(); ++j) {
             if (i != j) {
-                term->add_term(this->terms[j]->clone());
+                term->add_term(token.terms[j]->clone());
 
                 continue;
             }
 
-            auto derivative = dynamic_cast<Differentiable &>(*this->terms[i])
-                                  .derivative(variable, 1);
+            auto derivative = mlp::derivative(*token.terms[i], variable, 1);
 
             if (typeid(*derivative) == typeid(Constant)) {
                 term->coefficient.value *=
@@ -239,39 +252,35 @@ Terms::derivative(Variable const &variable, std::uint32_t const order) const {
 
         result->add_token(std::move(term));
 
-        if (i != this->terms.size() - 1) {
+        if (i != token.terms.size() - 1) {
             result->add_token(std::make_unique<Operation>(Operation::add));
         }
     }
 
     Terms end{};
-    end.coefficient = this->coefficient;
+    end.coefficient = token.coefficient;
     end.add_term(std::move(result));
 
-    auto derivative = end.simplified();
+    auto derivative = simplified(end);
 
     if (order > 1)
-        return dynamic_cast<Simplifiable &>(
-                   *dynamic_cast<Differentiable &>(*derivative)
-                        .derivative(variable, order - 1)
-        )
-            .simplified();
+        return simplified(*mlp::derivative(*derivative, variable, order - 1));
 
     return derivative;
 }
 
-OwnedToken Expression::derivative(
-    Variable const &variable, std::uint32_t const order
-) const {
+mlp::OwnedToken mlp::derivative(
+    Expression const &token, Variable const &variable, std::uint32_t const order
+) {
     if (!order)
-        return this->clone();
+        return token.clone();
 
-    if (!this->is_dependent_on(variable))
+    if (!is_dependent_on(token, variable))
         return std::make_unique<Constant>(0);
 
     Expression result{};
 
-    for (OwnedToken const &term : this->tokens) {
+    for (OwnedToken const &term : token.tokens) {
         if (auto const &token_type = typeid(*term);
             token_type == typeid(Operation)) {
             result.add_token(term->clone());
@@ -279,19 +288,13 @@ OwnedToken Expression::derivative(
             continue;
         }
 
-        result.add_token(
-            dynamic_cast<Differentiable &>(*term).derivative(variable, 1)
-        );
+        result.add_token(derivative(*term, variable, 1));
     }
 
-    auto derivative = result.simplified();
+    auto derivative = simplified(result);
 
     if (order > 1)
-        return dynamic_cast<Simplifiable &>(
-                   *dynamic_cast<Differentiable &>(*derivative)
-                        .derivative(variable, order - 1)
-        )
-            .simplified();
+        return simplified(*mlp::derivative(*derivative, variable, order - 1));
 
     return derivative;
 }
