@@ -48,7 +48,9 @@ mlp::OwnedToken mlp::integral(Token const &token, Variable const &variable) {
     auto const &type = typeid(token);
 
     if (type == typeid(Constant))
-        return integral(dynamic_cast<Constant const &>(token), variable);
+        return std::make_unique<Term>(
+            integral(dynamic_cast<Constant const &>(token), variable)
+        );
 
     if (type == typeid(Variable))
         return integral(dynamic_cast<Variable const &>(token), variable);
@@ -68,10 +70,8 @@ mlp::OwnedToken mlp::integral(Token const &token, Variable const &variable) {
     throw std::invalid_argument("Invalid argument!");
 }
 
-mlp::OwnedToken mlp::integral(Constant const &token, Variable const &variable) {
-    return std::make_unique<Term>(
-        token.value, variable.clone(), std::make_unique<Constant>(1)
-    );
+mlp::Term mlp::integral(Constant const &token, Variable const &variable) {
+    return {token.value, variable.clone(), std::make_unique<Constant>(1)};
 }
 
 mlp::OwnedToken mlp::integral(Variable const &token, Variable const &variable) {
@@ -130,14 +130,14 @@ mlp::OwnedToken mlp::integral(Term const &token, Variable const &variable) {
 
         if (power.value == -1) {
             return std::make_unique<Term>(
-                token.coefficient.value,
+                token.coefficient,
                 std::make_unique<Function>("ln", token.base->clone()),
                 std::make_unique<Constant>(1)
             );
         }
 
         return std::make_unique<Term>(
-            token.coefficient.value / (power.value + 1), token.base->clone(),
+            token.coefficient / (power.value + 1), token.base->clone(),
             std::make_unique<Constant>(power.value + 1)
         );
     }

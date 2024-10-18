@@ -68,7 +68,7 @@ struct Function final : Token {
 };
 
 struct Term final : Token {
-    Constant coefficient{1};
+    double coefficient{1};
     OwnedToken base;
     OwnedToken power;
 
@@ -82,7 +82,7 @@ struct Term final : Token {
 };
 
 struct Terms final : Token {
-    Constant coefficient{1};
+    double coefficient{1};
 
     std::vector<OwnedToken> terms;
 

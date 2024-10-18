@@ -13,8 +13,7 @@ namespace mlp {
 
 [[nodiscard]] OwnedToken integral(Token const &token, Variable const &variable);
 
-[[nodiscard]] OwnedToken
-integral(Constant const &token, Variable const &variable);
+[[nodiscard]] Term integral(Constant const &token, Variable const &variable);
 
 [[nodiscard]] OwnedToken
 integral(Variable const &token, Variable const &variable);

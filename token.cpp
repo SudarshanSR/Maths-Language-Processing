@@ -213,15 +213,15 @@ mlp::Term::Term(OwnedToken &&base, OwnedToken &&power)
 
 mlp::OwnedToken mlp::Term::clone() const {
     return std::make_unique<Term>(
-        this->coefficient.value, this->base->clone(), this->power->clone()
+        this->coefficient, this->base->clone(), this->power->clone()
     );
 }
 
 mlp::Term::operator std::string() const {
     std::stringstream result;
 
-    if (this->coefficient.value != 1) {
-        if (this->coefficient.value == -1)
+    if (this->coefficient != 1) {
+        if (this->coefficient == -1)
             result << "-";
 
         else
@@ -232,16 +232,10 @@ mlp::Term::operator std::string() const {
 
     result << *this->base;
 
-    if (this->power) {
-        if (typeid(*this->power) == typeid(Constant)) {
-            if (dynamic_cast<Constant &>(*this->power).value != 1) {
-                result << '^';
-                result << *this->power;
-            }
-        } else {
-            result << '^';
-            result << *this->power;
-        }
+    if (typeid(*this->power) != typeid(Constant) ||
+        dynamic_cast<Constant &>(*this->power).value != 1) {
+        result << '^';
+        result << *this->power;
     }
 
     result << ')';
@@ -263,15 +257,15 @@ void mlp::Terms::add_term(OwnedToken &&token) {
     auto const &term_type = typeid(*token);
 
     if (term_type == typeid(Constant)) {
-        this->coefficient.value *= dynamic_cast<Constant &>(*token).value;
+        this->coefficient *= dynamic_cast<Constant &>(*token).value;
 
         return;
     }
 
     if (term_type == typeid(Term)) {
         auto &term = dynamic_cast<Term &>(*token);
-        this->coefficient.value *= term.coefficient.value;
-        term.coefficient.value = 1;
+        this->coefficient *= term.coefficient;
+        term.coefficient = 1;
 
         this->terms.push_back(std::move(token));
 
@@ -280,8 +274,8 @@ void mlp::Terms::add_term(OwnedToken &&token) {
 
     if (term_type == typeid(Terms)) {
         auto &terms = dynamic_cast<Terms &>(*token);
-        this->coefficient.value *= terms.coefficient.value;
-        terms.coefficient.value = 1;
+        this->coefficient *= terms.coefficient;
+        terms.coefficient = 1;
 
         for (OwnedToken &term : terms.terms)
             this->add_term(std::move(term));
@@ -295,8 +289,8 @@ void mlp::Terms::add_term(OwnedToken &&token) {
 mlp::Terms::operator std::string() const {
     std::stringstream result;
 
-    if (this->coefficient.value != 1) {
-        if (this->coefficient.value == -1)
+    if (this->coefficient != 1) {
+        if (this->coefficient == -1)
             result << "-";
 
         else
@@ -398,8 +392,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
             if (operation.operation == Operation::mul) {
                 if (typeid(*next) == typeid(Constant)) {
-                    terms->coefficient.value *=
-                        dynamic_cast<Constant &>(*next).value;
+                    terms->coefficient *= dynamic_cast<Constant &>(*next).value;
                 } else {
                     terms->add_term(std::move(next));
                 }
@@ -409,8 +402,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
             if (operation.operation == Operation::div) {
                 if (typeid(*next) == typeid(Constant)) {
-                    terms->coefficient.value /=
-                        dynamic_cast<Constant &>(*next).value;
+                    terms->coefficient /= dynamic_cast<Constant &>(*next).value;
                 } else {
                     terms->add_term(
                         std::make_unique<Term>(

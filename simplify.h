@@ -8,11 +8,11 @@
 namespace mlp {
 [[nodiscard]] OwnedToken simplified(Token const &token);
 
-[[nodiscard]] OwnedToken simplified(Constant const &token);
+[[nodiscard]] Constant simplified(Constant const &token);
 
-[[nodiscard]] OwnedToken simplified(Variable const &token);
+[[nodiscard]] Variable simplified(Variable const &token);
 
-[[nodiscard]] OwnedToken simplified(Function const &token);
+[[nodiscard]] Function simplified(Function const &token);
 
 [[nodiscard]] OwnedToken simplified(Term const &token);
 

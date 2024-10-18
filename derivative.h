@@ -5,6 +5,7 @@
 
 #include <map>
 #include <memory>
+#include <variant>
 
 namespace mlp {
 [[nodiscard]] OwnedToken derivative(
@@ -15,11 +16,11 @@ namespace mlp {
 [[nodiscard]] OwnedToken
 derivative(Token const &token, Variable const &variable, std::uint32_t order);
 
-[[nodiscard]] OwnedToken derivative(
+[[nodiscard]] Constant derivative(
     Constant const &token, Variable const &variable, std::uint32_t order
 );
 
-[[nodiscard]] OwnedToken derivative(
+[[nodiscard]] std::variant<Constant, Variable> derivative(
     Variable const &token, Variable const &variable, std::uint32_t order
 );
 
