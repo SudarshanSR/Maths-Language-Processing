@@ -122,8 +122,8 @@ get_next_token(std::string const &expression, int &i) {
 
 mlp::Constant::Constant(double const value) : value(value) {}
 
-mlp::OwnedToken mlp::Constant::clone() const {
-    return std::make_unique<Constant>(this->value);
+gsl::owner<mlp::Constant *> mlp::Constant::clone() const {
+    return new Constant(this->value);
 }
 
 mlp::Constant::operator std::string() const {
@@ -136,8 +136,8 @@ bool mlp::Constant::operator==(Constant const &constant) const {
 
 mlp::Variable::Variable(char const var) : var(var) {}
 
-mlp::OwnedToken mlp::Variable::clone() const {
-    return std::make_unique<Variable>(this->var);
+gsl::owner<mlp::Variable *> mlp::Variable::clone() const {
+    return new Variable(this->var);
 }
 
 mlp::Variable::operator std::string() const { return {this->var}; }
@@ -193,8 +193,8 @@ mlp::Function::Function(std::string function, OwnedToken &&parameter)
 mlp::Function::Function(Function const &function)
     : function(function.function), parameter(function.parameter->clone()) {}
 
-mlp::OwnedToken mlp::Function::clone() const {
-    return std::make_unique<Function>(this->function, this->parameter->clone());
+gsl::owner<mlp::Function *> mlp::Function::clone() const {
+    return new Function(this->function, OwnedToken(this->parameter->clone()));
 }
 
 mlp::Function::operator std::string() const {
@@ -213,9 +213,10 @@ mlp::Term::Term(double const coefficient, OwnedToken &&base, OwnedToken &&power)
 mlp::Term::Term(OwnedToken &&base, OwnedToken &&power)
     : base(std::move(base)), power(std::move(power)) {}
 
-mlp::OwnedToken mlp::Term::clone() const {
-    return std::make_unique<Term>(
-        this->coefficient, this->base->clone(), this->power->clone()
+gsl::owner<mlp::Term *> mlp::Term::clone() const {
+    return new Term(
+        this->coefficient, OwnedToken(this->base->clone()),
+        OwnedToken(this->power->clone())
     );
 }
 
@@ -245,12 +246,12 @@ mlp::Term::operator std::string() const {
     return result.str();
 }
 
-mlp::OwnedToken mlp::Terms::clone() const {
-    auto terms = std::make_unique<Terms>();
+gsl::owner<mlp::Terms *> mlp::Terms::clone() const {
+    auto *terms = new Terms;
     terms->coefficient = this->coefficient;
 
     for (auto const &term : this->terms)
-        terms->add_term(term->clone());
+        terms->add_term(OwnedToken(term->clone()));
 
     return terms;
 }
@@ -313,11 +314,11 @@ mlp::Terms::operator std::string() const {
     return result.str();
 }
 
-mlp::OwnedToken mlp::Expression::clone() const {
-    auto expression = std::make_unique<Expression>();
+gsl::owner<mlp::Expression *> mlp::Expression::clone() const {
+    auto *expression = new Expression();
 
     for (auto const &[operation, token] : this->tokens)
-        expression->add_token(operation, token->clone());
+        expression->add_token(operation, OwnedToken(token->clone()));
 
     return expression;
 }

@@ -1,20 +1,25 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+#include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
 
+#include <gsl/gsl>
+
 namespace mlp {
 struct Token;
 
+template <typename T> using Owned = std::unique_ptr<T>;
+
 using SharedToken = std::shared_ptr<Token>;
-using OwnedToken = std::unique_ptr<Token>;
+using OwnedToken = Owned<Token>;
 
 struct Token {
     virtual ~Token() = default;
 
-    [[nodiscard]] virtual OwnedToken clone() const = 0;
+    [[nodiscard]] virtual gsl::owner<Token *> clone() const = 0;
 
     explicit virtual operator std::string() const = 0;
 };
@@ -24,7 +29,7 @@ struct Constant final : Token {
 
     explicit Constant(double value);
 
-    [[nodiscard]] OwnedToken clone() const override;
+    [[nodiscard]] gsl::owner<Constant *> clone() const override;
 
     explicit operator std::string() const override;
 
@@ -36,7 +41,7 @@ struct Variable final : Token {
 
     explicit Variable(char var);
 
-    [[nodiscard]] OwnedToken clone() const override;
+    [[nodiscard]] gsl::owner<Variable *> clone() const override;
 
     explicit operator std::string() const override;
 
@@ -70,7 +75,7 @@ struct Function final : Token {
 
     Function(Function &&function) = default;
 
-    [[nodiscard]] OwnedToken clone() const override;
+    [[nodiscard]] gsl::owner<Function *> clone() const override;
 
     explicit operator std::string() const override;
 };
@@ -84,7 +89,7 @@ struct Term final : Token {
 
     Term(OwnedToken &&base, OwnedToken &&power);
 
-    [[nodiscard]] OwnedToken clone() const override;
+    [[nodiscard]] gsl::owner<Term *> clone() const override;
 
     explicit operator std::string() const override;
 };
@@ -96,7 +101,7 @@ struct Terms final : Token {
 
     Terms() = default;
 
-    [[nodiscard]] OwnedToken clone() const override;
+    [[nodiscard]] gsl::owner<Terms *> clone() const override;
 
     void add_term(OwnedToken &&token);
 
@@ -108,7 +113,7 @@ struct Expression final : Token {
 
     Expression() = default;
 
-    [[nodiscard]] OwnedToken clone() const override;
+    [[nodiscard]] gsl::owner<Expression *> clone() const override;
 
     void add_token(Sign sign, OwnedToken &&token);
 

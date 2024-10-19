@@ -1,6 +1,8 @@
 #include "evaluate.h"
 #include "simplify.h"
 
+#include <cmath>
+#include <map>
 #include <ranges>
 
 namespace {
@@ -75,7 +77,9 @@ mlp::evaluate(Constant const &token, std::map<Variable, SharedToken> const &) {
 mlp::OwnedToken mlp::evaluate(
     Variable const &token, std::map<Variable, SharedToken> const &values
 ) {
-    return values.contains(token) ? values.at(token)->clone() : token.clone();
+    return OwnedToken(
+        values.contains(token) ? values.at(token)->clone() : token.clone()
+    );
 }
 
 std::variant<mlp::Constant, mlp::Function> mlp::evaluate(
@@ -94,34 +98,32 @@ std::variant<mlp::Constant, mlp::Function> mlp::evaluate(
 mlp::OwnedToken mlp::evaluate(
     Term const &token, std::map<Variable, SharedToken> const &values
 ) {
-    auto const clone = token.clone();
-    auto &term = dynamic_cast<Term &>(*clone);
-    term.base = evaluate(*term.base, values);
-    term.power = evaluate(*term.power, values);
+    auto const term = Owned<Term>(token.clone());
 
-    return simplified(term);
+    term->base = evaluate(*term->base, values);
+    term->power = evaluate(*term->power, values);
+
+    return simplified(*term);
 }
 
 mlp::OwnedToken mlp::evaluate(
     Terms const &token, std::map<Variable, SharedToken> const &values
 ) {
-    auto const clone = token.clone();
-    auto &terms = dynamic_cast<Terms &>(*clone);
+    auto const terms = Owned<Terms>(token.clone());
 
-    for (auto &term : terms.terms)
+    for (auto &term : terms->terms)
         term = evaluate(*term, values);
 
-    return simplified(terms);
+    return simplified(*terms);
 }
 
 mlp::OwnedToken mlp::evaluate(
     Expression const &token, std::map<Variable, SharedToken> const &values
 ) {
-    auto const clone = token.clone();
-    auto &expression = dynamic_cast<Expression &>(*clone);
+    auto const expression = Owned<Expression>(token.clone());
 
-    for (auto &term : expression.tokens | std::views::values)
+    for (auto &term : expression->tokens | std::views::values)
         term = evaluate(*term, values);
 
-    return simplified(expression);
+    return simplified(*expression);
 }

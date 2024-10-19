@@ -70,18 +70,22 @@ mlp::OwnedToken mlp::integral(Token const &token, Variable const &variable) {
 }
 
 mlp::Term mlp::integral(Constant const &token, Variable const &variable) {
-    return {token.value, variable.clone(), std::make_unique<Constant>(1)};
+    return {
+        token.value, Owned<Variable>(variable.clone()),
+        std::make_unique<Constant>(1)
+    };
 }
 
 mlp::OwnedToken mlp::integral(Variable const &token, Variable const &variable) {
     if (token == variable)
         return std::make_unique<Term>(
-            0.5, variable.clone(), std::make_unique<Constant>(2)
+            0.5, Owned<Variable>(variable.clone()),
+            std::make_unique<Constant>(2)
         );
 
     auto terms = std::make_unique<Terms>();
-    terms->add_term(variable.clone());
-    terms->add_term(token.clone());
+    terms->add_term(Owned<Variable>(variable.clone()));
+    terms->add_term(Owned<Variable>(token.clone()));
 
     return terms;
 }
@@ -89,8 +93,8 @@ mlp::OwnedToken mlp::integral(Variable const &token, Variable const &variable) {
 mlp::OwnedToken mlp::integral(Function const &token, Variable const &variable) {
     if (!is_dependent_on(token, variable)) {
         auto terms = std::make_unique<Terms>();
-        terms->add_term(variable.clone());
-        terms->add_term(token.clone());
+        terms->add_term(Owned<Variable>(variable.clone()));
+        terms->add_term(Owned<Function>(token.clone()));
 
         return terms;
     }
@@ -100,11 +104,9 @@ mlp::OwnedToken mlp::integral(Function const &token, Variable const &variable) {
 
         auto string = static_cast<std::string>(*token.parameter);
 
-        terms.add_term(tokenise(
-            std::vformat(
-                k_function_map.at(token.function), std::make_format_args(string)
-            )
-        ));
+        terms.add_term(tokenise(std::vformat(
+            k_function_map.at(token.function), std::make_format_args(string)
+        )));
 
         return simplified(terms);
     }
@@ -115,8 +117,8 @@ mlp::OwnedToken mlp::integral(Function const &token, Variable const &variable) {
 mlp::OwnedToken mlp::integral(Term const &token, Variable const &variable) {
     if (!is_dependent_on(token, variable)) {
         auto terms = std::make_unique<Terms>();
-        terms->add_term(variable.clone());
-        terms->add_term(token.clone());
+        terms->add_term(Owned<Variable>(variable.clone()));
+        terms->add_term(Owned<Term>(token.clone()));
 
         return terms;
     }
@@ -130,30 +132,34 @@ mlp::OwnedToken mlp::integral(Term const &token, Variable const &variable) {
         if (power.value == -1) {
             return std::make_unique<Term>(
                 token.coefficient,
-                std::make_unique<Function>("ln", token.base->clone()),
+                std::make_unique<Function>(
+                    "ln", OwnedToken(token.base->clone())
+                ),
                 std::make_unique<Constant>(1)
             );
         }
 
         return std::make_unique<Term>(
-            token.coefficient / (power.value + 1), token.base->clone(),
+            token.coefficient / (power.value + 1),
+            OwnedToken(token.base->clone()),
             std::make_unique<Constant>(power.value + 1)
         );
     }
 
     if (base_type == typeid(Constant) && power_type == typeid(Variable)) {
         Terms terms{};
-        terms.add_term(token.clone());
+        terms.add_term(Owned<Term>(token.clone()));
 
         if (dynamic_cast<Variable &>(*token.power) != variable) {
-            terms.add_term(variable.clone());
+            terms.add_term(Owned<Variable>(variable.clone()));
         } else {
-            terms.add_term(
-                std::make_unique<Term>(
-                    1, std::make_unique<Function>("ln", token.base->clone()),
-                    std::make_unique<Constant>(-1)
-                )
-            );
+            terms.add_term(std::make_unique<Term>(
+                1,
+                std::make_unique<Function>(
+                    "ln", OwnedToken(token.base->clone())
+                ),
+                std::make_unique<Constant>(-1)
+            ));
         }
 
         return simplified(terms);
@@ -165,8 +171,8 @@ mlp::OwnedToken mlp::integral(Term const &token, Variable const &variable) {
 mlp::OwnedToken mlp::integral(Terms const &token, Variable const &variable) {
     if (!is_dependent_on(token, variable)) {
         auto terms = std::make_unique<Terms>();
-        terms->add_term(variable.clone());
-        terms->add_term(token.clone());
+        terms->add_term(Owned<Variable>(variable.clone()));
+        terms->add_term(Owned<Terms>(token.clone()));
 
         return terms;
     }
@@ -178,8 +184,8 @@ mlp::OwnedToken
 mlp::integral(Expression const &token, Variable const &variable) {
     if (!is_dependent_on(token, variable)) {
         auto terms = std::make_unique<Terms>();
-        terms->add_term(variable.clone());
-        terms->add_term(token.clone());
+        terms->add_term(Owned<Variable>(variable.clone()));
+        terms->add_term(Owned<Expression>(token.clone()));
 
         return terms;
     }

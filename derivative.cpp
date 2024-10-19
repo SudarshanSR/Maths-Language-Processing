@@ -101,7 +101,7 @@ mlp::OwnedToken mlp::derivative(
     Function const &token, Variable const &variable, std::uint32_t const order
 ) {
     if (!order)
-        return token.clone();
+        return OwnedToken(token.clone());
 
     if (!is_dependent_on(token, variable))
         return std::make_unique<Constant>(0);
@@ -110,11 +110,9 @@ mlp::OwnedToken mlp::derivative(
 
     auto parameter = static_cast<std::string>(*token.parameter);
 
-    result.add_term(tokenise(
-        std::vformat(
-            k_function_map.at(token.function), std::make_format_args(parameter)
-        )
-    ));
+    result.add_term(tokenise(std::vformat(
+        k_function_map.at(token.function), std::make_format_args(parameter)
+    )));
 
     result.add_term(derivative(*token.parameter, variable, 1));
 
@@ -130,7 +128,7 @@ mlp::OwnedToken mlp::derivative(
     Term const &token, Variable const &variable, std::uint32_t const order
 ) {
     if (!order)
-        return token.clone();
+        return OwnedToken(token.clone());
 
     if (!is_dependent_on(token, variable))
         return std::make_unique<Constant>(0);
@@ -147,12 +145,10 @@ mlp::OwnedToken mlp::derivative(
         double const power = dynamic_cast<Constant &>(*token.power).value;
 
         Terms terms{};
-        terms.add_term(
-            std::make_unique<Term>(
-                c * power, token.base->clone(),
-                std::make_unique<Constant>(power - 1)
-            )
-        );
+        terms.add_term(std::make_unique<Term>(
+            c * power, OwnedToken(token.base->clone()),
+            std::make_unique<Constant>(power - 1)
+        ));
         terms.add_term(derivative(*token.base, variable, 1));
 
         auto derivative = simplified(terms);
@@ -166,10 +162,12 @@ mlp::OwnedToken mlp::derivative(
 
     Terms result{};
 
-    result.add_term(token.clone());
+    result.add_term(OwnedToken(token.clone()));
 
     if (base_type == typeid(Constant)) {
-        result.add_term(std::make_unique<Function>("ln", token.base->clone()));
+        result.add_term(
+            std::make_unique<Function>("ln", OwnedToken(token.base->clone()))
+        );
         result.add_term(derivative(*token.power, variable, 1));
 
         auto derivative = simplified(result);
@@ -182,17 +180,17 @@ mlp::OwnedToken mlp::derivative(
     }
 
     auto terms_1 = std::make_unique<Terms>();
-    terms_1->add_term(token.power->clone());
+    terms_1->add_term(OwnedToken(token.power->clone()));
     terms_1->add_term(derivative(*token.base, variable, 1));
-    terms_1->add_term(
-        std::make_unique<Term>(
-            token.base->clone(), std::make_unique<Constant>(-1)
-        )
-    );
+    terms_1->add_term(std::make_unique<Term>(
+        OwnedToken(token.base->clone()), std::make_unique<Constant>(-1)
+    ));
 
     auto terms_2 = std::make_unique<Terms>();
     terms_2->add_term(derivative(*token.power, variable, 1));
-    terms_2->add_term(std::make_unique<Function>("ln", token.base->clone()));
+    terms_2->add_term(
+        std::make_unique<Function>("ln", OwnedToken(token.base->clone()))
+    );
 
     auto expression = std::make_unique<Expression>();
     expression->add_token(Sign::pos, std::move(terms_1));
@@ -212,7 +210,7 @@ mlp::OwnedToken mlp::derivative(
     Terms const &token, Variable const &variable, std::uint32_t const order
 ) {
     if (!order)
-        return token.clone();
+        return OwnedToken(token.clone());
 
     if (token.coefficient == 0 || !is_dependent_on(token, variable))
         return std::make_unique<Constant>(0);
@@ -224,7 +222,7 @@ mlp::OwnedToken mlp::derivative(
 
         for (int j = 0; j < token.terms.size(); ++j) {
             if (i != j) {
-                term->add_term(token.terms[j]->clone());
+                term->add_term(OwnedToken(token.terms[j]->clone()));
 
                 continue;
             }
@@ -260,7 +258,7 @@ mlp::OwnedToken mlp::derivative(
     Expression const &token, Variable const &variable, std::uint32_t const order
 ) {
     if (!order)
-        return token.clone();
+        return OwnedToken(token.clone());
 
     if (!is_dependent_on(token, variable))
         return std::make_unique<Constant>(0);

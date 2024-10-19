@@ -48,23 +48,22 @@ mlp::Function mlp::simplified(Function const &token) {
 }
 
 mlp::OwnedToken mlp::simplified(Term const &token) {
-    auto clone = token.clone();
-    auto &term = dynamic_cast<Term &>(*clone);
+    auto term = Owned<Term>(token.clone());
 
-    term.base = simplified(*term.base);
-    term.power = simplified(*term.power);
+    term->base = simplified(*term->base);
+    term->power = simplified(*term->power);
 
-    if (typeid(*term.power) == typeid(Constant)) {
-        auto &power = dynamic_cast<Constant &>(*term.power);
+    if (typeid(*term->power) == typeid(Constant)) {
+        auto &power = dynamic_cast<Constant &>(*term->power);
 
-        if (term.coefficient == 1 && power.value == 1)
-            return std::move(term.base);
+        if (term->coefficient == 1 && power.value == 1)
+            return std::move(term->base);
 
         if (power.value == 0)
-            return std::make_unique<Constant>(term.coefficient);
+            return std::make_unique<Constant>(term->coefficient);
 
-        if (typeid(*term.base) == typeid(Term)) {
-            auto &base = dynamic_cast<Term &>(*term.base);
+        if (typeid(*term->base) == typeid(Term)) {
+            auto &base = dynamic_cast<Term &>(*term->base);
             base.coefficient = std::pow(base.coefficient, power.value);
 
             if (typeid(*base.power) == typeid(Constant)) {
@@ -83,35 +82,35 @@ mlp::OwnedToken mlp::simplified(Term const &token) {
 
             power.value = 1;
 
-            if (term.coefficient == 1 && power.value == 1)
-                return std::move(term.base);
+            if (term->coefficient == 1 && power.value == 1)
+                return std::move(term->base);
         }
     }
 
-    if (typeid(*term.base) == typeid(Constant)) {
-        auto const &base = dynamic_cast<Constant &>(*term.base);
+    if (typeid(*term->base) == typeid(Constant)) {
+        auto const &base = dynamic_cast<Constant &>(*term->base);
 
-        if (typeid(*term.power) == typeid(Constant))
+        if (typeid(*term->power) == typeid(Constant))
             return std::make_unique<Constant>(
-                term.coefficient *
+                term->coefficient *
                 std::powl(
-                    base.value, dynamic_cast<Constant &>(*term.power).value
+                    base.value, dynamic_cast<Constant &>(*term->power).value
                 )
             );
 
-        if (term.coefficient == base.value) {
-            if (typeid(*term.power) == typeid(Expression)) {
-                auto &power = dynamic_cast<Expression &>(*term.power);
+        if (term->coefficient == base.value) {
+            if (typeid(*term->power) == typeid(Expression)) {
+                auto &power = dynamic_cast<Expression &>(*term->power);
                 power.add_token(Sign::pos, std::make_unique<Constant>(1));
-                term.coefficient = 1;
+                term->coefficient = 1;
             }
         }
     }
 
-    term.base = simplified(*term.base);
-    term.power = simplified(*term.power);
+    term->base = simplified(*term->base);
+    term->power = simplified(*term->power);
 
-    return clone;
+    return term;
 }
 
 mlp::OwnedToken mlp::simplified(Terms const &token) {
@@ -122,7 +121,7 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
         return std::make_unique<Constant>(token.coefficient);
 
     if (token.terms.size() == 1) {
-        auto term = token.terms[0]->clone();
+        auto term = OwnedToken(token.terms[0]->clone());
 
         if (typeid(*term) == typeid(Constant))
             return std::make_unique<Constant>(
@@ -140,24 +139,23 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
         ));
     }
 
-    auto clone = token.clone();
-    auto &terms = dynamic_cast<Terms &>(*clone);
+    auto terms = Owned<Terms>(token.clone());
 
     std::map<Variable, OwnedToken *> variable_powers;
 
     std::int32_t i = 0;
 
-    while (i < terms.terms.size()) {
-        auto t = simplified(*terms.terms[i]);
+    while (i < terms->terms.size()) {
+        auto t = simplified(*terms->terms[i]);
 
         if (typeid(*t) == typeid(Constant)) {
             auto const &constant = dynamic_cast<Constant &>(*t);
 
             if (constant.value == 0)
-                return constant.clone();
+                return std::make_unique<Constant>(0);
 
-            terms.coefficient *= constant.value;
-            terms.terms.erase(terms.terms.begin() + i);
+            terms->coefficient *= constant.value;
+            terms->terms.erase(terms->terms.begin() + i);
 
             continue;
         }
@@ -171,7 +169,7 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
                 );
                 power.add_token(Sign::pos, std::make_unique<Constant>(1));
 
-                terms.terms.erase(terms.terms.begin() + 1);
+                terms->terms.erase(terms->terms.begin() + 1);
 
                 continue;
             }
@@ -179,9 +177,10 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
             auto power = std::make_unique<Expression>();
             power->add_token(Sign::pos, std::make_unique<Constant>(1));
 
-            terms.terms[i] =
-                std::make_unique<Term>(variable.clone(), std::move(power));
-            variable_powers[variable] = &terms.terms[i];
+            terms->terms[i] = std::make_unique<Term>(
+                Owned<Variable>(variable.clone()), std::move(power)
+            );
+            variable_powers[variable] = &terms->terms[i];
 
             ++i;
 
@@ -190,7 +189,7 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
 
         if (typeid(*t) == typeid(Term)) {
             auto &term = dynamic_cast<Term &>(*t);
-            terms.coefficient *= term.coefficient;
+            terms->coefficient *= term.coefficient;
             term.coefficient = 1;
 
             if (typeid(*term.base) == typeid(Variable)) {
@@ -202,7 +201,7 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
                     );
                     power.add_token(Sign::pos, std::move(term.power));
 
-                    terms.terms.erase(terms.terms.begin() + 1);
+                    terms->terms.erase(terms->terms.begin() + 1);
 
                     continue;
                 }
@@ -213,8 +212,8 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
                     term.power = std::move(power);
                 }
 
-                terms.terms[i] = std::move(t);
-                variable_powers[variable] = &terms.terms[i];
+                terms->terms[i] = std::move(t);
+                variable_powers[variable] = &terms->terms[i];
 
                 ++i;
 
@@ -222,7 +221,7 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
             }
         }
 
-        terms.terms[i] = std::move(t);
+        terms->terms[i] = std::move(t);
 
         ++i;
     }
@@ -238,42 +237,41 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
         *t = simplified(**t);
     }
 
-    if (terms.terms.empty())
-        return std::make_unique<Constant>(terms.coefficient);
+    if (terms->terms.empty())
+        return std::make_unique<Constant>(terms->coefficient);
 
-    if (terms.terms.size() == 1) {
-        auto &term = terms.terms[0];
+    if (terms->terms.size() == 1) {
+        auto &term = terms->terms[0];
 
         if (typeid(*term) == typeid(Constant))
             return std::make_unique<Constant>(
-                terms.coefficient * dynamic_cast<Constant &>(*term).value
+                terms->coefficient * dynamic_cast<Constant &>(*term).value
             );
 
         if (typeid(*term) == typeid(Term)) {
-            dynamic_cast<Term &>(*term).coefficient *= terms.coefficient;
+            dynamic_cast<Term &>(*term).coefficient *= terms->coefficient;
 
             return simplified(*term);
         }
 
         return simplified(Term(
-            terms.coefficient, std::move(term), std::make_unique<Constant>(1)
+            terms->coefficient, std::move(term), std::make_unique<Constant>(1)
         ));
     }
 
-    return clone;
+    return terms;
 }
 
 mlp::OwnedToken mlp::simplified(Expression const &token) {
-    auto clone = token.clone();
-    auto &expression = dynamic_cast<Expression &>(*clone);
+    auto expression = Owned<Expression>(token.clone());
 
-    std::vector<std::pair<Sign, OwnedToken>> &tokens = expression.tokens;
+    std::vector<std::pair<Sign, OwnedToken>> &tokens = expression->tokens;
 
     if (tokens.empty())
         return std::make_unique<Constant>(0);
 
     if (tokens.size() == 1) {
-        auto &&[sign, term] = expression.pop_token();
+        auto &&[sign, term] = expression->pop_token();
 
         if (sign == Sign::pos)
             return simplified(*term);
@@ -427,7 +425,7 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
         return std::make_unique<Constant>(0);
 
     if (tokens.size() == 1) {
-        auto &&[sign, term] = expression.pop_token();
+        auto &&[sign, term] = expression->pop_token();
 
         if (sign == Sign::pos)
             return simplified(*term);
@@ -437,5 +435,5 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
         );
     }
 
-    return clone;
+    return expression;
 }
