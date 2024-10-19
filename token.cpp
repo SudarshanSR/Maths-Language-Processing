@@ -374,7 +374,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
             if (!term)
                 continue;
 
-            if (typeid(token) == typeid(Constant))
+            if (typeid(*term) == typeid(Constant))
                 terms->terms.push_back(std::move(term));
 
             else
@@ -385,10 +385,17 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
         auto &operation = std::get<Operation>(token);
 
+        auto next = get_next_token(expression, ++i);
+
+        if (std::holds_alternative<Operation>(next))
+            throw std::runtime_error("Expression is not valid!");
+
+        auto &next_term = std::get<OwnedToken>(next);
+
         if (operation.operation == Operation::add ||
             operation.operation == Operation::sub) {
-            Sign sign =
-                operation.operation == Operation::add ? Sign::pos : Sign::neg;
+            Sign const sign =
+                op.operation == Operation::add ? Sign::pos : Sign::neg;
 
             if (!terms->terms.empty())
                 result.add_token(sign, std::move(terms));
@@ -402,15 +409,14 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
             terms = std::make_unique<Terms>();
 
+            if (typeid(*next_term) == typeid(Constant))
+                terms->terms.push_back(std::move(next_term));
+
+            else
+                terms->add_term(std::move(next_term));
+
             continue;
         }
-
-        auto next = get_next_token(expression, ++i);
-
-        if (std::holds_alternative<Operation>(next))
-            throw std::runtime_error("Expression is not valid!");
-
-        OwnedToken &next_term = std::get<OwnedToken>(next);
 
         if (operation.operation == Operation::mul) {
             if (typeid(*next_term) == typeid(Constant))
@@ -428,11 +434,9 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                     dynamic_cast<Constant &>(*next_term).value;
 
             else
-                terms->add_term(
-                    std::make_unique<Term>(
-                        1, std::move(next_term), std::make_unique<Constant>(-1)
-                    )
-                );
+                terms->add_term(std::make_unique<Term>(
+                    1, std::move(next_term), std::make_unique<Constant>(-1)
+                ));
 
             continue;
         }
@@ -443,11 +447,9 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
             if (typeid(*next_term) == typeid(Term)) {
                 powers.push_back(std::move(next_term));
             } else {
-                powers.push_back(
-                    std::make_unique<Term>(
-                        1, std::move(next_term), std::make_unique<Constant>(1)
-                    )
-                );
+                powers.push_back(std::make_unique<Term>(
+                    1, std::move(next_term), std::make_unique<Constant>(1)
+                ));
             }
 
             next = get_next_token(expression, ++i);
