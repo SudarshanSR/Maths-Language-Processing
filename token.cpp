@@ -393,6 +393,9 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
         auto &next_term = std::get<OwnedToken>(next);
 
+        if (!next_term)
+            throw std::runtime_error("Expression is not valid!");
+
         if (operation.operation == Operation::add ||
             operation.operation == Operation::sub) {
             Sign const sign =
