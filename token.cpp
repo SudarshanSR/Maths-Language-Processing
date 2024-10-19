@@ -20,14 +20,15 @@ std::set<std::string> k_functions{
     "asech", "acsch", "acoth", "ln",
 };
 
-mlp::OwnedToken get_next_token(std::string const &expression, int &i) {
+std::variant<mlp::Operation, mlp::OwnedToken>
+get_next_token(std::string const &expression, int &i) {
     if (i >= expression.size())
         return nullptr;
 
     char character = expression[i];
 
     if (auto op = mlp::Operation::from_char(character))
-        return op;
+        return *op;
 
     if ('0' <= character && character <= '9') {
         std::string number;
@@ -38,27 +39,25 @@ mlp::OwnedToken get_next_token(std::string const &expression, int &i) {
             character = expression[++i];
         }
 
-        if (i < expression.size()) {
-            if (character != '.') {
-                --i;
+        if (i >= expression.size())
+            return std::make_unique<mlp::Constant>(std::stoull(number));
 
-                return std::make_unique<mlp::Constant>(std::stoull(number));
-            }
+        if (character != '.') {
+            --i;
 
-            do {
-                number.push_back(character);
-
-                character = expression[++i];
-            } while (i < expression.size() && '0' <= character &&
-                     character <= '9');
-
-            if (i < expression.size())
-                --i;
-
-            return std::make_unique<mlp::Constant>(std::stold(number));
+            return std::make_unique<mlp::Constant>(std::stoull(number));
         }
 
-        return std::make_unique<mlp::Constant>(std::stoull(number));
+        do {
+            number.push_back(character);
+
+            character = expression[++i];
+        } while (i < expression.size() && '0' <= character && character <= '9');
+
+        if (i < expression.size())
+            --i;
+
+        return std::make_unique<mlp::Constant>(std::stold(number));
     }
 
     if (k_parenthesis_map.contains(character)) {
@@ -100,7 +99,12 @@ mlp::OwnedToken get_next_token(std::string const &expression, int &i) {
 
         i += offset;
 
-        mlp::OwnedToken parameter = get_next_token(expression, i);
+        auto token = get_next_token(expression, i);
+
+        if (std::holds_alternative<mlp::Operation>(token))
+            throw std::runtime_error("Expression is not valid!");
+
+        auto &parameter = std::get<mlp::OwnedToken>(token);
 
         if (!parameter)
             throw std::runtime_error("Expression is not valid!");
@@ -144,30 +148,25 @@ bool mlp::Variable::operator==(Variable const &variable) const {
 
 mlp::Operation::Operation(op const operation) : operation(operation) {}
 
-mlp::OwnedToken mlp::Operation::clone() const {
-    return std::make_unique<Operation>(this->operation);
-}
-
-std::unique_ptr<mlp::Operation>
-mlp::Operation::from_char(char const operation) {
+std::optional<mlp::Operation> mlp::Operation::from_char(char const operation) {
     switch (operation) {
     case '+':
-        return std::make_unique<Operation>(add);
+        return Operation(add);
 
     case '-':
-        return std::make_unique<Operation>(sub);
+        return Operation(sub);
 
     case '*':
-        return std::make_unique<Operation>(mul);
+        return Operation(mul);
 
     case '/':
-        return std::make_unique<Operation>(div);
+        return Operation(div);
 
     case '^':
-        return std::make_unique<Operation>(pow);
+        return Operation(pow);
 
     default:
-        return nullptr;
+        return {};
     }
 }
 
@@ -190,6 +189,9 @@ mlp::Operation::operator std::string() const {
 
 mlp::Function::Function(std::string function, OwnedToken &&parameter)
     : function(std::move(function)), parameter(std::move(parameter)) {}
+
+mlp::Function::Function(Function const &function)
+    : function(function.function), parameter(function.parameter->clone()) {}
 
 mlp::OwnedToken mlp::Function::clone() const {
     return std::make_unique<Function>(this->function, this->parameter->clone());
@@ -314,18 +316,20 @@ mlp::Terms::operator std::string() const {
 mlp::OwnedToken mlp::Expression::clone() const {
     auto expression = std::make_unique<Expression>();
 
-    for (auto const &token : this->tokens)
-        expression->add_token(token->clone());
+    for (auto const &[operation, token] : this->tokens)
+        expression->add_token(operation, token->clone());
 
     return expression;
 }
 
-void mlp::Expression::add_token(OwnedToken &&token) {
-    this->tokens.push_back(std::move(token));
+void mlp::Expression::add_token(
+    Operation const &operation, OwnedToken &&token
+) {
+    this->tokens.emplace_back(operation, std::move(token));
 }
 
-mlp::OwnedToken mlp::Expression::pop_token() {
-    OwnedToken token = std::move(this->tokens.back());
+std::pair<mlp::Operation, mlp::OwnedToken> mlp::Expression::pop_token() {
+    auto token = std::move(this->tokens.back());
 
     this->tokens.pop_back();
 
@@ -336,12 +340,14 @@ mlp::Expression::operator std::string() const {
     std::stringstream result;
 
     if (this->tokens.size() == 1) {
-        result << static_cast<std::string>(*this->tokens[0]);
+        result << static_cast<std::string>(this->tokens[0].first)
+               << static_cast<std::string>(*this->tokens[0].second);
     } else {
         result << '(';
 
-        for (OwnedToken const &token : this->tokens)
-            result << static_cast<std::string>(*token);
+        for (auto const &[operation, token] : this->tokens)
+            result << static_cast<std::string>(operation)
+                   << static_cast<std::string>(*token);
 
         result << ')';
     }
@@ -358,122 +364,128 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
     auto terms = std::make_unique<Terms>();
 
+    Operation op{Operation::add};
+
     for (int i = 0; i < expression.size(); ++i) {
         std::int32_t const copy = i;
 
-        OwnedToken token = get_next_token(expression, i);
+        auto token = get_next_token(expression, i);
 
-        if (!token)
-            continue;
+        if (!std::holds_alternative<Operation>(token)) {
+            auto &term = std::get<OwnedToken>(token);
 
-        if (typeid(*token) == typeid(Operation)) {
-            auto &operation = dynamic_cast<Operation &>(*token);
-
-            if (operation.operation == Operation::add ||
-                operation.operation == Operation::sub) {
-                if (!terms->terms.empty())
-                    result.add_token(std::move(terms));
-
-                else if (copy != 0)
-                    result.add_token(
-                        std::make_unique<Constant>(terms->coefficient)
-                    );
-
-                terms = std::make_unique<Terms>();
-                result.add_token(std::move(token));
-
+            if (!term)
                 continue;
-            }
 
-            OwnedToken next = get_next_token(expression, ++i);
+            if (typeid(token) == typeid(Constant))
+                terms->terms.push_back(std::move(term));
 
-            if (!next)
-                throw std::runtime_error("Expression is not valid!");
-
-            if (operation.operation == Operation::mul) {
-                if (typeid(*next) == typeid(Constant)) {
-                    terms->coefficient *= dynamic_cast<Constant &>(*next).value;
-                } else {
-                    terms->add_term(std::move(next));
-                }
-
-                continue;
-            }
-
-            if (operation.operation == Operation::div) {
-                if (typeid(*next) == typeid(Constant)) {
-                    terms->coefficient /= dynamic_cast<Constant &>(*next).value;
-                } else {
-                    terms->add_term(
-                        std::make_unique<Term>(
-                            1, std::move(next), std::make_unique<Constant>(-1)
-                        )
-                    );
-                }
-
-                continue;
-            }
-
-            std::vector<OwnedToken> powers;
-
-            while (true) {
-                if (typeid(*next) == typeid(Term)) {
-                    powers.push_back(std::move(next));
-                } else {
-                    powers.push_back(
-                        std::make_unique<Term>(
-                            1, std::move(next), std::make_unique<Constant>(1)
-                        )
-                    );
-                }
-
-                next = get_next_token(expression, ++i);
-
-                if (!next)
-                    break;
-
-                if (typeid(*next) == typeid(Operation)) {
-                    if (i == expression.size() - 1)
-                        throw std::runtime_error("Expression is not valid!");
-
-                    operation = dynamic_cast<Operation &>(*next);
-
-                    if (operation.operation == Operation::pow)
-                        continue;
-
-                    break;
-                }
-            }
-
-            OwnedToken power = std::make_unique<Constant>(1);
-
-            for (OwnedToken &p : powers | std::views::reverse) {
-                power =
-                    std::make_unique<Term>(1, std::move(p), std::move(power));
-            }
-
-            terms->terms.back() = std::make_unique<Term>(
-                1, std::move(terms->terms.back()), std::move(power)
-            );
-
-            if (next) {
-                --i;
-            }
+            else
+                terms->add_term(std::move(term));
 
             continue;
         }
 
-        if (typeid(*token) == typeid(Constant)) {
-            terms->terms.push_back(std::move(token));
-        } else {
-            terms->add_term(std::move(token));
+        auto &operation = std::get<Operation>(token);
+
+        if (operation.operation == Operation::add ||
+            operation.operation == Operation::sub) {
+            if (!terms->terms.empty())
+                result.add_token(op, std::move(terms));
+
+            else if (copy != 0)
+                result.add_token(
+                    op, std::make_unique<Constant>(terms->coefficient)
+                );
+
+            op = operation;
+
+            terms = std::make_unique<Terms>();
+
+            continue;
         }
+
+        auto next = get_next_token(expression, ++i);
+
+        if (std::holds_alternative<Operation>(next))
+            throw std::runtime_error("Expression is not valid!");
+
+        OwnedToken &next_term = std::get<OwnedToken>(next);
+
+        if (operation.operation == Operation::mul) {
+            if (typeid(*next_term) == typeid(Constant))
+                terms->coefficient *=
+                    dynamic_cast<Constant &>(*next_term).value;
+            else
+                terms->add_term(std::move(next_term));
+
+            continue;
+        }
+
+        if (operation.operation == Operation::div) {
+            if (typeid(*next_term) == typeid(Constant))
+                terms->coefficient /=
+                    dynamic_cast<Constant &>(*next_term).value;
+
+            else
+                terms->add_term(
+                    std::make_unique<Term>(
+                        1, std::move(next_term), std::make_unique<Constant>(-1)
+                    )
+                );
+
+            continue;
+        }
+
+        std::vector<OwnedToken> powers;
+
+        while (true) {
+            if (typeid(*next_term) == typeid(Term)) {
+                powers.push_back(std::move(next_term));
+            } else {
+                powers.push_back(
+                    std::make_unique<Term>(
+                        1, std::move(next_term), std::make_unique<Constant>(1)
+                    )
+                );
+            }
+
+            next = get_next_token(expression, ++i);
+
+            if (std::holds_alternative<Operation>(next)) {
+                if (i == expression.size() - 1)
+                    throw std::runtime_error("Expression is not valid!");
+
+                operation = std::get<Operation>(next);
+
+                if (operation.operation == Operation::pow)
+                    continue;
+
+                break;
+            }
+
+            if (!next_term)
+                break;
+        }
+
+        OwnedToken power = std::make_unique<Constant>(1);
+
+        for (OwnedToken &p : powers | std::views::reverse) {
+            power = std::make_unique<Term>(1, std::move(p), std::move(power));
+        }
+
+        terms->terms.back() = std::make_unique<Term>(
+            1, std::move(terms->terms.back()), std::move(power)
+        );
+
+        if (next_term)
+            --i;
     }
 
     if (terms->terms.empty())
         throw std::runtime_error("Expression is not valid!");
 
-    result.add_token(std::move(terms));
+    result.add_token(op, std::move(terms));
 
     return simplified(result);
 }

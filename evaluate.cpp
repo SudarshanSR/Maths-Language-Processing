@@ -1,6 +1,8 @@
 #include "evaluate.h"
 #include "simplify.h"
 
+#include <ranges>
+
 namespace {
 std::map<std::string, double (*)(double)> k_functions{
     {"sin", std::sin},
@@ -37,13 +39,21 @@ mlp::OwnedToken mlp::evaluate(
     auto const &type = typeid(token);
 
     if (type == typeid(Constant))
-        return evaluate(dynamic_cast<Constant const &>(token), values);
+        return std::make_unique<Constant>(
+            evaluate(dynamic_cast<Constant const &>(token), values)
+        );
 
     if (type == typeid(Variable))
         return evaluate(dynamic_cast<Variable const &>(token), values);
 
-    if (type == typeid(Function))
-        return evaluate(dynamic_cast<Function const &>(token), values);
+    if (type == typeid(Function)) {
+        auto variant = evaluate(dynamic_cast<Function const &>(token), values);
+
+        if (std::holds_alternative<Constant>(variant))
+            return std::make_unique<Constant>(std::get<Constant>(variant));
+
+        return std::make_unique<Function>(std::get<Function>(variant));
+    }
 
     if (type == typeid(Term))
         return evaluate(dynamic_cast<Term const &>(token), values);
@@ -57,9 +67,9 @@ mlp::OwnedToken mlp::evaluate(
     throw std::invalid_argument("Invalid argument!");
 }
 
-mlp::OwnedToken
+mlp::Constant
 mlp::evaluate(Constant const &token, std::map<Variable, SharedToken> const &) {
-    return token.clone();
+    return token;
 }
 
 mlp::OwnedToken mlp::evaluate(
@@ -68,17 +78,17 @@ mlp::OwnedToken mlp::evaluate(
     return values.contains(token) ? values.at(token)->clone() : token.clone();
 }
 
-mlp::OwnedToken mlp::evaluate(
+std::variant<mlp::Constant, mlp::Function> mlp::evaluate(
     Function const &token, std::map<Variable, SharedToken> const &values
 ) {
     auto param = evaluate(*token.parameter, values);
 
     if (typeid(*param) == typeid(Constant))
-        return std::make_unique<Constant>(k_functions.at(token.function)(
+        return Constant(k_functions.at(token.function)(
             dynamic_cast<Constant &>(*param).value
         ));
 
-    return std::make_unique<Function>(token.function, std::move(param));
+    return Function(token.function, std::move(param));
 }
 
 mlp::OwnedToken mlp::evaluate(
@@ -110,9 +120,8 @@ mlp::OwnedToken mlp::evaluate(
     auto const clone = token.clone();
     auto &expression = dynamic_cast<Expression &>(*clone);
 
-    for (auto &term : expression.tokens)
-        if (typeid(*term) != typeid(Operation))
-            term = evaluate(*term, values);
+    for (auto &term : expression.tokens | std::views::values)
+        term = evaluate(*term, values);
 
     return simplified(expression);
 }

@@ -55,9 +55,8 @@ bool mlp::is_dependent_on(Terms const &token, Variable const &variable) {
 bool mlp::is_dependent_on(Expression const &token, Variable const &variable) {
     return std::ranges::any_of(
         token.tokens,
-        [variable](OwnedToken const &term) -> bool {
-            return typeid(*term) != typeid(Operation) &&
-                   is_dependent_on(*term, variable);
+        [variable](auto const &term) -> bool {
+            return is_dependent_on(*term.second, variable);
         }
     );
 }

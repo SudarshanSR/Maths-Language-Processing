@@ -92,7 +92,7 @@ std::variant<mlp::Constant, mlp::Variable> mlp::derivative(
     Variable const &token, Variable const &variable, std::uint32_t const order
 ) {
     if (!order)
-        return Variable(token.var);
+        return token;
 
     return Constant(token == variable && order == 1 ? 1 : 0);
 }
@@ -147,10 +147,10 @@ mlp::OwnedToken mlp::derivative(
         double const power = dynamic_cast<Constant &>(*token.power).value;
 
         Terms terms{};
-        terms.coefficient *= c * power;
         terms.add_term(
             std::make_unique<Term>(
-                1, token.base->clone(), std::make_unique<Constant>(power - 1)
+                c * power, token.base->clone(),
+                std::make_unique<Constant>(power - 1)
             )
         );
         terms.add_term(derivative(*token.base, variable, 1));
@@ -195,9 +195,8 @@ mlp::OwnedToken mlp::derivative(
     terms_2->add_term(std::make_unique<Function>("ln", token.base->clone()));
 
     auto expression = std::make_unique<Expression>();
-    expression->add_token(std::move(terms_1));
-    expression->add_token(std::make_unique<Operation>(Operation::add));
-    expression->add_token(std::move(terms_2));
+    expression->add_token(Operation(Operation::add), std::move(terms_1));
+    expression->add_token(Operation(Operation::add), std::move(terms_2));
 
     result.add_term(std::move(expression));
 
@@ -242,11 +241,7 @@ mlp::OwnedToken mlp::derivative(
             term->add_term(std::move(derivative));
         }
 
-        result->add_token(std::move(term));
-
-        if (i != token.terms.size() - 1) {
-            result->add_token(std::make_unique<Operation>(Operation::add));
-        }
+        result->add_token(Operation{Operation::add}, std::move(term));
     }
 
     Term const end{
@@ -272,16 +267,8 @@ mlp::OwnedToken mlp::derivative(
 
     Expression result{};
 
-    for (OwnedToken const &term : token.tokens) {
-        if (auto const &token_type = typeid(*term);
-            token_type == typeid(Operation)) {
-            result.add_token(term->clone());
-
-            continue;
-        }
-
-        result.add_token(derivative(*term, variable, 1));
-    }
+    for (auto const &[operation, token] : token.tokens)
+        result.add_token(operation, derivative(*token, variable, 1));
 
     auto derivative = simplified(result);
 

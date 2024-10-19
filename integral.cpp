@@ -37,9 +37,12 @@ mlp::OwnedToken mlp::integral(
     auto const integral = mlp::integral(token, variable);
 
     Expression result{};
-    result.add_token(evaluate(*integral, {{variable, to}}));
-    result.add_token(std::make_unique<Operation>(Operation::sub));
-    result.add_token(evaluate(*integral, {{variable, from}}));
+    result.add_token(
+        Operation{Operation::add}, evaluate(*integral, {{variable, to}})
+    );
+    result.add_token(
+        Operation{Operation::sub}, evaluate(*integral, {{variable, from}})
+    );
 
     return simplified(result);
 }
@@ -187,16 +190,8 @@ mlp::integral(Expression const &token, Variable const &variable) {
 
     Expression result{};
 
-    for (OwnedToken const &term : token.tokens) {
-        if (auto const &token_type = typeid(*term);
-            token_type == typeid(Operation)) {
-            result.add_token(term->clone());
-
-            continue;
-        }
-
-        result.add_token(integral(*term, variable));
-    }
+    for (auto const &[operation, term] : token.tokens)
+        result.add_token(operation, integral(*term, variable));
 
     return simplified(result);
 }

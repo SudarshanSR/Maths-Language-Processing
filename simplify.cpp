@@ -102,8 +102,9 @@ mlp::OwnedToken mlp::simplified(Term const &token) {
         if (term.coefficient == base.value) {
             if (typeid(*term.power) == typeid(Expression)) {
                 auto &power = dynamic_cast<Expression &>(*term.power);
-                power.add_token(std::make_unique<Operation>(Operation::add));
-                power.add_token(std::make_unique<Constant>(1));
+                power.add_token(
+                    Operation{Operation::add}, std::make_unique<Constant>(1)
+                );
                 term.coefficient = 1;
             }
         }
@@ -170,8 +171,9 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
                 auto &power = dynamic_cast<Expression &>(
                     *dynamic_cast<Term &>(**variable_powers[variable]).power
                 );
-                power.add_token(std::make_unique<Operation>(Operation::add));
-                power.add_token(std::make_unique<Constant>(1));
+                power.add_token(
+                    Operation(Operation::add), std::make_unique<Constant>(1)
+                );
 
                 terms.terms.erase(terms.terms.begin() + 1);
 
@@ -179,7 +181,9 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
             }
 
             auto power = std::make_unique<Expression>();
-            power->add_token(std::make_unique<Constant>(1));
+            power->add_token(
+                Operation(Operation::add), std::make_unique<Constant>(1)
+            );
 
             terms.terms[i] =
                 std::make_unique<Term>(variable.clone(), std::move(power));
@@ -203,9 +207,8 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
                         *dynamic_cast<Term &>(**variable_powers[variable]).power
                     );
                     power.add_token(
-                        std::make_unique<Operation>(Operation::add)
+                        Operation(Operation::add), std::move(term.power)
                     );
-                    power.add_token(std::move(term.power));
 
                     terms.terms.erase(terms.terms.begin() + 1);
 
@@ -214,7 +217,9 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
 
                 if (typeid(*term.power) != typeid(Expression)) {
                     auto power = std::make_unique<Expression>();
-                    power->add_token(std::move(term.power));
+                    power->add_token(
+                        Operation(Operation::add), std::move(term.power)
+                    );
                     term.power = std::move(power);
                 }
 
@@ -272,230 +277,180 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
     auto clone = token.clone();
     auto &expression = dynamic_cast<Expression &>(*clone);
 
-    std::vector<OwnedToken> &tokens = expression.tokens;
+    std::vector<std::pair<Operation, OwnedToken>> &tokens = expression.tokens;
 
-    if (tokens.size() == 1)
-        return simplified(*expression.pop_token());
+    if (tokens.empty())
+        return std::make_unique<Constant>(0);
 
-    for (OwnedToken &t : tokens)
-        if (typeid(*t) != typeid(Operation))
-            t = simplified(*t);
+    if (tokens.size() == 1) {
+        auto &&[operation, term] = expression.pop_token();
 
-    for (int i = 1; i < tokens.size(); ++i) {
-        OwnedToken &t = tokens[i];
+        if (operation.operation == Operation::add)
+            return simplified(*term);
 
-        if (typeid(*t) != typeid(Operation))
-            continue;
-
-        if (i == tokens.size())
-            throw std::invalid_argument("Expression is not valid!");
-
-        OwnedToken &left = tokens[i - 1];
-        OwnedToken &right = tokens[i + 1];
-
-        auto &operation = dynamic_cast<Operation &>(*t);
-
-        if (operation.operation == Operation::add) {
-            if (typeid(*left) == typeid(Constant)) {
-                if (auto const left_constant = dynamic_cast<Constant &>(*left);
-                    left_constant.value == 0) {
-                    --i;
-
-                    tokens.erase(tokens.begin() + i);
-                    tokens.erase(tokens.begin() + i);
-                } else if (typeid(*right) == typeid(Constant)) {
-                    auto &right_constant = dynamic_cast<Constant &>(*right);
-
-                    right_constant.value += left_constant.value;
-
-                    --i;
-
-                    tokens.erase(tokens.begin() + i);
-                    tokens.erase(tokens.begin() + i);
-                }
-
-                continue;
-            }
-
-            if (typeid(*right) == typeid(Constant)) {
-                auto &right_constant = dynamic_cast<Constant &>(*right);
-
-                if (right_constant.value > 0)
-                    continue;
-
-                if (right_constant.value != 0) {
-                    right_constant.value = -right_constant.value;
-                    operation.operation = Operation::sub;
-
-                    continue;
-                }
-
-                tokens[i + 1] = std::move(left);
-
-                --i;
-
-                tokens.erase(tokens.begin() + i);
-                tokens.erase(tokens.begin() + i);
-
-                continue;
-            }
-
-            if (typeid(*right) == typeid(Terms)) {
-                auto &right_terms = dynamic_cast<Terms &>(*right);
-
-                if (right_terms.coefficient >= 0)
-                    continue;
-
-                right_terms.coefficient = -right_terms.coefficient;
-                operation.operation = Operation::sub;
-
-                continue;
-            }
-
-            if (typeid(*right) == typeid(Term)) {
-                auto &right_term = dynamic_cast<Term &>(*right);
-
-                if (right_term.coefficient >= 0)
-                    continue;
-
-                right_term.coefficient = -right_term.coefficient;
-                operation.operation = Operation::sub;
-
-                continue;
-            }
-        } else if (operation.operation == Operation::sub) {
-            if (typeid(*left) == typeid(Constant)) {
-                if (typeid(*right) == typeid(Constant)) {
-                    auto &right_constant = dynamic_cast<Constant &>(*right);
-
-                    right_constant.value =
-                        dynamic_cast<Constant &>(*left).value -
-                        right_constant.value;
-
-                    --i;
-
-                    tokens.erase(tokens.begin() + i);
-                    tokens.erase(tokens.begin() + i);
-                }
-
-                continue;
-            }
-
-            if (typeid(*right) == typeid(Constant)) {
-                if (dynamic_cast<Constant &>(*right).value != 0)
-                    continue;
-
-                tokens[i + 1] = std::move(left);
-
-                --i;
-
-                tokens.erase(tokens.begin() + i);
-                tokens.erase(tokens.begin() + i);
-            }
-        }
+        return simplified(
+            Term(-1, std::move(term), std::make_unique<Constant>(1))
+        );
     }
 
-    if (tokens.size() == 1)
-        return expression.pop_token();
+    for (auto &t : tokens | std::views::values)
+        t = simplified(*t);
 
-    std::map<Variable, OwnedToken *> variable_multiples;
+    std::pair<Operation, OwnedToken> *constant = nullptr;
+    std::map<Variable, std::pair<Operation, OwnedToken> *> variable_multiples;
 
     for (int i = 0; i < tokens.size(); ++i) {
-        OwnedToken &t = tokens[i];
+        Operation &prev = tokens[i].first;
+        OwnedToken &left = tokens[i].second;
 
-        auto const &token_type = typeid(*t);
-
-        if (token_type == typeid(Variable)) {
-            auto &variable = dynamic_cast<Variable &>(*t);
-
-            if (variable_multiples.contains(variable)) {
-                auto &terms =
-                    dynamic_cast<Terms &>(**variable_multiples[variable]);
-
-                auto &multiple = dynamic_cast<Expression &>(*terms.terms[0]);
-                multiple.add_token(std::move(tokens[i - 1]));
-                multiple.add_token(std::make_unique<Constant>(1));
-
-                --i;
-
-                tokens.erase(tokens.begin() + i);
-                tokens.erase(tokens.begin() + i);
-
-                --i;
+        if (typeid(*left) == typeid(Constant)) {
+            if (!constant) {
+                constant = &tokens[i];
 
                 continue;
             }
 
-            auto multiple = std::make_unique<Expression>();
+            if (auto &[op, c] = *constant; op.operation == prev.operation)
+                dynamic_cast<Constant &>(*c).value +=
+                    dynamic_cast<Constant const &>(*left).value;
 
-            if (i != 0)
-                multiple->add_token(std::move(tokens[i - 1]));
+            else
+                dynamic_cast<Constant &>(*c).value -=
+                    dynamic_cast<Constant const &>(*left).value;
 
-            multiple->add_token(std::make_unique<Constant>(1));
-
-            auto terms = std::make_unique<Terms>();
-            terms->add_term(std::move(multiple));
-            terms->add_term(std::move(t));
-
-            tokens[i] = std::move(terms);
-            variable_multiples[variable] = &tokens[i];
+            tokens.erase(tokens.begin() + i--);
 
             continue;
         }
 
-        if (token_type == typeid(Operation)) {
-            auto const &operation = dynamic_cast<Operation &>(*t);
+        if (typeid(*left) == typeid(Variable)) {
+            auto &variable = dynamic_cast<Variable &>(*left);
 
-            if (i == tokens.size() - 1)
-                throw std::invalid_argument("Expression is not valid!");
+            if (!variable_multiples.contains(variable)) {
+                auto multiple = std::make_unique<Expression>();
 
-            if (operation.operation == Operation::sub) {
-                if (i != 0)
+                multiple->add_token(prev, std::make_unique<Constant>(1));
+
+                auto terms = std::make_unique<Terms>();
+                terms->add_term(std::move(multiple));
+                terms->add_term(std::move(left));
+
+                tokens[i] = {Operation{Operation::add}, std::move(terms)};
+                variable_multiples[variable] = &tokens[i];
+
+                continue;
+            }
+
+            auto &terms =
+                dynamic_cast<Terms &>(*variable_multiples[variable]->second);
+
+            auto &multiple = dynamic_cast<Expression &>(*terms.terms[0]);
+            multiple.add_token(prev, std::make_unique<Constant>(1));
+
+            tokens.erase(tokens.begin() + i--);
+
+            continue;
+        }
+
+        if (typeid(*left) == typeid(Term)) {
+            auto &term = dynamic_cast<Term &>(*left);
+
+            if (term.coefficient < 0) {
+                prev.operation = prev.operation == Operation::add
+                                     ? Operation::sub
+                                     : Operation::add;
+
+                term.coefficient = -term.coefficient;
+            }
+
+            if (typeid(*term.base) != typeid(Variable) ||
+                typeid(*term.power) != typeid(Constant) ||
+                dynamic_cast<Constant const &>(*term.power).value != 1)
+                continue;
+
+            auto &variable = dynamic_cast<Variable &>(*term.base);
+
+            if (!variable_multiples.contains(variable)) {
+                auto multiple = std::make_unique<Expression>();
+
+                multiple->add_token(
+                    prev, std::make_unique<Constant>(term.coefficient)
+                );
+
+                auto terms = std::make_unique<Terms>();
+                terms->add_term(std::move(multiple));
+                terms->add_term(std::move(term.base));
+
+                tokens[i] = {Operation{Operation::add}, std::move(terms)};
+                variable_multiples[variable] = &tokens[i];
+
+                continue;
+            }
+
+            auto &terms =
+                dynamic_cast<Terms &>(*variable_multiples[variable]->second);
+
+            auto &multiple = dynamic_cast<Expression &>(*terms.terms[0]);
+            multiple.add_token(
+                prev, std::make_unique<Constant>(term.coefficient)
+            );
+
+            tokens.erase(tokens.begin() + i--);
+
+            continue;
+        }
+
+        if (typeid(*left) == typeid(Terms)) {
+            auto &terms = dynamic_cast<Terms &>(*left);
+
+            if (terms.coefficient < 0) {
+                prev.operation = prev.operation == Operation::add
+                                     ? Operation::sub
+                                     : Operation::add;
+
+                terms.coefficient = -terms.coefficient;
+            }
+        }
+    }
+
+    if (constant) {
+        auto &[op, t] = *constant;
+
+        auto &c = dynamic_cast<Constant &>(*t);
+
+        if (c.value == 0) {
+            for (int i = 0; i < tokens.size(); ++i) {
+                if (tokens[i] != *constant)
                     continue;
 
-                if (OwnedToken &next = tokens[i + 1];
-                    typeid(*next) == typeid(Constant)) {
-                    auto &constant = dynamic_cast<Constant &>(*next);
+                tokens.erase(tokens.begin() + i);
 
-                    constant.value = -constant.value;
-                } else if (typeid(*next) == typeid(Term)) {
-                    auto &term = dynamic_cast<Term &>(*next);
-
-                    term.coefficient = -term.coefficient;
-                } else if (typeid(*next) == typeid(Terms)) {
-                    auto &terms = dynamic_cast<Terms &>(*next);
-
-                    terms.coefficient = -terms.coefficient;
-                } else {
-                    tokens[i + 1] = std::make_unique<Term>(
-                        -1, std::move(next), std::make_unique<Constant>(1)
-                    );
-                }
-
-                --i;
-            } else if (i == 0) {
-                --i;
-            } else {
-                continue;
+                break;
             }
+        } else if (c.value < 0) {
+            op.operation = op.operation == Operation::add ? Operation::sub
+                                                          : Operation::add;
 
-            tokens.erase(tokens.begin());
+            c.value = -c.value;
         }
     }
 
-    for (auto const t : variable_multiples | std::views::values) {
-        if (auto &terms = dynamic_cast<Terms &>(**t);
-            dynamic_cast<Expression &>(*terms.terms[0]).tokens.empty()) {
-            *t = std::move(terms.terms[1]);
+    for (auto const t : variable_multiples | std::views::values)
+        t->second = simplified(*t->second);
 
-            continue;
-        }
+    if (tokens.empty())
+        return std::make_unique<Constant>(0);
 
-        *t = simplified(**t);
+    if (tokens.size() == 1) {
+        auto &&[operation, term] = expression.pop_token();
+
+        if (operation.operation == Operation::add)
+            return simplified(*term);
+
+        return simplified(
+            Term(-1, std::move(term), std::make_unique<Constant>(1))
+        );
     }
-
-    if (tokens.size() == 1)
-        return expression.pop_token();
 
     return clone;
 }

@@ -4,18 +4,19 @@
 #include "token.h"
 
 #include <map>
+#include <variant>
 
 namespace mlp {
 [[nodiscard]] OwnedToken
 evaluate(Token const &token, std::map<Variable, SharedToken> const &values);
 
-[[nodiscard]] OwnedToken
+[[nodiscard]] Constant
 evaluate(Constant const &token, std::map<Variable, SharedToken> const &values);
 
 [[nodiscard]] OwnedToken
 evaluate(Variable const &token, std::map<Variable, SharedToken> const &values);
 
-[[nodiscard]] OwnedToken
+[[nodiscard]] std::variant<Constant, Function>
 evaluate(Function const &token, std::map<Variable, SharedToken> const &values);
 
 [[nodiscard]] OwnedToken

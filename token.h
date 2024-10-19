@@ -43,16 +43,18 @@ struct Variable final : Token {
     bool operator==(Variable const &) const;
 };
 
-struct Operation final : Token {
+struct Operation final {
     enum op { add, sub, mul, div, pow } operation;
 
     explicit Operation(op operation);
 
-    [[nodiscard]] OwnedToken clone() const override;
+    Operation(Operation const &) = default;
 
-    static std::unique_ptr<Operation> from_char(char operation);
+    static std::optional<Operation> from_char(char operation);
 
-    explicit operator std::string() const override;
+    explicit operator std::string() const;
+
+    bool operator==(Operation const &) const = default;
 };
 
 struct Function final : Token {
@@ -61,6 +63,10 @@ struct Function final : Token {
     OwnedToken parameter;
 
     explicit Function(std::string function, OwnedToken &&parameter);
+
+    Function(Function const &function);
+
+    Function(Function &&function) = default;
 
     [[nodiscard]] OwnedToken clone() const override;
 
@@ -96,15 +102,15 @@ struct Terms final : Token {
 };
 
 struct Expression final : Token {
-    std::vector<OwnedToken> tokens;
+    std::vector<std::pair<Operation, OwnedToken>> tokens;
 
     Expression() = default;
 
     [[nodiscard]] OwnedToken clone() const override;
 
-    void add_token(OwnedToken &&token);
+    void add_token(Operation const &operation, OwnedToken &&token);
 
-    [[nodiscard]] OwnedToken pop_token();
+    [[nodiscard]] std::pair<Operation, OwnedToken> pop_token();
 
     explicit operator std::string() const override;
 };
