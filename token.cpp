@@ -322,13 +322,11 @@ mlp::OwnedToken mlp::Expression::clone() const {
     return expression;
 }
 
-void mlp::Expression::add_token(
-    Operation const &operation, OwnedToken &&token
-) {
-    this->tokens.emplace_back(operation, std::move(token));
+void mlp::Expression::add_token(Sign const sign, OwnedToken &&token) {
+    this->tokens.emplace_back(sign, std::move(token));
 }
 
-std::pair<mlp::Operation, mlp::OwnedToken> mlp::Expression::pop_token() {
+std::pair<mlp::Sign, mlp::OwnedToken> mlp::Expression::pop_token() {
     auto token = std::move(this->tokens.back());
 
     this->tokens.pop_back();
@@ -340,14 +338,13 @@ mlp::Expression::operator std::string() const {
     std::stringstream result;
 
     if (this->tokens.size() == 1) {
-        result << static_cast<std::string>(this->tokens[0].first)
+        result << this->tokens[0].first
                << static_cast<std::string>(*this->tokens[0].second);
     } else {
         result << '(';
 
         for (auto const &[operation, token] : this->tokens)
-            result << static_cast<std::string>(operation)
-                   << static_cast<std::string>(*token);
+            result << operation << static_cast<std::string>(*token);
 
         result << ')';
     }
@@ -390,12 +387,15 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
         if (operation.operation == Operation::add ||
             operation.operation == Operation::sub) {
+            Sign sign =
+                operation.operation == Operation::add ? Sign::pos : Sign::neg;
+
             if (!terms->terms.empty())
-                result.add_token(op, std::move(terms));
+                result.add_token(sign, std::move(terms));
 
             else if (copy != 0)
                 result.add_token(
-                    op, std::make_unique<Constant>(terms->coefficient)
+                    sign, std::make_unique<Constant>(terms->coefficient)
                 );
 
             op = operation;
@@ -485,7 +485,9 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
     if (terms->terms.empty())
         throw std::runtime_error("Expression is not valid!");
 
-    result.add_token(op, std::move(terms));
+    result.add_token(
+        op.operation == Operation::add ? Sign::pos : Sign::neg, std::move(terms)
+    );
 
     return simplified(result);
 }
@@ -500,4 +502,14 @@ std::ostream &operator<<(std::ostream &os, Token const &token) {
 bool operator<(Variable const &lhs, Variable const &rhs) {
     return lhs.var < rhs.var;
 }
+
+std::ostream &operator<<(std::ostream &os, Sign const sign) {
+    os << to_string(sign);
+
+    return os;
+}
 } // namespace mlp
+
+std::string to_string(mlp::Sign const sign) {
+    return sign == mlp::Sign::pos ? "+" : "-";
+}

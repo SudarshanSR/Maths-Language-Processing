@@ -102,9 +102,7 @@ mlp::OwnedToken mlp::simplified(Term const &token) {
         if (term.coefficient == base.value) {
             if (typeid(*term.power) == typeid(Expression)) {
                 auto &power = dynamic_cast<Expression &>(*term.power);
-                power.add_token(
-                    Operation{Operation::add}, std::make_unique<Constant>(1)
-                );
+                power.add_token(Sign::pos, std::make_unique<Constant>(1));
                 term.coefficient = 1;
             }
         }
@@ -171,9 +169,7 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
                 auto &power = dynamic_cast<Expression &>(
                     *dynamic_cast<Term &>(**variable_powers[variable]).power
                 );
-                power.add_token(
-                    Operation(Operation::add), std::make_unique<Constant>(1)
-                );
+                power.add_token(Sign::pos, std::make_unique<Constant>(1));
 
                 terms.terms.erase(terms.terms.begin() + 1);
 
@@ -181,9 +177,7 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
             }
 
             auto power = std::make_unique<Expression>();
-            power->add_token(
-                Operation(Operation::add), std::make_unique<Constant>(1)
-            );
+            power->add_token(Sign::pos, std::make_unique<Constant>(1));
 
             terms.terms[i] =
                 std::make_unique<Term>(variable.clone(), std::move(power));
@@ -206,9 +200,7 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
                     auto &power = dynamic_cast<Expression &>(
                         *dynamic_cast<Term &>(**variable_powers[variable]).power
                     );
-                    power.add_token(
-                        Operation(Operation::add), std::move(term.power)
-                    );
+                    power.add_token(Sign::pos, std::move(term.power));
 
                     terms.terms.erase(terms.terms.begin() + 1);
 
@@ -217,9 +209,7 @@ mlp::OwnedToken mlp::simplified(Terms const &token) {
 
                 if (typeid(*term.power) != typeid(Expression)) {
                     auto power = std::make_unique<Expression>();
-                    power->add_token(
-                        Operation(Operation::add), std::move(term.power)
-                    );
+                    power->add_token(Sign::pos, std::move(term.power));
                     term.power = std::move(power);
                 }
 
@@ -277,15 +267,15 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
     auto clone = token.clone();
     auto &expression = dynamic_cast<Expression &>(*clone);
 
-    std::vector<std::pair<Operation, OwnedToken>> &tokens = expression.tokens;
+    std::vector<std::pair<Sign, OwnedToken>> &tokens = expression.tokens;
 
     if (tokens.empty())
         return std::make_unique<Constant>(0);
 
     if (tokens.size() == 1) {
-        auto &&[operation, term] = expression.pop_token();
+        auto &&[sign, term] = expression.pop_token();
 
-        if (operation.operation == Operation::add)
+        if (sign == Sign::pos)
             return simplified(*term);
 
         return simplified(
@@ -296,11 +286,11 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
     for (auto &t : tokens | std::views::values)
         t = simplified(*t);
 
-    std::pair<Operation, OwnedToken> *constant = nullptr;
-    std::map<Variable, std::pair<Operation, OwnedToken> *> variable_multiples;
+    std::pair<Sign, OwnedToken> *constant = nullptr;
+    std::map<Variable, std::pair<Sign, OwnedToken> *> variable_multiples;
 
     for (int i = 0; i < tokens.size(); ++i) {
-        Operation &prev = tokens[i].first;
+        Sign &prev = tokens[i].first;
         OwnedToken &left = tokens[i].second;
 
         if (typeid(*left) == typeid(Constant)) {
@@ -310,7 +300,7 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
                 continue;
             }
 
-            if (auto &[op, c] = *constant; op.operation == prev.operation)
+            if (auto &[op, c] = *constant; op == prev)
                 dynamic_cast<Constant &>(*c).value +=
                     dynamic_cast<Constant const &>(*left).value;
 
@@ -335,7 +325,7 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
                 terms->add_term(std::move(multiple));
                 terms->add_term(std::move(left));
 
-                tokens[i] = {Operation{Operation::add}, std::move(terms)};
+                tokens[i] = {Sign::pos, std::move(terms)};
                 variable_multiples[variable] = &tokens[i];
 
                 continue;
@@ -356,9 +346,7 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
             auto &term = dynamic_cast<Term &>(*left);
 
             if (term.coefficient < 0) {
-                prev.operation = prev.operation == Operation::add
-                                     ? Operation::sub
-                                     : Operation::add;
+                prev = prev == Sign::pos ? Sign::neg : Sign::pos;
 
                 term.coefficient = -term.coefficient;
             }
@@ -381,7 +369,7 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
                 terms->add_term(std::move(multiple));
                 terms->add_term(std::move(term.base));
 
-                tokens[i] = {Operation{Operation::add}, std::move(terms)};
+                tokens[i] = {Sign::pos, std::move(terms)};
                 variable_multiples[variable] = &tokens[i];
 
                 continue;
@@ -404,9 +392,7 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
             auto &terms = dynamic_cast<Terms &>(*left);
 
             if (terms.coefficient < 0) {
-                prev.operation = prev.operation == Operation::add
-                                     ? Operation::sub
-                                     : Operation::add;
+                prev = prev == Sign::pos ? Sign::neg : Sign::pos;
 
                 terms.coefficient = -terms.coefficient;
             }
@@ -414,7 +400,7 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
     }
 
     if (constant) {
-        auto &[op, t] = *constant;
+        auto &[sign, t] = *constant;
 
         auto &c = dynamic_cast<Constant &>(*t);
 
@@ -428,8 +414,7 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
                 break;
             }
         } else if (c.value < 0) {
-            op.operation = op.operation == Operation::add ? Operation::sub
-                                                          : Operation::add;
+            sign = sign == Sign::pos ? Sign::neg : Sign::pos;
 
             c.value = -c.value;
         }
@@ -442,9 +427,9 @@ mlp::OwnedToken mlp::simplified(Expression const &token) {
         return std::make_unique<Constant>(0);
 
     if (tokens.size() == 1) {
-        auto &&[operation, term] = expression.pop_token();
+        auto &&[sign, term] = expression.pop_token();
 
-        if (operation.operation == Operation::add)
+        if (sign == Sign::pos)
             return simplified(*term);
 
         return simplified(

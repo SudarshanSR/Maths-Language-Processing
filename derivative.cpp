@@ -195,8 +195,8 @@ mlp::OwnedToken mlp::derivative(
     terms_2->add_term(std::make_unique<Function>("ln", token.base->clone()));
 
     auto expression = std::make_unique<Expression>();
-    expression->add_token(Operation(Operation::add), std::move(terms_1));
-    expression->add_token(Operation(Operation::add), std::move(terms_2));
+    expression->add_token(Sign::pos, std::move(terms_1));
+    expression->add_token(Sign::pos, std::move(terms_2));
 
     result.add_term(std::move(expression));
 
@@ -241,7 +241,7 @@ mlp::OwnedToken mlp::derivative(
             term->add_term(std::move(derivative));
         }
 
-        result->add_token(Operation{Operation::add}, std::move(term));
+        result->add_token(Sign::pos, std::move(term));
     }
 
     Term const end{

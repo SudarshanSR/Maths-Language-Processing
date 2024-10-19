@@ -37,12 +37,8 @@ mlp::OwnedToken mlp::integral(
     auto const integral = mlp::integral(token, variable);
 
     Expression result{};
-    result.add_token(
-        Operation{Operation::add}, evaluate(*integral, {{variable, to}})
-    );
-    result.add_token(
-        Operation{Operation::sub}, evaluate(*integral, {{variable, from}})
-    );
+    result.add_token(Sign::pos, evaluate(*integral, {{variable, to}}));
+    result.add_token(Sign::neg, evaluate(*integral, {{variable, from}}));
 
     return simplified(result);
 }

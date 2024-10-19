@@ -43,6 +43,8 @@ struct Variable final : Token {
     bool operator==(Variable const &) const;
 };
 
+enum class Sign { pos, neg };
+
 struct Operation final {
     enum op { add, sub, mul, div, pow } operation;
 
@@ -102,15 +104,15 @@ struct Terms final : Token {
 };
 
 struct Expression final : Token {
-    std::vector<std::pair<Operation, OwnedToken>> tokens;
+    std::vector<std::pair<Sign, OwnedToken>> tokens;
 
     Expression() = default;
 
     [[nodiscard]] OwnedToken clone() const override;
 
-    void add_token(Operation const &operation, OwnedToken &&token);
+    void add_token(Sign sign, OwnedToken &&token);
 
-    [[nodiscard]] std::pair<Operation, OwnedToken> pop_token();
+    [[nodiscard]] std::pair<Sign, OwnedToken> pop_token();
 
     explicit operator std::string() const override;
 };
@@ -120,6 +122,10 @@ OwnedToken tokenise(std::string expression);
 std::ostream &operator<<(std::ostream &os, Token const &token);
 
 bool operator<(Variable const &lhs, Variable const &rhs);
+
+std::ostream &operator<<(std::ostream &os, Sign sign);
 } // namespace mlp
+
+std::string to_string(mlp::Sign sign);
 
 #endif
