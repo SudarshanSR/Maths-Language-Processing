@@ -1,5 +1,4 @@
-#include "evaluate.h"
-#include "simplify.h"
+#include "token.h"
 
 #include <cmath>
 #include <map>
@@ -35,95 +34,56 @@ std::map<std::string, double (*)(double)> k_functions{
 };
 } // namespace
 
-mlp::OwnedToken mlp::evaluate(
-    Token const &token, std::map<Variable, SharedToken> const &values
-) {
-    auto const &type = typeid(token);
-
-    if (type == typeid(Constant))
-        return std::make_unique<Constant>(
-            evaluate(dynamic_cast<Constant const &>(token), values)
-        );
-
-    if (type == typeid(Variable))
-        return evaluate(dynamic_cast<Variable const &>(token), values);
-
-    if (type == typeid(Function)) {
-        auto variant = evaluate(dynamic_cast<Function const &>(token), values);
-
-        if (std::holds_alternative<Constant>(variant))
-            return std::make_unique<Constant>(std::get<Constant>(variant));
-
-        return std::make_unique<Function>(std::get<Function>(variant));
-    }
-
-    if (type == typeid(Term))
-        return evaluate(dynamic_cast<Term const &>(token), values);
-
-    if (type == typeid(Terms))
-        return evaluate(dynamic_cast<Terms const &>(token), values);
-
-    if (type == typeid(Expression))
-        return evaluate(dynamic_cast<Expression const &>(token), values);
-
-    throw std::invalid_argument("Invalid argument!");
+mlp::OwnedToken
+mlp::Constant::evaluate(std::map<Variable, SharedToken> const &values) const {
+    return std::make_unique<Constant>(*this);
 }
 
-mlp::Constant
-mlp::evaluate(Constant const &token, std::map<Variable, SharedToken> const &) {
-    return token;
-}
-
-mlp::OwnedToken mlp::evaluate(
-    Variable const &token, std::map<Variable, SharedToken> const &values
-) {
+mlp::OwnedToken
+mlp::Variable::evaluate(std::map<Variable, SharedToken> const &values) const {
     return OwnedToken(
-        values.contains(token) ? values.at(token)->clone() : token.clone()
+        values.contains(*this) ? values.at(*this)->clone() : this->clone()
     );
 }
 
-std::variant<mlp::Constant, mlp::Function> mlp::evaluate(
-    Function const &token, std::map<Variable, SharedToken> const &values
-) {
-    auto param = evaluate(*token.parameter, values);
+mlp::OwnedToken
+mlp::Function::evaluate(std::map<Variable, SharedToken> const &values) const {
+    auto param = this->parameter->evaluate(values);
 
     if (typeid(*param) == typeid(Constant))
-        return Constant(k_functions.at(token.function)(
+        return std::make_unique<Constant>(k_functions.at(this->function)(
             dynamic_cast<Constant &>(*param).value
         ));
 
-    return Function(token.function, std::move(param));
+    return std::make_unique<Function>(this->function, std::move(param));
 }
 
-mlp::OwnedToken mlp::evaluate(
-    Term const &token, std::map<Variable, SharedToken> const &values
-) {
-    auto const term = Owned<Term>(token.clone());
+mlp::OwnedToken
+mlp::Term::evaluate(std::map<Variable, SharedToken> const &values) const {
+    auto const term = Owned<Term>(this->clone());
 
-    term->base = evaluate(*term->base, values);
-    term->power = evaluate(*term->power, values);
+    term->base = term->base->evaluate(values);
+    term->power = term->power->evaluate(values);
 
-    return simplified(*term);
+    return term->simplified();
 }
 
-mlp::OwnedToken mlp::evaluate(
-    Terms const &token, std::map<Variable, SharedToken> const &values
-) {
-    auto const terms = Owned<Terms>(token.clone());
+mlp::OwnedToken
+mlp::Terms::evaluate(std::map<Variable, SharedToken> const &values) const {
+    auto const terms = Owned<Terms>(this->clone());
 
     for (auto &term : terms->terms)
-        term = evaluate(*term, values);
+        term = term->evaluate(values);
 
-    return simplified(*terms);
+    return terms->simplified();
 }
 
-mlp::OwnedToken mlp::evaluate(
-    Expression const &token, std::map<Variable, SharedToken> const &values
-) {
-    auto const expression = Owned<Expression>(token.clone());
+mlp::OwnedToken
+mlp::Expression::evaluate(std::map<Variable, SharedToken> const &values) const {
+    auto const expression = Owned<Expression>(this->clone());
 
     for (auto &term : expression->tokens | std::views::values)
-        term = evaluate(*term, values);
+        term = term->evaluate(values);
 
-    return simplified(*expression);
+    return expression->simplified();
 }

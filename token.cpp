@@ -1,5 +1,4 @@
 #include "token.h"
-#include "simplify.h"
 
 #include <algorithm>
 #include <map>
@@ -335,6 +334,8 @@ std::pair<mlp::Sign, mlp::OwnedToken> mlp::Expression::pop_token() {
     return token;
 }
 
+bool mlp::Expression::empty() const { return this->tokens.empty(); }
+
 mlp::Expression::operator std::string() const {
     std::stringstream result;
 
@@ -495,7 +496,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         op.operation == Operation::add ? Sign::pos : Sign::neg, std::move(terms)
     );
 
-    return simplified(result);
+    return result.simplified();
 }
 
 namespace mlp {

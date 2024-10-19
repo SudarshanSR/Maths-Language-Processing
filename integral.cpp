@@ -1,7 +1,4 @@
-#include "integral.h"
-#include "dependent.h"
-#include "evaluate.h"
-#include "simplify.h"
+#include "token.h"
 
 #include <format>
 #include <map>
@@ -30,54 +27,27 @@ std::map<std::string, std::string> k_function_map{
 };
 } // namespace
 
-mlp::OwnedToken mlp::integral(
-    Token const &token, Variable const &variable, SharedToken const &from,
-    SharedToken const &to
+mlp::OwnedToken mlp::Integrable::integral(
+    Variable const &variable, SharedToken const &from, SharedToken const &to
 ) {
-    auto const integral = mlp::integral(token, variable);
+    auto const integral = this->integral(variable);
 
     Expression result{};
-    result.add_token(Sign::pos, evaluate(*integral, {{variable, to}}));
-    result.add_token(Sign::neg, evaluate(*integral, {{variable, from}}));
+    result.add_token(Sign::pos, integral->evaluate({{variable, to}}));
+    result.add_token(Sign::neg, integral->evaluate({{variable, from}}));
 
-    return simplified(result);
+    return result.simplified();
 }
 
-mlp::OwnedToken mlp::integral(Token const &token, Variable const &variable) {
-    auto const &type = typeid(token);
-
-    if (type == typeid(Constant))
-        return std::make_unique<Term>(
-            integral(dynamic_cast<Constant const &>(token), variable)
-        );
-
-    if (type == typeid(Variable))
-        return integral(dynamic_cast<Variable const &>(token), variable);
-
-    if (type == typeid(Function))
-        return integral(dynamic_cast<Function const &>(token), variable);
-
-    if (type == typeid(Term))
-        return integral(dynamic_cast<Term const &>(token), variable);
-
-    if (type == typeid(Terms))
-        return integral(dynamic_cast<Terms const &>(token), variable);
-
-    if (type == typeid(Expression))
-        return integral(dynamic_cast<Expression const &>(token), variable);
-
-    throw std::invalid_argument("Invalid argument!");
-}
-
-mlp::Term mlp::integral(Constant const &token, Variable const &variable) {
-    return {
-        token.value, Owned<Variable>(variable.clone()),
+mlp::OwnedToken mlp::Constant::integral(Variable const &variable) {
+    return std::make_unique<Term>(
+        this->value, Owned<Variable>(variable.clone()),
         std::make_unique<Constant>(1)
-    };
+    );
 }
 
-mlp::OwnedToken mlp::integral(Variable const &token, Variable const &variable) {
-    if (token == variable)
+mlp::OwnedToken mlp::Variable::integral(Variable const &variable) {
+    if (*this == variable)
         return std::make_unique<Term>(
             0.5, Owned<Variable>(variable.clone()),
             std::make_unique<Constant>(2)
@@ -85,94 +55,94 @@ mlp::OwnedToken mlp::integral(Variable const &token, Variable const &variable) {
 
     auto terms = std::make_unique<Terms>();
     terms->add_term(Owned<Variable>(variable.clone()));
-    terms->add_term(Owned<Variable>(token.clone()));
+    terms->add_term(Owned<Variable>(this->clone()));
 
     return terms;
 }
 
-mlp::OwnedToken mlp::integral(Function const &token, Variable const &variable) {
-    if (!is_dependent_on(token, variable)) {
+mlp::OwnedToken mlp::Function::integral(Variable const &variable) {
+    if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
         terms->add_term(Owned<Variable>(variable.clone()));
-        terms->add_term(Owned<Function>(token.clone()));
+        terms->add_term(Owned<Function>(this->clone()));
 
         return terms;
     }
 
-    if (typeid(*token.parameter) == typeid(Variable)) {
+    if (typeid(*this->parameter) == typeid(Variable)) {
         Terms terms{};
 
-        auto string = static_cast<std::string>(*token.parameter);
+        auto string = static_cast<std::string>(*this->parameter);
 
         terms.add_term(tokenise(std::vformat(
-            k_function_map.at(token.function), std::make_format_args(string)
+            k_function_map.at(this->function), std::make_format_args(string)
         )));
 
-        return simplified(terms);
+        return terms.simplified();
     }
 
     throw std::runtime_error("Expression is not integrable!");
 }
 
-mlp::OwnedToken mlp::integral(Term const &token, Variable const &variable) {
-    if (!is_dependent_on(token, variable)) {
+mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
+    if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
         terms->add_term(Owned<Variable>(variable.clone()));
-        terms->add_term(Owned<Term>(token.clone()));
+        terms->add_term(Owned<Term>(this->clone()));
 
         return terms;
     }
 
-    auto const &base_type = typeid(*token.base);
-    auto const &power_type = typeid(*token.power);
+    auto const &base_type = typeid(*this->base);
+    auto const &power_type = typeid(*this->power);
 
     if (base_type == typeid(Variable) && power_type == typeid(Constant)) {
-        auto const &power = dynamic_cast<Constant &>(*token.power);
+        auto const &power = dynamic_cast<Constant &>(*this->power);
 
         if (power.value == -1) {
             return std::make_unique<Term>(
-                token.coefficient,
+                this->coefficient,
                 std::make_unique<Function>(
-                    "ln", OwnedToken(token.base->clone())
+                    "ln", OwnedToken(this->base->clone())
                 ),
                 std::make_unique<Constant>(1)
             );
         }
 
         return std::make_unique<Term>(
-            token.coefficient / (power.value + 1),
-            OwnedToken(token.base->clone()),
+            this->coefficient / (power.value + 1),
+            OwnedToken(this->base->clone()),
             std::make_unique<Constant>(power.value + 1)
         );
     }
 
     if (base_type == typeid(Constant) && power_type == typeid(Variable)) {
         Terms terms{};
-        terms.add_term(Owned<Term>(token.clone()));
+        terms.add_term(Owned<Term>(this->clone()));
 
-        if (dynamic_cast<Variable &>(*token.power) != variable) {
+        if (dynamic_cast<Variable &>(*this->power) != variable) {
             terms.add_term(Owned<Variable>(variable.clone()));
         } else {
             terms.add_term(std::make_unique<Term>(
                 1,
                 std::make_unique<Function>(
-                    "ln", OwnedToken(token.base->clone())
+                    "ln", OwnedToken(this->base->clone())
                 ),
                 std::make_unique<Constant>(-1)
             ));
         }
 
-        return simplified(terms);
+        return terms.simplified();
     }
 
     throw std::runtime_error("Expression is not integrable!");
 }
 
-mlp::OwnedToken mlp::integral(Terms const &token, Variable const &variable) {
-    if (!is_dependent_on(token, variable)) {
+mlp::OwnedToken mlp::Terms::integral(Variable const &variable) {
+    if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
         terms->add_term(Owned<Variable>(variable.clone()));
-        terms->add_term(Owned<Terms>(token.clone()));
+        terms->add_term(Owned<Terms>(this->clone()));
 
         return terms;
     }
@@ -180,20 +150,19 @@ mlp::OwnedToken mlp::integral(Terms const &token, Variable const &variable) {
     throw std::runtime_error("Expression is not integrable!");
 }
 
-mlp::OwnedToken
-mlp::integral(Expression const &token, Variable const &variable) {
-    if (!is_dependent_on(token, variable)) {
+mlp::OwnedToken mlp::Expression::integral(Variable const &variable) {
+    if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
         terms->add_term(Owned<Variable>(variable.clone()));
-        terms->add_term(Owned<Expression>(token.clone()));
+        terms->add_term(Owned<Expression>(this->clone()));
 
         return terms;
     }
 
     Expression result{};
 
-    for (auto const &[operation, term] : token.tokens)
-        result.add_token(operation, integral(*term, variable));
+    for (auto const &[operation, term] : this->tokens)
+        result.add_token(operation, term->integral(variable));
 
-    return simplified(result);
+    return result.simplified();
 }

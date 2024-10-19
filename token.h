@@ -1,6 +1,7 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+#include <map>
 #include <optional>
 #include <ostream>
 #include <string>
@@ -16,9 +17,55 @@ template <typename T> using Owned = std::unique_ptr<T>;
 using SharedToken = std::shared_ptr<Token>;
 using OwnedToken = Owned<Token>;
 
-struct Token {
-    virtual ~Token() = default;
+struct Variable;
 
+struct Dependable {
+    virtual ~Dependable() = default;
+
+    [[nodiscard]] virtual bool is_dependent_on(Variable const &variable
+    ) const = 0;
+};
+
+struct Evaluatable {
+    virtual ~Evaluatable() = default;
+
+    [[nodiscard]] virtual OwnedToken
+    evaluate(std::map<Variable, SharedToken> const &values) const = 0;
+};
+
+struct Simplifiable {
+    virtual ~Simplifiable() = default;
+
+    [[nodiscard]] virtual OwnedToken simplified() const = 0;
+};
+
+struct Differentiable {
+    virtual ~Differentiable() = default;
+
+    [[nodiscard]] OwnedToken derivative(
+        Variable const &variable, std::uint32_t order,
+        std::map<Variable, SharedToken> const &values
+    ) const;
+
+    [[nodiscard]] virtual OwnedToken
+    derivative(Variable const &variable, std::uint32_t order) const = 0;
+};
+
+struct Integrable {
+    virtual ~Integrable() = default;
+
+    [[nodiscard]] OwnedToken integral(
+        Variable const &variable, SharedToken const &from, SharedToken const &to
+    );
+
+    [[nodiscard]] virtual OwnedToken integral(Variable const &variable) = 0;
+};
+
+struct Token : Dependable,
+               Evaluatable,
+               Simplifiable,
+               Differentiable,
+               Integrable {
     [[nodiscard]] virtual gsl::owner<Token *> clone() const = 0;
 
     explicit virtual operator std::string() const = 0;
@@ -34,6 +81,18 @@ struct Constant final : Token {
     explicit operator std::string() const override;
 
     bool operator==(Constant const &) const;
+
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+
+    [[nodiscard]] OwnedToken
+    evaluate(std::map<Variable, SharedToken> const &values) const override;
+
+    [[nodiscard]] OwnedToken simplified() const override;
+
+    [[nodiscard]] OwnedToken
+    derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
 
 struct Variable final : Token {
@@ -46,6 +105,18 @@ struct Variable final : Token {
     explicit operator std::string() const override;
 
     bool operator==(Variable const &) const;
+
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+
+    [[nodiscard]] OwnedToken
+    evaluate(std::map<Variable, SharedToken> const &values) const override;
+
+    [[nodiscard]] OwnedToken simplified() const override;
+
+    [[nodiscard]] OwnedToken
+    derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
 
 enum class Sign { pos, neg };
@@ -78,6 +149,18 @@ struct Function final : Token {
     [[nodiscard]] gsl::owner<Function *> clone() const override;
 
     explicit operator std::string() const override;
+
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+
+    [[nodiscard]] OwnedToken
+    evaluate(std::map<Variable, SharedToken> const &values) const override;
+
+    [[nodiscard]] OwnedToken simplified() const override;
+
+    [[nodiscard]] OwnedToken
+    derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
 
 struct Term final : Token {
@@ -92,6 +175,18 @@ struct Term final : Token {
     [[nodiscard]] gsl::owner<Term *> clone() const override;
 
     explicit operator std::string() const override;
+
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+
+    [[nodiscard]] OwnedToken
+    evaluate(std::map<Variable, SharedToken> const &values) const override;
+
+    [[nodiscard]] OwnedToken simplified() const override;
+
+    [[nodiscard]] OwnedToken
+    derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
 
 struct Terms final : Token {
@@ -106,11 +201,24 @@ struct Terms final : Token {
     void add_term(OwnedToken &&token);
 
     explicit operator std::string() const override;
+
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+
+    [[nodiscard]] OwnedToken
+    evaluate(std::map<Variable, SharedToken> const &values) const override;
+
+    [[nodiscard]] OwnedToken simplified() const override;
+
+    [[nodiscard]] OwnedToken
+    derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
 
-struct Expression final : Token {
+class Expression final : public Token {
     std::vector<std::pair<Sign, OwnedToken>> tokens;
 
+  public:
     Expression() = default;
 
     [[nodiscard]] gsl::owner<Expression *> clone() const override;
@@ -119,7 +227,21 @@ struct Expression final : Token {
 
     [[nodiscard]] std::pair<Sign, OwnedToken> pop_token();
 
+    [[nodiscard]] bool empty() const;
+
     explicit operator std::string() const override;
+
+    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+
+    [[nodiscard]] OwnedToken
+    evaluate(std::map<Variable, SharedToken> const &values) const override;
+
+    [[nodiscard]] OwnedToken simplified() const override;
+
+    [[nodiscard]] OwnedToken
+    derivative(Variable const &variable, std::uint32_t order) const override;
+
+    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
 
 OwnedToken tokenise(std::string expression);

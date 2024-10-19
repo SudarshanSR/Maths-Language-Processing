@@ -1,62 +1,38 @@
-#include "dependent.h"
+#include "token.h"
 
 #include <algorithm>
 
-bool mlp::is_dependent_on(Token const &token, Variable const &variable) {
-    auto const &type = typeid(token);
-
-    if (type == typeid(Constant))
-        return is_dependent_on(dynamic_cast<Constant const &>(token), variable);
-
-    if (type == typeid(Variable))
-        return is_dependent_on(dynamic_cast<Variable const &>(token), variable);
-
-    if (type == typeid(Function))
-        return is_dependent_on(dynamic_cast<Function const &>(token), variable);
-
-    if (type == typeid(Term))
-        return is_dependent_on(dynamic_cast<Term const &>(token), variable);
-
-    if (type == typeid(Terms))
-        return is_dependent_on(dynamic_cast<Terms const &>(token), variable);
-
-    if (type == typeid(Expression))
-        return is_dependent_on(
-            dynamic_cast<Expression const &>(token), variable
-        );
-
-    throw std::invalid_argument("Invalid argument!");
+bool mlp::Constant::is_dependent_on(Variable const &variable) const {
+    return false;
 }
 
-bool mlp::is_dependent_on(Constant const &, Variable const &) { return false; }
-
-bool mlp::is_dependent_on(Variable const &token, Variable const &variable) {
-    return token == variable;
+bool mlp::Variable::is_dependent_on(Variable const &variable) const {
+    return *this == variable;
 }
 
-bool mlp::is_dependent_on(Function const &token, Variable const &variable) {
-    return is_dependent_on(*token.parameter, variable);
+bool mlp::Function::is_dependent_on(Variable const &variable) const {
+    return this->parameter->is_dependent_on(variable);
 }
 
-bool mlp::is_dependent_on(Term const &token, Variable const &variable) {
-    return is_dependent_on(*token.base, variable) ||
-           is_dependent_on(*token.power, variable);
+bool mlp::Term::is_dependent_on(Variable const &variable) const {
+    return this->base->is_dependent_on(variable) ||
+           this->power->is_dependent_on(variable);
 }
 
-bool mlp::is_dependent_on(Terms const &token, Variable const &variable) {
+bool mlp::Terms::is_dependent_on(Variable const &variable) const {
     return std::ranges::any_of(
-        token.terms,
+        this->terms,
         [variable](OwnedToken const &term) -> bool {
-            return is_dependent_on(*term, variable);
+            return term->is_dependent_on(variable);
         }
     );
 }
 
-bool mlp::is_dependent_on(Expression const &token, Variable const &variable) {
+bool mlp::Expression::is_dependent_on(Variable const &variable) const {
     return std::ranges::any_of(
-        token.tokens,
-        [variable](auto const &term) -> bool {
-            return is_dependent_on(*term.second, variable);
+        this->tokens,
+        [variable](std::pair<Sign, OwnedToken> const &term) -> bool {
+            return term.second->is_dependent_on(variable);
         }
     );
 }
