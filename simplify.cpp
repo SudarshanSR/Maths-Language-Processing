@@ -318,6 +318,12 @@ mlp::OwnedToken mlp::Expression::simplified() const {
         if (typeid(*left) == typeid(Term)) {
             auto &term = dynamic_cast<Term &>(*left);
 
+            if (term.coefficient == 0) {
+                tokens.erase(tokens.begin() + i--);
+
+                continue;
+            }
+
             if (term.coefficient < 0) {
                 prev = prev == Sign::pos ? Sign::neg : Sign::pos;
 
@@ -363,6 +369,12 @@ mlp::OwnedToken mlp::Expression::simplified() const {
 
         if (typeid(*left) == typeid(Terms)) {
             auto &terms = dynamic_cast<Terms &>(*left);
+
+            if (terms.coefficient == 0) {
+                tokens.erase(tokens.begin() + i--);
+
+                continue;
+            }
 
             if (terms.coefficient < 0) {
                 prev = prev == Sign::pos ? Sign::neg : Sign::pos;

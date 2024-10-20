@@ -81,6 +81,23 @@ mlp::OwnedToken mlp::Function::integral(Variable const &variable) {
         return terms.simplified();
     }
 
+    if (this->parameter->is_linear_of(variable)) {
+        Terms terms{};
+
+        auto string = static_cast<std::string>(*this->parameter);
+
+        terms.add_term(tokenise(std::vformat(
+            k_function_map.at(this->function), std::make_format_args(string)
+        )));
+        terms.add_term(Term(
+                           1, this->parameter->derivative(variable, 1),
+                           std::make_unique<Constant>(-1)
+        )
+                           .simplified());
+
+        return terms.simplified();
+    }
+
     throw std::runtime_error("Expression is not integrable!");
 }
 
@@ -96,24 +113,54 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
     auto const &base_type = typeid(*this->base);
     auto const &power_type = typeid(*this->power);
 
-    if (base_type == typeid(Variable) && power_type == typeid(Constant)) {
-        auto const &power = dynamic_cast<Constant &>(*this->power);
+    if (power_type == typeid(Constant)) {
+        if (base_type == typeid(Variable)) {
+            auto const &power = dynamic_cast<Constant &>(*this->power);
 
-        if (power.value == -1) {
+            if (power.value == -1)
+                return std::make_unique<Term>(
+                    this->coefficient,
+                    std::make_unique<Function>(
+                        "ln", OwnedToken(this->base->clone())
+                    ),
+                    std::make_unique<Constant>(1)
+                );
+
             return std::make_unique<Term>(
-                this->coefficient,
-                std::make_unique<Function>(
-                    "ln", OwnedToken(this->base->clone())
-                ),
-                std::make_unique<Constant>(1)
+                this->coefficient / (power.value + 1),
+                OwnedToken(this->base->clone()),
+                std::make_unique<Constant>(power.value + 1)
             );
         }
 
-        return std::make_unique<Term>(
-            this->coefficient / (power.value + 1),
-            OwnedToken(this->base->clone()),
-            std::make_unique<Constant>(power.value + 1)
-        );
+        if (this->base->is_linear_of(variable)) {
+            auto const &power = dynamic_cast<Constant &>(*this->power);
+            Terms terms{};
+
+            if (power.value == -1)
+                terms.add_term(std::make_unique<Term>(
+                    this->coefficient,
+                    std::make_unique<Function>(
+                        "ln", OwnedToken(this->base->clone())
+                    ),
+                    std::make_unique<Constant>(1)
+                ));
+
+            else
+                terms.add_term(std::make_unique<Term>(
+                    this->coefficient / (power.value + 1),
+                    OwnedToken(this->base->clone()),
+                    std::make_unique<Constant>(power.value + 1)
+                ));
+
+            terms.add_term(Term(
+                               1, this->base->derivative(variable, 1),
+                               std::make_unique<Constant>(-1)
+            )
+                               .simplified());
+
+            return terms.simplified();
+        }
     }
 
     if (base_type == typeid(Constant) && power_type == typeid(Variable)) {
@@ -145,6 +192,19 @@ mlp::OwnedToken mlp::Terms::integral(Variable const &variable) {
         terms->add_term(Owned<Terms>(this->clone()));
 
         return terms;
+    }
+
+    if (this->is_linear_of(variable)) {
+        Terms terms{};
+        terms.coefficient = this->coefficient;
+
+        for (OwnedToken const &token : this->terms)
+            terms.add_term(
+                token->is_linear_of(variable) ? token->integral(variable)
+                                              : Owned<Token>(token->clone())
+            );
+
+        return terms.simplified();
     }
 
     throw std::runtime_error("Expression is not integrable!");

@@ -468,6 +468,8 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 if (operation.operation == Operation::pow)
                     continue;
 
+                --i;
+
                 break;
             }
 
@@ -481,12 +483,11 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
             power = std::make_unique<Term>(1, std::move(p), std::move(power));
         }
 
+        power = power->simplified();
+
         terms->terms.back() = std::make_unique<Term>(
             1, std::move(terms->terms.back()), std::move(power)
         );
-
-        if (next_term)
-            --i;
     }
 
     if (terms->terms.empty())

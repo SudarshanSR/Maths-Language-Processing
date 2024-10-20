@@ -24,6 +24,8 @@ struct Dependable {
 
     [[nodiscard]] virtual bool is_dependent_on(Variable const &variable
     ) const = 0;
+
+    [[nodiscard]] virtual bool is_linear_of(Variable const &variable) const = 0;
 };
 
 struct Evaluatable {
@@ -84,6 +86,8 @@ struct Constant final : Token {
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
+    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
+
     [[nodiscard]] OwnedToken
     evaluate(std::map<Variable, SharedToken> const &values) const override;
 
@@ -107,6 +111,8 @@ struct Variable final : Token {
     bool operator==(Variable const &) const;
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+
+    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
 
     [[nodiscard]] OwnedToken
     evaluate(std::map<Variable, SharedToken> const &values) const override;
@@ -152,6 +158,8 @@ struct Function final : Token {
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
+    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
+
     [[nodiscard]] OwnedToken
     evaluate(std::map<Variable, SharedToken> const &values) const override;
 
@@ -178,6 +186,8 @@ struct Term final : Token {
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
+    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
+
     [[nodiscard]] OwnedToken
     evaluate(std::map<Variable, SharedToken> const &values) const override;
 
@@ -203,6 +213,8 @@ struct Terms final : Token {
     explicit operator std::string() const override;
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+
+    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
 
     [[nodiscard]] OwnedToken
     evaluate(std::map<Variable, SharedToken> const &values) const override;
@@ -232,6 +244,8 @@ class Expression final : public Token {
     explicit operator std::string() const override;
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+
+    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
 
     [[nodiscard]] OwnedToken
     evaluate(std::map<Variable, SharedToken> const &values) const override;
