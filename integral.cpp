@@ -69,18 +69,6 @@ mlp::OwnedToken mlp::Function::integral(Variable const &variable) {
         return terms;
     }
 
-    if (typeid(*this->parameter) == typeid(Variable)) {
-        Terms terms{};
-
-        auto string = static_cast<std::string>(*this->parameter);
-
-        terms.add_term(tokenise(std::vformat(
-            k_function_map.at(this->function), std::make_format_args(string)
-        )));
-
-        return terms.simplified();
-    }
-
     if (this->parameter->is_linear_of(variable)) {
         Terms terms{};
 
@@ -113,71 +101,55 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
     auto const &base_type = typeid(*this->base);
     auto const &power_type = typeid(*this->power);
 
-    if (power_type == typeid(Constant)) {
-        if (base_type == typeid(Variable)) {
-            auto const &power = dynamic_cast<Constant &>(*this->power);
+    if (power_type == typeid(Constant) && this->base->is_linear_of(variable)) {
+        auto const &power = dynamic_cast<Constant &>(*this->power);
+        Terms terms{};
 
-            if (power.value == -1)
-                return std::make_unique<Term>(
-                    this->coefficient,
-                    std::make_unique<Function>(
-                        "ln", OwnedToken(this->base->clone())
-                    ),
-                    std::make_unique<Constant>(1)
-                );
+        if (power.value == -1)
+            terms.add_term(std::make_unique<Term>(
+                this->coefficient,
+                std::make_unique<Function>(
+                    "ln", OwnedToken(this->base->clone())
+                ),
+                std::make_unique<Constant>(1)
+            ));
 
-            return std::make_unique<Term>(
+        else
+            terms.add_term(std::make_unique<Term>(
                 this->coefficient / (power.value + 1),
                 OwnedToken(this->base->clone()),
                 std::make_unique<Constant>(power.value + 1)
-            );
-        }
+            ));
 
-        if (this->base->is_linear_of(variable)) {
-            auto const &power = dynamic_cast<Constant &>(*this->power);
-            Terms terms{};
+        terms.add_term(Term(
+                           1, this->base->derivative(variable, 1),
+                           std::make_unique<Constant>(-1)
+        )
+                           .simplified());
 
-            if (power.value == -1)
-                terms.add_term(std::make_unique<Term>(
-                    this->coefficient,
-                    std::make_unique<Function>(
-                        "ln", OwnedToken(this->base->clone())
-                    ),
-                    std::make_unique<Constant>(1)
-                ));
+        return terms.simplified();
+    }
 
-            else
-                terms.add_term(std::make_unique<Term>(
-                    this->coefficient / (power.value + 1),
-                    OwnedToken(this->base->clone()),
-                    std::make_unique<Constant>(power.value + 1)
-                ));
+    if (base_type == typeid(Constant) && this->power->is_linear_of(variable)) {
+        Terms terms{};
+        terms.add_term(Owned<Term>(this->clone()));
 
+        if (power_type == typeid(Variable) &&
+            dynamic_cast<Variable &>(*this->power) != variable)
+            terms.add_term(Owned<Variable>(variable.clone()));
+
+        else if (power_type != typeid(Variable))
             terms.add_term(Term(
-                               1, this->base->derivative(variable, 1),
+                               1, this->power->derivative(variable, 1),
                                std::make_unique<Constant>(-1)
             )
                                .simplified());
 
-            return terms.simplified();
-        }
-    }
-
-    if (base_type == typeid(Constant) && power_type == typeid(Variable)) {
-        Terms terms{};
-        terms.add_term(Owned<Term>(this->clone()));
-
-        if (dynamic_cast<Variable &>(*this->power) != variable) {
-            terms.add_term(Owned<Variable>(variable.clone()));
-        } else {
-            terms.add_term(std::make_unique<Term>(
-                1,
-                std::make_unique<Function>(
-                    "ln", OwnedToken(this->base->clone())
-                ),
-                std::make_unique<Constant>(-1)
-            ));
-        }
+        terms.add_term(std::make_unique<Term>(
+            1,
+            std::make_unique<Function>("ln", OwnedToken(this->base->clone())),
+            std::make_unique<Constant>(-1)
+        ));
 
         return terms.simplified();
     }
