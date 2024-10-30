@@ -64,15 +64,15 @@ mlp::OwnedToken mlp::Function::derivative(
     if (!this->is_dependent_on(variable))
         return std::make_unique<Constant>(0);
 
-    Terms result{};
-
     auto parameter = static_cast<std::string>(*this->parameter);
 
-    result.add_term(tokenise(std::vformat(
-        k_function_map.at(this->function), std::make_format_args(parameter)
-    )));
-
-    result.add_term(this->parameter->derivative(variable, 1));
+    Terms result{};
+    result *= tokenise(
+        std::vformat(
+            k_function_map.at(this->function), std::make_format_args(parameter)
+        )
+    );
+    result *= this->parameter->derivative(variable, 1);
 
     auto derivative = result.simplified();
 
@@ -93,21 +93,19 @@ mlp::OwnedToken mlp::Term::derivative(
 
     auto const &base_type = typeid(*this->base);
 
-    double const c = this->coefficient;
+    std::double_t const c = this->coefficient;
 
     if (auto const &power_type = typeid(*this->power);
         power_type == typeid(Constant)) {
         if (base_type == typeid(Constant))
             return std::make_unique<Constant>(0);
 
-        double const power = dynamic_cast<Constant &>(*this->power).value;
+        std::double_t const power =
+            dynamic_cast<Constant &>(*this->power).value;
 
         Terms terms{};
-        terms.add_term(std::make_unique<Term>(
-            c * power, OwnedToken(this->base->clone()),
-            std::make_unique<Constant>(power - 1)
-        ));
-        terms.add_term(this->base->derivative(variable, 1));
+        terms *= std::make_unique<Term>(c * power * (*this->base ^ power - 1));
+        terms *= this->base->derivative(variable, 1);
 
         auto derivative = terms.simplified();
 
@@ -119,13 +117,12 @@ mlp::OwnedToken mlp::Term::derivative(
 
     Terms result{};
 
-    result.add_term(OwnedToken(this->clone()));
+    result *= OwnedToken(this->clone());
 
     if (base_type == typeid(Constant)) {
-        result.add_term(
-            std::make_unique<Function>("ln", OwnedToken(this->base->clone()))
-        );
-        result.add_term(this->power->derivative(variable, 1));
+        result *=
+            std::make_unique<Function>("ln", OwnedToken(this->base->clone()));
+        result *= this->power->derivative(variable, 1);
 
         auto derivative = result.simplified();
 
@@ -136,23 +133,20 @@ mlp::OwnedToken mlp::Term::derivative(
     }
 
     auto terms_1 = std::make_unique<Terms>();
-    terms_1->add_term(OwnedToken(this->power->clone()));
-    terms_1->add_term(this->base->derivative(variable, 1));
-    terms_1->add_term(std::make_unique<Term>(
-        OwnedToken(this->base->clone()), std::make_unique<Constant>(-1)
-    ));
+    *terms_1 *= OwnedToken(this->power->clone());
+    *terms_1 *= this->base->derivative(variable, 1);
+    *terms_1 /= OwnedToken(this->base->clone());
 
     auto terms_2 = std::make_unique<Terms>();
-    terms_2->add_term(this->power->derivative(variable, 1));
-    terms_2->add_term(
-        std::make_unique<Function>("ln", OwnedToken(this->base->clone()))
-    );
+    *terms_2 *= this->power->derivative(variable, 1);
+    *terms_2 *=
+        std::make_unique<Function>("ln", OwnedToken(this->base->clone()));
 
     auto expression = std::make_unique<Expression>();
-    expression->add_token(Sign::pos, std::move(terms_1));
-    expression->add_token(Sign::pos, std::move(terms_2));
+    *expression += std::move(terms_1);
+    *expression += std::move(terms_2);
 
-    result.add_term(std::move(expression));
+    result *= std::move(expression);
 
     auto derivative = result.simplified();
 
@@ -173,12 +167,12 @@ mlp::OwnedToken mlp::Terms::derivative(
 
     auto result = std::make_unique<Expression>();
 
-    for (int i = 0; i < this->terms.size(); ++i) {
+    for (std::size_t i = 0; i < this->terms.size(); ++i) {
         auto term = std::make_unique<Terms>();
 
-        for (int j = 0; j < this->terms.size(); ++j) {
+        for (std::size_t j = 0; j < this->terms.size(); ++j) {
             if (i != j) {
-                term->add_term(OwnedToken(this->terms[j]->clone()));
+                *term *= OwnedToken(this->terms[j]->clone());
 
                 continue;
             }
@@ -192,10 +186,10 @@ mlp::OwnedToken mlp::Terms::derivative(
                 continue;
             }
 
-            term->add_term(std::move(derivative));
+            *term *= std::move(derivative);
         }
 
-        result->add_token(Sign::pos, std::move(term));
+        *result += std::move(term);
     }
 
     Term const end{

@@ -22,8 +22,8 @@ struct Variable;
 struct Dependable {
     virtual ~Dependable() = default;
 
-    [[nodiscard]] virtual bool is_dependent_on(Variable const &variable
-    ) const = 0;
+    [[nodiscard]] virtual bool
+    is_dependent_on(Variable const &variable) const = 0;
 
     [[nodiscard]] virtual bool is_linear_of(Variable const &variable) const = 0;
 };
@@ -63,20 +63,51 @@ struct Integrable {
     [[nodiscard]] virtual OwnedToken integral(Variable const &variable) = 0;
 };
 
+struct Term;
+
+struct Exponentiable {
+    virtual ~Exponentiable() = default;
+
+    [[nodiscard]] virtual Term operator^(std::double_t exponent) const = 0;
+
+    [[nodiscard]] virtual Term operator^(Token const &exponent) const = 0;
+
+    [[nodiscard]] virtual Term operator^(OwnedToken &&exponent) const = 0;
+
+    [[nodiscard]] virtual Term operator^(std::double_t exponent) && = 0;
+
+    [[nodiscard]] virtual Term operator^(Token const &exponent) && = 0;
+
+    [[nodiscard]] virtual Term operator^(OwnedToken &&exponent) && = 0;
+};
+
 struct Token : Dependable,
                Evaluatable,
                Simplifiable,
                Differentiable,
-               Integrable {
+               Integrable,
+               Exponentiable {
     [[nodiscard]] virtual gsl::owner<Token *> clone() const = 0;
 
     explicit virtual operator std::string() const = 0;
+
+    [[nodiscard]] Term operator^(std::double_t exponent) const override;
+
+    [[nodiscard]] Term operator^(Token const &exponent) const override;
+
+    [[nodiscard]] Term operator^(OwnedToken &&exponent) const override;
+
+    [[nodiscard]] Term operator^(std::double_t exponent) && override;
+
+    [[nodiscard]] Term operator^(Token const &exponent) && override;
+
+    [[nodiscard]] Term operator^(OwnedToken &&exponent) && override;
 };
 
 struct Constant final : Token {
-    double value;
+    std::double_t value;
 
-    explicit Constant(double value);
+    explicit Constant(std::double_t value);
 
     [[nodiscard]] gsl::owner<Constant *> clone() const override;
 
@@ -172,17 +203,33 @@ struct Function final : Token {
 };
 
 struct Term final : Token {
-    double coefficient{1};
+    std::double_t coefficient{1};
     OwnedToken base;
     OwnedToken power;
 
-    Term(double coefficient, OwnedToken &&base, OwnedToken &&power);
+    Term(std::double_t coefficient, OwnedToken &&base, OwnedToken &&power);
 
     Term(OwnedToken &&base, OwnedToken &&power);
+
+    Term(Term const &term);
 
     [[nodiscard]] gsl::owner<Term *> clone() const override;
 
     explicit operator std::string() const override;
+
+    friend Term operator-(Term const &rhs);
+
+    Term &operator*=(std::double_t rhs);
+
+    friend Term operator*(std::double_t lhs, Term rhs);
+
+    friend Term operator*(Term lhs, std::double_t rhs);
+
+    Term &operator/=(std::double_t rhs);
+
+    friend Term operator/(std::double_t lhs, Term rhs);
+
+    friend Term operator/(Term lhs, std::double_t rhs);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
@@ -200,7 +247,7 @@ struct Term final : Token {
 };
 
 struct Terms final : Token {
-    double coefficient{1};
+    std::double_t coefficient{1};
 
     std::vector<OwnedToken> terms;
 
@@ -211,6 +258,14 @@ struct Terms final : Token {
     void add_term(OwnedToken &&token);
 
     explicit operator std::string() const override;
+
+    Terms &operator*=(OwnedToken &&token);
+
+    Terms &operator/=(OwnedToken &&token);
+
+    Terms &operator*=(std::double_t scalar);
+
+    Terms &operator/=(std::double_t scalar);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
@@ -242,6 +297,10 @@ class Expression final : public Token {
     [[nodiscard]] bool empty() const;
 
     explicit operator std::string() const override;
+
+    Expression &operator+=(OwnedToken &&token);
+
+    Expression &operator-=(OwnedToken &&token);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 

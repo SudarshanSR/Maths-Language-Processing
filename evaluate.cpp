@@ -5,31 +5,58 @@
 #include <ranges>
 
 namespace {
-std::map<std::string, double (*)(double)> k_functions{
+std::map<std::string, std::double_t (*)(std::double_t)> k_functions{
     {"sin", std::sin},
     {"cos", std::cos},
     {"tan", std::tan},
-    {"sec", [](double const val) -> double { return 1 / std::cos(val); }},
-    {"csc", [](double const val) -> double { return 1 / std::sin(val); }},
-    {"cot", [](double const val) -> double { return 1 / std::tan(val); }},
+    {"sec",
+     [](std::double_t const val) -> std::double_t { return 1 / std::cos(val); }
+    },
+    {"csc",
+     [](std::double_t const val) -> std::double_t { return 1 / std::sin(val); }
+    },
+    {"cot",
+     [](std::double_t const val) -> std::double_t { return 1 / std::tan(val); }
+    },
     {"sinh", std::sinh},
     {"cosh", std::cosh},
     {"tanh", std::tanh},
-    {"sech", [](double const val) -> double { return 1 / std::cosh(val); }},
-    {"csch", [](double const val) -> double { return 1 / std::sinh(val); }},
-    {"coth", [](double const val) -> double { return 1 / std::tanh(val); }},
+    {"sech",
+     [](std::double_t const val) -> std::double_t { return 1 / std::cosh(val); }
+    },
+    {"csch",
+     [](std::double_t const val) -> std::double_t { return 1 / std::sinh(val); }
+    },
+    {"coth",
+     [](std::double_t const val) -> std::double_t { return 1 / std::tanh(val); }
+    },
     {"asin", std::asin},
     {"acos", std::acos},
     {"atan", std::atan},
-    {"asec", [](double const val) -> double { return std::acos(1 / val); }},
-    {"acsc", [](double const val) -> double { return std::asin(1 / val); }},
-    {"acot", [](double const val) -> double { return std::atan(1 / val); }},
+    {"asec",
+     [](std::double_t const val) -> std::double_t { return std::acos(1 / val); }
+    },
+    {"acsc",
+     [](std::double_t const val) -> std::double_t { return std::asin(1 / val); }
+    },
+    {"acot",
+     [](std::double_t const val) -> std::double_t { return std::atan(1 / val); }
+    },
     {"asinh", std::asinh},
     {"acosh", std::acosh},
     {"atanh", std::atanh},
-    {"asech", [](double const val) -> double { return std::acosh(1 / val); }},
-    {"acsch", [](double const val) -> double { return std::asinh(1 / val); }},
-    {"acoth", [](double const val) -> double { return std::atanh(1 / val); }},
+    {"asech",
+     [](std::double_t const val) -> std::double_t {
+         return std::acosh(1 / val);
+     }},
+    {"acsch",
+     [](std::double_t const val) -> std::double_t {
+         return std::asinh(1 / val);
+     }},
+    {"acoth",
+     [](std::double_t const val) -> std::double_t {
+         return std::atanh(1 / val);
+     }},
     {"ln", std::log},
 };
 } // namespace

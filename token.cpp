@@ -20,7 +20,7 @@ std::set<std::string> k_functions{
 };
 
 std::variant<mlp::Operation, mlp::OwnedToken>
-get_next_token(std::string const &expression, int &i) {
+get_next_token(std::string const &expression, std::size_t &i) {
     if (i >= expression.size())
         return nullptr;
 
@@ -60,7 +60,7 @@ get_next_token(std::string const &expression, int &i) {
     }
 
     if (k_parenthesis_map.contains(character)) {
-        int count = 1;
+        std::size_t count = 1;
         char const original = character;
 
         character = expression[++i];
@@ -87,7 +87,7 @@ get_next_token(std::string const &expression, int &i) {
         return mlp::tokenise(expression.substr(start, end));
     }
 
-    for (int const offset : {5, 4, 3, 2}) {
+    for (std::size_t const offset : {5, 4, 3, 2}) {
         if (i + offset >= expression.size())
             continue;
 
@@ -119,7 +119,33 @@ get_next_token(std::string const &expression, int &i) {
 }
 } // namespace
 
-mlp::Constant::Constant(double const value) : value(value) {}
+mlp::Term mlp::Token::operator^(std::double_t exponent) const {
+    return Term(
+        1, OwnedToken(this->clone()), std::make_unique<Constant>(exponent)
+    );
+}
+
+mlp::Term mlp::Token::operator^(Token const &exponent) const {
+    return Term(1, OwnedToken(this->clone()), OwnedToken(exponent.clone()));
+}
+
+mlp::Term mlp::Token::operator^(OwnedToken &&exponent) const {
+    return Term(1, OwnedToken(this->clone()), std::move(exponent));
+}
+
+mlp::Term mlp::Token::operator^(std::double_t exponent) && {
+    return Term(1, OwnedToken(this), std::make_unique<Constant>(exponent));
+}
+
+mlp::Term mlp::Token::operator^(Token const &exponent) && {
+    return Term(1, OwnedToken(this), OwnedToken(exponent.clone()));
+}
+
+mlp::Term mlp::Token::operator^(OwnedToken &&exponent) && {
+    return Term(1, OwnedToken(this), std::move(exponent));
+}
+
+mlp::Constant::Constant(std::double_t const value) : value(value) {}
 
 gsl::owner<mlp::Constant *> mlp::Constant::clone() const {
     return new Constant(this->value);
@@ -205,12 +231,18 @@ mlp::Function::operator std::string() const {
     return result.str();
 }
 
-mlp::Term::Term(double const coefficient, OwnedToken &&base, OwnedToken &&power)
+mlp::Term::Term(
+    std::double_t const coefficient, OwnedToken &&base, OwnedToken &&power
+)
     : coefficient(coefficient), base(std::move(base)), power(std::move(power)) {
 }
 
 mlp::Term::Term(OwnedToken &&base, OwnedToken &&power)
     : base(std::move(base)), power(std::move(power)) {}
+
+mlp::Term::Term(Term const &term)
+    : coefficient(term.coefficient), base(term.base->clone()),
+      power(term.power->clone()) {}
 
 gsl::owner<mlp::Term *> mlp::Term::clone() const {
     return new Term(
@@ -245,6 +277,18 @@ mlp::Term::operator std::string() const {
     return result.str();
 }
 
+mlp::Term &mlp::Term::operator*=(std::double_t const rhs) {
+    this->coefficient *= rhs;
+
+    return *this;
+}
+
+mlp::Term &mlp::Term::operator/=(std::double_t const rhs) {
+    this->coefficient /= rhs;
+
+    return *this;
+}
+
 gsl::owner<mlp::Terms *> mlp::Terms::clone() const {
     auto *terms = new Terms;
     terms->coefficient = this->coefficient;
@@ -266,7 +310,7 @@ void mlp::Terms::add_term(OwnedToken &&token) {
 
     if (term_type == typeid(Term)) {
         auto &term = dynamic_cast<Term &>(*token);
-        this->coefficient *= term.coefficient;
+        *this *= term.coefficient;
         term.coefficient = 1;
 
         this->terms.push_back(std::move(token));
@@ -276,7 +320,7 @@ void mlp::Terms::add_term(OwnedToken &&token) {
 
     if (term_type == typeid(Terms)) {
         auto &terms = dynamic_cast<Terms &>(*token);
-        this->coefficient *= terms.coefficient;
+        *this *= terms.coefficient;
         terms.coefficient = 1;
 
         for (OwnedToken &term : terms.terms)
@@ -301,7 +345,7 @@ mlp::Terms::operator std::string() const {
 
     result << '(';
 
-    for (int i = 0; i < this->terms.size(); ++i) {
+    for (std::size_t i = 0; i < this->terms.size(); ++i) {
         result << static_cast<std::string>(*this->terms[i]);
 
         if (i != this->terms.size() - 1)
@@ -311,6 +355,32 @@ mlp::Terms::operator std::string() const {
     result << ')';
 
     return result.str();
+}
+
+mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
+    this->add_term(std::move(token));
+
+    return *this;
+}
+
+mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
+    this->add_term(
+        std::make_unique<Term>(std::move(token), std::make_unique<Constant>(-1))
+    );
+
+    return *this;
+}
+
+mlp::Terms &mlp::Terms::operator*=(std::double_t const scalar) {
+    this->coefficient *= scalar;
+
+    return *this;
+}
+
+mlp::Terms &mlp::Terms::operator/=(std::double_t const scalar) {
+    this->coefficient /= scalar;
+
+    return *this;
 }
 
 gsl::owner<mlp::Expression *> mlp::Expression::clone() const {
@@ -323,7 +393,11 @@ gsl::owner<mlp::Expression *> mlp::Expression::clone() const {
 }
 
 void mlp::Expression::add_token(Sign const sign, OwnedToken &&token) {
-    this->tokens.emplace_back(sign, std::move(token));
+    if (sign == Sign::pos)
+        *this += std::move(token);
+
+    else
+        *this -= std::move(token);
 }
 
 std::pair<mlp::Sign, mlp::OwnedToken> mlp::Expression::pop_token() {
@@ -354,6 +428,18 @@ mlp::Expression::operator std::string() const {
     return result.str();
 }
 
+mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
+    this->tokens.emplace_back(Sign::pos, std::move(token));
+
+    return *this;
+}
+
+mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
+    this->tokens.emplace_back(Sign::neg, std::move(token));
+
+    return *this;
+}
+
 mlp::OwnedToken mlp::tokenise(std::string expression) {
     Expression result{};
 
@@ -365,8 +451,8 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
     Operation op{Operation::add};
 
-    for (int i = 0; i < expression.size(); ++i) {
-        std::int32_t const copy = i;
+    for (std::size_t i = 0; i < expression.size(); ++i) {
+        std::size_t const copy = i;
 
         auto token = get_next_token(expression, i);
 
@@ -380,7 +466,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 terms->terms.push_back(std::move(term));
 
             else
-                terms->add_term(std::move(term));
+                *terms *= std::move(term);
 
             continue;
         }
@@ -418,7 +504,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 terms->terms.push_back(std::move(next_term));
 
             else
-                terms->add_term(std::move(next_term));
+                *terms *= std::move(next_term);
 
             continue;
         }
@@ -428,7 +514,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 terms->coefficient *=
                     dynamic_cast<Constant &>(*next_term).value;
             else
-                terms->add_term(std::move(next_term));
+                *terms *= std::move(next_term);
 
             continue;
         }
@@ -439,9 +525,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                     dynamic_cast<Constant &>(*next_term).value;
 
             else
-                terms->add_term(std::make_unique<Term>(
-                    1, std::move(next_term), std::make_unique<Constant>(-1)
-                ));
+                *terms /= std::move(next_term);
 
             continue;
         }
@@ -449,13 +533,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         std::vector<OwnedToken> powers;
 
         while (true) {
-            if (typeid(*next_term) == typeid(Term)) {
-                powers.push_back(std::move(next_term));
-            } else {
-                powers.push_back(std::make_unique<Term>(
-                    1, std::move(next_term), std::make_unique<Constant>(1)
-                ));
-            }
+            powers.push_back(std::move(next_term));
 
             next = get_next_token(expression, ++i);
 
@@ -480,13 +558,15 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         OwnedToken power = std::make_unique<Constant>(1);
 
         for (OwnedToken &p : powers | std::views::reverse) {
-            power = std::make_unique<Term>(1, std::move(p), std::move(power));
+            power = std::make_unique<Term>(
+                std::move(*p.release()) ^ std::move(power)
+            );
         }
 
         power = power->simplified();
 
         terms->terms.back() = std::make_unique<Term>(
-            1, std::move(terms->terms.back()), std::move(power)
+            std::move(*terms->terms.back().release()) ^ std::move(power)
         );
     }
 
@@ -516,6 +596,29 @@ std::ostream &operator<<(std::ostream &os, Sign const sign) {
 
     return os;
 }
+
+Term operator-(Term const &rhs) {
+    return Term(
+        -rhs.coefficient, OwnedToken(rhs.base->clone()),
+        OwnedToken(rhs.power->clone())
+    );
+}
+
+Term operator*(std::double_t const lhs, Term rhs) { return rhs *= lhs; }
+
+Term operator*(Term lhs, std::double_t const rhs) { return lhs *= rhs; }
+
+Term operator/(std::double_t const lhs, Term rhs) {
+    rhs /= lhs;
+
+    Expression power{};
+    power -= std::move(rhs.power);
+    rhs.power = power.simplified();
+
+    return rhs;
+}
+
+Term operator/(Term lhs, std::double_t const rhs) { return lhs /= rhs; }
 } // namespace mlp
 
 std::string to_string(mlp::Sign const sign) {
