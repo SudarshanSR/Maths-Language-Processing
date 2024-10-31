@@ -124,17 +124,35 @@ struct Constant final : Token {
 
     friend bool operator==(Constant const &lhs, std::double_t rhs);
 
+    friend bool operator!=(Constant const &lhs, Constant const &rhs);
+
+    friend bool operator!=(std::double_t lhs, Constant const &rhs);
+
+    friend bool operator!=(Constant const &lhs, std::double_t rhs);
+
     friend bool operator>(Constant const &lhs, Constant const &rhs);
 
     friend bool operator>(std::double_t lhs, Constant const &rhs);
 
     friend bool operator>(Constant const &lhs, std::double_t rhs);
 
+    friend bool operator>=(Constant const &lhs, Constant const &rhs);
+
+    friend bool operator>=(std::double_t lhs, Constant const &rhs);
+
+    friend bool operator>=(Constant const &lhs, std::double_t rhs);
+
     friend bool operator<(Constant const &lhs, Constant const &rhs);
 
     friend bool operator<(std::double_t lhs, Constant const &rhs);
 
     friend bool operator<(Constant const &lhs, std::double_t rhs);
+
+    friend bool operator<=(Constant const &lhs, Constant const &rhs);
+
+    friend bool operator<=(std::double_t lhs, Constant const &rhs);
+
+    friend bool operator<=(Constant const &lhs, std::double_t rhs);
 
     friend Constant &operator+=(Constant &lhs, Constant const &rhs);
 
@@ -337,8 +355,6 @@ struct Terms final : Token {
     Terms() = default;
 
     [[nodiscard]] gsl::owner<Terms *> clone() const override;
-
-    void add_term(OwnedToken &&token);
 
     explicit operator std::string() const override;
 

@@ -113,6 +113,9 @@ get_next_token(std::string const &expression, std::size_t &i) {
         return std::make_unique<mlp::Function>(fn, std::move(parameter));
     }
 
+    if (character == 'e')
+        return std::make_unique<mlp::Constant>(std::numbers::e);
+
     if (('A' <= character && character <= 'Z') ||
         ('a' <= character && character <= 'z'))
         return std::make_unique<mlp::Variable>(character);
@@ -181,6 +184,18 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         }
 
         auto &operation = std::get<Operation>(token);
+
+        if (copy == 0) {
+            if (operation.operation == Operation::mul ||
+                operation.operation == Operation::div ||
+                operation.operation == Operation::pow)
+                throw std::runtime_error("Expression is not valid!");
+
+            if (operation.operation == Operation::sub)
+                terms->coefficient = -terms->coefficient;
+
+            continue;
+        }
 
         auto next = get_next_token(expression, ++i);
 

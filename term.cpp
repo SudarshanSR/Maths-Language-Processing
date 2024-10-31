@@ -38,7 +38,7 @@ mlp::Term::operator std::string() const {
     result << *this->base;
 
     if (typeid(*this->power) != typeid(Constant) ||
-        dynamic_cast<Constant const&>(*this->power) != 1) {
+        dynamic_cast<Constant const &>(*this->power) != 1) {
         result << '^';
         result << *this->power;
     }
@@ -77,7 +77,7 @@ gsl::owner<mlp::Terms *> mlp::Terms::clone() const {
     terms->coefficient = this->coefficient;
 
     for (auto const &term : this->terms)
-        terms->add_term(OwnedToken(term->clone()));
+        *terms *= OwnedToken(term->clone());
 
     return terms;
 }

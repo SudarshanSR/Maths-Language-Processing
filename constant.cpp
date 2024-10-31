@@ -33,6 +33,18 @@ bool operator==(Constant const &lhs, std::double_t const rhs) {
     return lhs.value == rhs;
 }
 
+bool operator!=(Constant const &lhs, Constant const &rhs) {
+    return !(lhs == rhs);
+}
+
+bool operator!=(std::double_t const lhs, Constant const &rhs) {
+    return !(lhs == rhs);
+}
+
+bool operator!=(Constant const &lhs, std::double_t const rhs) {
+    return !(lhs == rhs);
+}
+
 bool operator<(Constant const &lhs, Constant const &rhs) {
     return lhs.value < rhs.value;
 }
@@ -45,16 +57,36 @@ bool operator<(Constant const &lhs, std::double_t const rhs) {
     return lhs.value < rhs;
 }
 
-bool operator>(Constant const &lhs, Constant const &rhs) {
-    return lhs.value > rhs.value;
+bool operator>=(Constant const &lhs, Constant const &rhs) {
+    return !(lhs < rhs);
 }
 
+bool operator>=(std::double_t const lhs, Constant const &rhs) {
+    return !(lhs < rhs);
+}
+
+bool operator>=(Constant const &lhs, std::double_t const rhs) {
+    return !(lhs < rhs);
+}
+
+bool operator>(Constant const &lhs, Constant const &rhs) { return rhs < lhs; }
+
 bool operator>(std::double_t const lhs, Constant const &rhs) {
-    return lhs > rhs.value;
+    return rhs < lhs;
 }
 
 bool operator>(Constant const &lhs, std::double_t const rhs) {
-    return lhs.value > rhs;
+    return rhs < lhs;
+}
+
+bool operator<=(Constant const &lhs, Constant const &rhs) { return rhs >= lhs; }
+
+bool operator<=(std::double_t const lhs, Constant const &rhs) {
+    return rhs >= lhs;
+}
+
+bool operator<=(Constant const &lhs, std::double_t const rhs) {
+    return rhs >= lhs;
 }
 
 Constant &operator+=(Constant &lhs, Constant const &rhs) {

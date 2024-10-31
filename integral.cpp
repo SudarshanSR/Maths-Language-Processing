@@ -92,18 +92,35 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
 
     auto const &power_type = typeid(*this->power);
 
-    if (power_type == typeid(Constant) && this->base->is_linear_of(variable)) {
-        auto const &power = dynamic_cast<Constant const &>(*this->power);
+    if (this->base->is_linear_of(variable)) {
         Terms terms{};
         terms *= this->coefficient;
 
-        if (power == -1) {
-            terms *= std::make_unique<Function>(
-                "ln", OwnedToken(this->base->clone())
+        if (power_type == typeid(Constant)) {
+            if (auto const &power =
+                    dynamic_cast<Constant const &>(*this->power);
+                power == -1) {
+                terms *= std::make_unique<Function>(
+                    "ln", OwnedToken(this->base->clone())
+                );
+            } else {
+                terms /= power + 1;
+                terms *= std::make_unique<Term>(
+                    std::move(*this->base->clone()) ^ power + 1
+                );
+            }
+        } else if (!this->power->is_dependent_on(variable)) {
+            auto expression = std::make_unique<Expression>();
+            *expression += OwnedToken(this->power->clone());
+            *expression += std::make_unique<Constant>(1);
+
+            terms *= std::make_unique<Term>(
+                std::move(*this->base->clone()) ^
+                OwnedToken(expression->clone())
             );
+            terms /= std::move(expression);
         } else {
-            terms /= power + 1;
-            terms *= OwnedToken(this->base->clone());
+            throw std::runtime_error("Expression is not integrable!");
         }
 
         terms /= this->base->derivative(variable, 1)->simplified();
@@ -111,7 +128,7 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
         return terms.simplified();
     }
 
-    if (typeid(*this->base) == typeid(Constant) &&
+    if (!this->base->is_dependent_on(variable) &&
         this->power->is_linear_of(variable)) {
         Terms terms{};
         terms *= Owned<Term>(this->clone());
