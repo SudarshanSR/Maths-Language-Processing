@@ -162,9 +162,25 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
                     v != variable)
                     continue;
 
-                t = std::make_unique<Term>(
-                    (1 + term.coefficient) * (variable ^ 1)
-                );
+                std::unique_ptr<Term> temp;
+
+                if (sign == Sign::pos) {
+                    temp = std::make_unique<Term>(
+                        (1 + term.coefficient) * (variable ^ 1)
+                    );
+                } else {
+                    temp = std::make_unique<Term>(
+                        (1 - term.coefficient) * (variable ^ 1)
+                    );
+                }
+
+                if (temp->coefficient < 0) {
+                    sign = sign == Sign::pos ? Sign::neg : Sign::pos;
+
+                    temp->coefficient = -temp->coefficient;
+                }
+
+                t = std::move(temp);
 
                 if (term.coefficient == 0)
                     this->tokens.erase(this->tokens.begin() + i);
@@ -200,9 +216,7 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
         if (terms.coefficient < 0) {
             terms.coefficient = -terms.coefficient;
 
-            this->tokens.emplace_back(Sign::neg, std::move(token));
-
-            return *this;
+            return *this -= std::move(token);
         }
     }
 
@@ -307,9 +321,7 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
         if (term.coefficient < 0) {
             term.coefficient = -term.coefficient;
 
-            this->tokens.emplace_back(Sign::pos, std::move(token));
-
-            return *this;
+            return *this += std::move(token);
         }
 
         if (typeid(*term.base) != typeid(Variable) ||
@@ -329,9 +341,25 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
                     v != variable)
                     continue;
 
-                t = std::make_unique<Term>(
-                    (1 - term.coefficient) * (variable ^ 1)
-                );
+                std::unique_ptr<Term> temp;
+
+                if (sign == Sign::pos) {
+                    temp = std::make_unique<Term>(
+                        (1 - term.coefficient) * (variable ^ 1)
+                    );
+                } else {
+                    temp = std::make_unique<Term>(
+                        (1 + term.coefficient) * (variable ^ 1)
+                    );
+                }
+
+                if (temp->coefficient < 0) {
+                    sign = sign == Sign::pos ? Sign::neg : Sign::pos;
+
+                    temp->coefficient = -temp->coefficient;
+                }
+
+                t = std::move(temp);
 
                 if (term.coefficient == 0)
                     this->tokens.erase(this->tokens.begin() + i);

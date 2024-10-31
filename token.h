@@ -1,6 +1,8 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+#include "interfaces.h"
+
 #include <cmath>
 #include <map>
 #include <optional>
@@ -18,29 +20,7 @@ template <typename T> using Owned = std::unique_ptr<T>;
 using SharedToken = std::shared_ptr<Token>;
 using OwnedToken = Owned<Token>;
 
-struct Variable;
-
-struct Dependable {
-    virtual ~Dependable() = default;
-
-    [[nodiscard]] virtual bool
-    is_dependent_on(Variable const &variable) const = 0;
-
-    [[nodiscard]] virtual bool is_linear_of(Variable const &variable) const = 0;
-};
-
-struct Evaluatable {
-    virtual ~Evaluatable() = default;
-
-    [[nodiscard]] virtual OwnedToken
-    evaluate(std::map<Variable, SharedToken> const &values) const = 0;
-};
-
-struct Simplifiable {
-    virtual ~Simplifiable() = default;
-
-    [[nodiscard]] virtual OwnedToken simplified() const = 0;
-};
+class Variable;
 
 struct Differentiable {
     virtual ~Differentiable() = default;
@@ -82,9 +62,9 @@ struct Exponentiable {
     [[nodiscard]] virtual Term operator^(OwnedToken &&exponent) && = 0;
 };
 
-struct Token : Dependable,
-               Evaluatable,
-               Simplifiable,
+struct Token : Dependable<Variable>,
+               Evaluatable<Variable, SharedToken, OwnedToken>,
+               Simplifiable<OwnedToken>,
                Differentiable,
                Integrable,
                Exponentiable {
@@ -105,9 +85,10 @@ struct Token : Dependable,
     [[nodiscard]] Term operator^(OwnedToken &&exponent) && override;
 };
 
-struct Constant final : Token {
+class Constant final : public Token {
     std::double_t value;
 
+  public:
     explicit Constant(std::double_t value);
 
     Constant &operator=(std::double_t value);
@@ -116,43 +97,25 @@ struct Constant final : Token {
 
     explicit operator std::string() const override;
 
+    explicit(false) operator std::double_t() const;
+
     Constant operator-() const;
 
     friend bool operator==(Constant const &lhs, Constant const &rhs);
 
-    friend bool operator==(std::double_t lhs, Constant const &rhs);
-
-    friend bool operator==(Constant const &lhs, std::double_t rhs);
-
     friend bool operator!=(Constant const &lhs, Constant const &rhs);
-
-    friend bool operator!=(std::double_t lhs, Constant const &rhs);
-
-    friend bool operator!=(Constant const &lhs, std::double_t rhs);
 
     friend bool operator>(Constant const &lhs, Constant const &rhs);
 
-    friend bool operator>(std::double_t lhs, Constant const &rhs);
-
-    friend bool operator>(Constant const &lhs, std::double_t rhs);
-
     friend bool operator>=(Constant const &lhs, Constant const &rhs);
-
-    friend bool operator>=(std::double_t lhs, Constant const &rhs);
-
-    friend bool operator>=(Constant const &lhs, std::double_t rhs);
 
     friend bool operator<(Constant const &lhs, Constant const &rhs);
 
-    friend bool operator<(std::double_t lhs, Constant const &rhs);
-
-    friend bool operator<(Constant const &lhs, std::double_t rhs);
-
     friend bool operator<=(Constant const &lhs, Constant const &rhs);
 
-    friend bool operator<=(std::double_t lhs, Constant const &rhs);
+    friend Constant &operator++(Constant &lhs);
 
-    friend bool operator<=(Constant const &lhs, std::double_t rhs);
+    friend Constant operator++(Constant &lhs, int);
 
     friend Constant &operator+=(Constant &lhs, Constant const &rhs);
 
@@ -163,6 +126,10 @@ struct Constant final : Token {
     friend Constant operator+(Constant lhs, std::double_t rhs);
 
     friend Constant operator+(std::double_t lhs, Constant rhs);
+
+    friend Constant &operator--(Constant &lhs);
+
+    friend Constant operator--(Constant &lhs, int);
 
     friend Constant &operator-=(Constant &lhs, Constant const &rhs);
 
@@ -219,9 +186,10 @@ struct Constant final : Token {
     [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
 
-struct Variable final : Token {
+class Variable final : public Token {
     char var;
 
+  public:
     explicit Variable(char var);
 
     [[nodiscard]] gsl::owner<Variable *> clone() const override;
@@ -229,6 +197,8 @@ struct Variable final : Token {
     explicit operator std::string() const override;
 
     bool operator==(Variable const &) const;
+
+    friend bool operator<(Variable const &lhs, Variable const &rhs);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
@@ -261,11 +231,12 @@ struct Operation final {
     bool operator==(Operation const &) const = default;
 };
 
-struct Function final : Token {
+class Function final : public Token {
     std::string function;
 
     OwnedToken parameter;
 
+  public:
     explicit Function(std::string function, OwnedToken &&parameter);
 
     Function(Function const &function);
@@ -347,10 +318,11 @@ struct Term final : Token {
     [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
 
-struct Terms final : Token {
-    Constant coefficient{1};
-
+class Terms final : public Token {
     std::vector<OwnedToken> terms;
+
+  public:
+    Constant coefficient{1};
 
     Terms() = default;
 
@@ -358,7 +330,7 @@ struct Terms final : Token {
 
     explicit operator std::string() const override;
 
-    friend Terms operator-(Terms const &rhs);
+    Terms operator-();
 
     Terms &operator*=(OwnedToken &&token);
 
@@ -438,20 +410,8 @@ OwnedToken tokenise(std::string expression);
 
 std::ostream &operator<<(std::ostream &os, Token const &token);
 
-bool operator<(Variable const &lhs, Variable const &rhs);
-
 std::ostream &operator<<(std::ostream &os, Sign sign);
 } // namespace mlp
-
-std::double_t &operator+=(std::double_t &lhs, mlp::Constant const &rhs);
-
-std::double_t &operator-=(std::double_t &lhs, mlp::Constant const &rhs);
-
-std::double_t &operator*=(std::double_t &lhs, mlp::Constant const &rhs);
-
-std::double_t &operator/=(std::double_t &lhs, mlp::Constant const &rhs);
-
-std::double_t &operator^=(std::double_t &lhs, mlp::Constant const &rhs);
 
 std::string to_string(mlp::Sign sign);
 

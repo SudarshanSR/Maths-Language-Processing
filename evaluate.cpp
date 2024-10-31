@@ -79,7 +79,7 @@ mlp::Function::evaluate(std::map<Variable, SharedToken> const &values) const {
 
     if (typeid(*param) == typeid(Constant))
         return std::make_unique<Constant>(k_functions.at(this->function)(
-            dynamic_cast<Constant const &>(*param).value
+            dynamic_cast<Constant const &>(*param)
         ));
 
     return std::make_unique<Function>(this->function, std::move(param));

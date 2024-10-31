@@ -104,9 +104,9 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
                     "ln", OwnedToken(this->base->clone())
                 );
             } else {
-                terms /= power + 1;
+                terms /= power + 1.0;
                 terms *= std::make_unique<Term>(
-                    std::move(*this->base->clone()) ^ power + 1
+                    std::move(*this->base->clone()) ^ power + 1.0
                 );
             }
         } else if (!this->power->is_dependent_on(variable)) {

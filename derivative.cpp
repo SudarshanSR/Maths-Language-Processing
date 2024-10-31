@@ -102,7 +102,7 @@ mlp::OwnedToken mlp::Term::derivative(
 
         Terms terms{};
         terms *= std::make_unique<Term>(
-            this->coefficient * power * (*this->base ^ power - 1)
+            this->coefficient * power * (*this->base ^ power - 1.0)
         );
         terms *= this->base->derivative(variable, 1);
 

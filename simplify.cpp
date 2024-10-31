@@ -37,7 +37,7 @@ mlp::OwnedToken mlp::Term::simplified() const {
 
         if (typeid(*term->base) == typeid(Term)) {
             auto &base = dynamic_cast<Term &>(*term->base);
-            base.coefficient ^= power;
+            base.coefficient = base.coefficient ^ power;
 
             if (term->coefficient != 1) {
                 base.coefficient *= term->coefficient;

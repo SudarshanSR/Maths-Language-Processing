@@ -320,12 +320,12 @@ mlp::Terms &mlp::Terms::operator/=(Constant const &rhs) {
     return *this;
 }
 
-mlp::Terms operator-(mlp::Terms const &rhs) {
-    mlp::Terms terms{};
-    terms.coefficient = -rhs.coefficient;
+mlp::Terms mlp::Terms::operator-() {
+    Terms terms{};
+    terms.coefficient = -this->coefficient;
 
-    for (mlp::OwnedToken const &token : rhs.terms)
-        terms *= mlp::OwnedToken(token->clone());
+    for (OwnedToken const &token : this->terms)
+        terms *= OwnedToken(token->clone());
 
     return terms;
 }

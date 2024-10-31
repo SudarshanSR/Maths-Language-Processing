@@ -159,7 +159,10 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         expression, std::regex("π"), std::to_string(std::numbers::pi)
     );
 
-    auto terms = std::make_unique<Terms>();
+    auto s = Sign::pos;
+    std::vector<OwnedToken> numerator;
+    std::vector<OwnedToken> denominator;
+    bool last = false;
 
     Operation op{Operation::add};
 
@@ -174,11 +177,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
             if (!term)
                 continue;
 
-            if (typeid(*term) == typeid(Constant))
-                terms->terms.push_back(std::move(term));
-
-            else
-                *terms *= std::move(term);
+            numerator.push_back(std::move(term));
 
             continue;
         }
@@ -192,7 +191,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 throw std::runtime_error("Expression is not valid!");
 
             if (operation.operation == Operation::sub)
-                terms->coefficient = -terms->coefficient;
+                s = Sign::neg;
 
             continue;
         }
@@ -212,44 +211,45 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
             Sign const sign =
                 op.operation == Operation::add ? Sign::pos : Sign::neg;
 
-            if (!terms->terms.empty())
-                result.add_token(sign, std::move(terms));
+            if (!numerator.empty()) {
+                Terms terms{};
 
-            else if (copy != 0)
-                result.add_token(
-                    sign, std::make_unique<Constant>(terms->coefficient)
-                );
+                for (OwnedToken &t : numerator)
+                    terms *= std::move(t);
+
+                for (OwnedToken &t : denominator)
+                    terms /= std::move(t);
+
+                result.add_token(sign, terms.simplified());
+
+                numerator.clear();
+                denominator.clear();
+            }
+
+            else if (sign == s)
+                result.add_token(Sign::pos, std::make_unique<Constant>(1));
+
+            else
+                result.add_token(Sign::neg, std::make_unique<Constant>(1));
 
             op = operation;
 
-            terms = std::make_unique<Terms>();
-
-            if (typeid(*next_term) == typeid(Constant))
-                terms->terms.push_back(std::move(next_term));
-
-            else
-                *terms *= std::move(next_term);
+            s = sign;
+            numerator.push_back(std::move(next_term));
 
             continue;
         }
 
         if (operation.operation == Operation::mul) {
-            if (typeid(*next_term) == typeid(Constant))
-                terms->coefficient *=
-                    dynamic_cast<Constant const &>(*next_term);
-            else
-                *terms *= std::move(next_term);
+            numerator.push_back(std::move(next_term));
+            last = false;
 
             continue;
         }
 
         if (operation.operation == Operation::div) {
-            if (typeid(*next_term) == typeid(Constant))
-                terms->coefficient /=
-                    dynamic_cast<Constant const &>(*next_term);
-
-            else
-                *terms /= std::move(next_term);
+            denominator.push_back(std::move(next_term));
+            last = true;
 
             continue;
         }
@@ -288,17 +288,25 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
         power = power->simplified();
 
-        terms->terms.back() = std::make_unique<Term>(
-            std::move(*terms->terms.back().release()) ^ std::move(power)
-        );
+        if (!last)
+            numerator.back() = std::make_unique<Term>(
+                std::move(*numerator.back().release()) ^ std::move(power)
+            );
+        else
+            denominator.back() = std::make_unique<Term>(
+                std::move(*denominator.back().release()) ^ std::move(power)
+            );
     }
 
-    if (terms->terms.empty())
-        throw std::runtime_error("Expression is not valid!");
+    Terms terms{};
 
-    result.add_token(
-        op.operation == Operation::add ? Sign::pos : Sign::neg, std::move(terms)
-    );
+    for (OwnedToken &t : numerator)
+        terms *= std::move(t);
+
+    for (OwnedToken &t : denominator)
+        terms /= std::move(t);
+
+    result.add_token(s, terms.simplified());
 
     return result.simplified();
 }

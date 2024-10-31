@@ -16,6 +16,8 @@ mlp::Constant::operator std::string() const {
     return std::to_string(this->value);
 }
 
+mlp::Constant::operator double() const { return this->value; }
+
 mlp::Constant mlp::Constant::operator-() const {
     return Constant{-this->value};
 }
@@ -25,23 +27,7 @@ bool operator==(Constant const &lhs, Constant const &rhs) {
     return lhs.value == rhs.value;
 }
 
-bool operator==(std::double_t const lhs, Constant const &rhs) {
-    return lhs == rhs.value;
-}
-
-bool operator==(Constant const &lhs, std::double_t const rhs) {
-    return lhs.value == rhs;
-}
-
 bool operator!=(Constant const &lhs, Constant const &rhs) {
-    return !(lhs == rhs);
-}
-
-bool operator!=(std::double_t const lhs, Constant const &rhs) {
-    return !(lhs == rhs);
-}
-
-bool operator!=(Constant const &lhs, std::double_t const rhs) {
     return !(lhs == rhs);
 }
 
@@ -49,45 +35,21 @@ bool operator<(Constant const &lhs, Constant const &rhs) {
     return lhs.value < rhs.value;
 }
 
-bool operator<(std::double_t const lhs, Constant const &rhs) {
-    return lhs < rhs.value;
-}
-
-bool operator<(Constant const &lhs, std::double_t const rhs) {
-    return lhs.value < rhs;
-}
-
 bool operator>=(Constant const &lhs, Constant const &rhs) {
-    return !(lhs < rhs);
-}
-
-bool operator>=(std::double_t const lhs, Constant const &rhs) {
-    return !(lhs < rhs);
-}
-
-bool operator>=(Constant const &lhs, std::double_t const rhs) {
     return !(lhs < rhs);
 }
 
 bool operator>(Constant const &lhs, Constant const &rhs) { return rhs < lhs; }
 
-bool operator>(std::double_t const lhs, Constant const &rhs) {
-    return rhs < lhs;
-}
-
-bool operator>(Constant const &lhs, std::double_t const rhs) {
-    return rhs < lhs;
-}
-
 bool operator<=(Constant const &lhs, Constant const &rhs) { return rhs >= lhs; }
 
-bool operator<=(std::double_t const lhs, Constant const &rhs) {
-    return rhs >= lhs;
+Constant &operator++(Constant &lhs) {
+    ++lhs.value;
+
+    return lhs;
 }
 
-bool operator<=(Constant const &lhs, std::double_t const rhs) {
-    return rhs >= lhs;
-}
+Constant operator++(Constant &lhs, int) { return ++lhs; }
 
 Constant &operator+=(Constant &lhs, Constant const &rhs) {
     lhs.value += rhs.value;
@@ -112,6 +74,14 @@ Constant operator+(Constant lhs, std::double_t const rhs) {
 Constant operator+(std::double_t const lhs, Constant rhs) {
     return std::move(rhs += lhs);
 }
+
+Constant &operator--(Constant &lhs) {
+    --lhs.value;
+
+    return lhs;
+}
+
+Constant operator--(Constant &lhs, int) { return --lhs; }
 
 Constant &operator-=(Constant &lhs, Constant const &rhs) {
     lhs.value -= rhs.value;
@@ -209,33 +179,3 @@ Constant operator^(std::double_t const lhs, Constant rhs) {
     return std::move(rhs ^= lhs);
 }
 } // namespace mlp
-
-std::double_t &operator+=(std::double_t &lhs, mlp::Constant const &rhs) {
-    lhs += rhs.value;
-
-    return lhs;
-}
-
-std::double_t &operator-=(std::double_t &lhs, mlp::Constant const &rhs) {
-    lhs += rhs.value;
-
-    return lhs;
-}
-
-std::double_t &operator*=(std::double_t &lhs, mlp::Constant const &rhs) {
-    lhs *= rhs.value;
-
-    return lhs;
-}
-
-std::double_t &operator/=(std::double_t &lhs, mlp::Constant const &rhs) {
-    lhs /= rhs.value;
-
-    return lhs;
-}
-
-std::double_t &operator^=(std::double_t &lhs, mlp::Constant const &rhs) {
-    lhs = std::pow(lhs, rhs.value);
-
-    return lhs;
-}
