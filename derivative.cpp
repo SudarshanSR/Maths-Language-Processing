@@ -93,18 +93,17 @@ mlp::OwnedToken mlp::Term::derivative(
 
     auto const &base_type = typeid(*this->base);
 
-    std::double_t const c = this->coefficient;
-
     if (auto const &power_type = typeid(*this->power);
         power_type == typeid(Constant)) {
         if (base_type == typeid(Constant))
             return std::make_unique<Constant>(0);
 
-        std::double_t const power =
-            dynamic_cast<Constant &>(*this->power).value;
+        auto const &power = dynamic_cast<Constant const &>(*this->power);
 
         Terms terms{};
-        terms *= std::make_unique<Term>(c * power * (*this->base ^ power - 1));
+        terms *= std::make_unique<Term>(
+            this->coefficient * power * (*this->base ^ power - 1)
+        );
         terms *= this->base->derivative(variable, 1);
 
         auto derivative = terms.simplified();
@@ -180,8 +179,7 @@ mlp::OwnedToken mlp::Terms::derivative(
             auto derivative = this->terms[i]->derivative(variable, 1);
 
             if (typeid(*derivative) == typeid(Constant)) {
-                term->coefficient *=
-                    dynamic_cast<Constant &>(*derivative).value;
+                *term *= dynamic_cast<Constant const &>(*derivative);
 
                 continue;
             }
@@ -192,9 +190,7 @@ mlp::OwnedToken mlp::Terms::derivative(
         *result += std::move(term);
     }
 
-    Term const end{
-        this->coefficient, std::move(result), std::make_unique<Constant>(1)
-    };
+    Term const end = this->coefficient * (std::move(*result.release()) ^ 1);
 
     auto derivative = end.simplified();
 

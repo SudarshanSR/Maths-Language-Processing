@@ -35,7 +35,7 @@ bool mlp::Term::is_dependent_on(Variable const &variable) const {
 bool mlp::Term::is_linear_of(Variable const &variable) const {
     return this->is_dependent_on(variable) &&
            typeid(*this->power) == typeid(Constant) &&
-           dynamic_cast<Constant const &>(*this->power).value == 1 &&
+           dynamic_cast<Constant const &>(*this->power) == 1 &&
            this->base->is_linear_of(variable);
 }
 

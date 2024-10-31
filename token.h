@@ -1,6 +1,7 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+#include <cmath>
 #include <map>
 #include <optional>
 #include <ostream>
@@ -68,11 +69,11 @@ struct Term;
 struct Exponentiable {
     virtual ~Exponentiable() = default;
 
-    [[nodiscard]] virtual Term operator^(std::double_t exponent) const = 0;
+    [[nodiscard]] virtual Term operator^(std::double_t exponent) const & = 0;
 
-    [[nodiscard]] virtual Term operator^(Token const &exponent) const = 0;
+    [[nodiscard]] virtual Term operator^(Token const &exponent) const & = 0;
 
-    [[nodiscard]] virtual Term operator^(OwnedToken &&exponent) const = 0;
+    [[nodiscard]] virtual Term operator^(OwnedToken &&exponent) const & = 0;
 
     [[nodiscard]] virtual Term operator^(std::double_t exponent) && = 0;
 
@@ -91,11 +92,11 @@ struct Token : Dependable,
 
     explicit virtual operator std::string() const = 0;
 
-    [[nodiscard]] Term operator^(std::double_t exponent) const override;
+    [[nodiscard]] Term operator^(std::double_t exponent) const & override;
 
-    [[nodiscard]] Term operator^(Token const &exponent) const override;
+    [[nodiscard]] Term operator^(Token const &exponent) const & override;
 
-    [[nodiscard]] Term operator^(OwnedToken &&exponent) const override;
+    [[nodiscard]] Term operator^(OwnedToken &&exponent) const & override;
 
     [[nodiscard]] Term operator^(std::double_t exponent) && override;
 
@@ -109,11 +110,81 @@ struct Constant final : Token {
 
     explicit Constant(std::double_t value);
 
+    Constant &operator=(std::double_t value);
+
     [[nodiscard]] gsl::owner<Constant *> clone() const override;
 
     explicit operator std::string() const override;
 
-    bool operator==(Constant const &) const;
+    Constant operator-() const;
+
+    friend bool operator==(Constant const &lhs, Constant const &rhs);
+
+    friend bool operator==(std::double_t lhs, Constant const &rhs);
+
+    friend bool operator==(Constant const &lhs, std::double_t rhs);
+
+    friend bool operator>(Constant const &lhs, Constant const &rhs);
+
+    friend bool operator>(std::double_t lhs, Constant const &rhs);
+
+    friend bool operator>(Constant const &lhs, std::double_t rhs);
+
+    friend bool operator<(Constant const &lhs, Constant const &rhs);
+
+    friend bool operator<(std::double_t lhs, Constant const &rhs);
+
+    friend bool operator<(Constant const &lhs, std::double_t rhs);
+
+    friend Constant &operator+=(Constant &lhs, Constant const &rhs);
+
+    friend Constant &operator+=(Constant &lhs, std::double_t rhs);
+
+    friend Constant operator+(Constant lhs, Constant const &rhs);
+
+    friend Constant operator+(Constant lhs, std::double_t rhs);
+
+    friend Constant operator+(std::double_t lhs, Constant rhs);
+
+    friend Constant &operator-=(Constant &lhs, Constant const &rhs);
+
+    friend Constant &operator-=(Constant &lhs, std::double_t rhs);
+
+    friend Constant operator-(Constant lhs, Constant const &rhs);
+
+    friend Constant operator-(Constant lhs, std::double_t rhs);
+
+    friend Constant operator-(std::double_t lhs, Constant rhs);
+
+    friend Constant &operator*=(Constant &lhs, Constant const &rhs);
+
+    friend Constant &operator*=(Constant &lhs, std::double_t rhs);
+
+    friend Constant operator*(Constant lhs, Constant const &rhs);
+
+    friend Constant operator*(Constant lhs, std::double_t rhs);
+
+    friend Constant operator*(std::double_t lhs, Constant rhs);
+
+    friend Constant &operator/=(Constant &lhs, Constant const &rhs);
+
+    friend Constant &operator/=(Constant &lhs, std::double_t rhs);
+
+    friend Constant operator/(Constant lhs, Constant const &rhs);
+
+    friend Constant operator/(Constant lhs, std::double_t rhs);
+
+    friend Constant operator/(std::double_t lhs, Constant rhs);
+
+    friend Constant &operator^=(Constant &lhs, Constant const &rhs);
+
+    friend Constant &operator^=(Constant &lhs, std::double_t rhs);
+
+    friend Constant operator^(Constant lhs, Constant const &rhs);
+
+    friend Constant operator^(Constant lhs, std::double_t rhs);
+
+    friend Constant operator^(std::double_t lhs, Constant rhs);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
@@ -231,6 +302,18 @@ struct Term final : Token {
 
     friend Term operator/(Term lhs, std::double_t rhs);
 
+    Term &operator*=(Constant const &rhs);
+
+    friend Term operator*(Constant const &lhs, Term rhs);
+
+    friend Term operator*(Term lhs, Constant const &rhs);
+
+    Term &operator/=(Constant const &rhs);
+
+    friend Term operator/(Constant const &lhs, Term rhs);
+
+    friend Term operator/(Term lhs, Constant const &rhs);
+
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
     [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
@@ -247,7 +330,7 @@ struct Term final : Token {
 };
 
 struct Terms final : Token {
-    std::double_t coefficient{1};
+    Constant coefficient{1};
 
     std::vector<OwnedToken> terms;
 
@@ -259,13 +342,31 @@ struct Terms final : Token {
 
     explicit operator std::string() const override;
 
+    friend Terms operator-(Terms const &rhs);
+
     Terms &operator*=(OwnedToken &&token);
 
     Terms &operator/=(OwnedToken &&token);
 
     Terms &operator*=(std::double_t scalar);
 
+    friend Terms operator*(std::double_t lhs, Terms rhs);
+
+    friend Terms operator*(Terms lhs, std::double_t rhs);
+
     Terms &operator/=(std::double_t scalar);
+
+    friend Terms operator/(std::double_t lhs, Terms rhs);
+
+    friend Terms operator/(Terms lhs, std::double_t rhs);
+
+    Terms &operator*=(Constant const &rhs);
+
+    friend Terms operator*(Terms lhs, Constant const &rhs);
+
+    Terms &operator/=(Constant const &rhs);
+
+    friend Terms operator/(Terms lhs, Constant const &rhs);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
@@ -325,6 +426,16 @@ bool operator<(Variable const &lhs, Variable const &rhs);
 
 std::ostream &operator<<(std::ostream &os, Sign sign);
 } // namespace mlp
+
+std::double_t &operator+=(std::double_t &lhs, mlp::Constant const &rhs);
+
+std::double_t &operator-=(std::double_t &lhs, mlp::Constant const &rhs);
+
+std::double_t &operator*=(std::double_t &lhs, mlp::Constant const &rhs);
+
+std::double_t &operator/=(std::double_t &lhs, mlp::Constant const &rhs);
+
+std::double_t &operator^=(std::double_t &lhs, mlp::Constant const &rhs);
 
 std::string to_string(mlp::Sign sign);
 

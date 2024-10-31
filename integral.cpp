@@ -40,7 +40,7 @@ mlp::OwnedToken mlp::Integrable::integral(
 }
 
 mlp::OwnedToken mlp::Constant::integral(Variable const &variable) {
-    return std::make_unique<Term>(this->value * (variable ^ 1));
+    return std::make_unique<Term>(*this * (variable ^ 1));
 }
 
 mlp::OwnedToken mlp::Variable::integral(Variable const &variable) {
@@ -90,20 +90,19 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
         return terms;
     }
 
-    auto const &base_type = typeid(*this->base);
     auto const &power_type = typeid(*this->power);
 
     if (power_type == typeid(Constant) && this->base->is_linear_of(variable)) {
-        auto const &power = dynamic_cast<Constant &>(*this->power);
+        auto const &power = dynamic_cast<Constant const &>(*this->power);
         Terms terms{};
         terms *= this->coefficient;
 
-        if (power.value == -1) {
+        if (power == -1) {
             terms *= std::make_unique<Function>(
                 "ln", OwnedToken(this->base->clone())
             );
         } else {
-            terms /= power.value + 1;
+            terms /= power + 1;
             terms *= OwnedToken(this->base->clone());
         }
 
@@ -112,12 +111,13 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
         return terms.simplified();
     }
 
-    if (base_type == typeid(Constant) && this->power->is_linear_of(variable)) {
+    if (typeid(*this->base) == typeid(Constant) &&
+        this->power->is_linear_of(variable)) {
         Terms terms{};
         terms *= Owned<Term>(this->clone());
 
         if (power_type == typeid(Variable) &&
-            dynamic_cast<Variable &>(*this->power) != variable)
+            dynamic_cast<Variable const &>(*this->power) != variable)
             terms *= Owned<Variable>(variable.clone());
 
         else if (power_type != typeid(Variable))
