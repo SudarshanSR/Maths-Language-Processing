@@ -21,11 +21,10 @@ mlp::Term::Term(Term const &term)
     : coefficient(term.coefficient), base(term.base->clone()),
       power(term.power->clone()) {}
 
-gsl::owner<mlp::Term *> mlp::Term::clone() const {
-    return new Term(
-        this->coefficient, OwnedToken(this->base->clone()),
-        OwnedToken(this->power->clone())
-    );
+gsl::owner<mlp::Term *> mlp::Term::clone() const { return new Term(*this); }
+
+gsl::owner<mlp::Term *> mlp::Term::move() && {
+    return new Term(std::move(*this));
 }
 
 mlp::Term::operator std::string() const {
@@ -78,14 +77,17 @@ mlp::Term &mlp::Term::operator/=(Constant const &rhs) {
     return *this;
 }
 
-gsl::owner<mlp::Terms *> mlp::Terms::clone() const {
-    auto *terms = new Terms;
-    terms->coefficient = this->coefficient;
+mlp::Terms::Terms(Terms const &terms) {
+    this->coefficient = terms.coefficient;
 
-    for (auto const &term : this->terms)
-        *terms *= OwnedToken(term->clone());
+    for (auto const &term : terms.terms)
+        *this *= OwnedToken(term->clone());
+}
 
-    return terms;
+gsl::owner<mlp::Terms *> mlp::Terms::clone() const { return new Terms(*this); }
+
+gsl::owner<mlp::Terms *> mlp::Terms::move() && {
+    return new Terms(std::move(*this));
 }
 
 bool mlp::Term::is_dependent_on(Variable const &variable) const {
@@ -102,12 +104,12 @@ bool mlp::Term::is_linear_of(Variable const &variable) const {
 
 mlp::OwnedToken
 mlp::Term::evaluate(std::map<Variable, SharedToken> const &values) const {
-    auto const term = Owned<Term>(this->clone());
+    Term term{*this};
 
-    term->base = term->base->evaluate(values);
-    term->power = term->power->evaluate(values);
+    term.base = term.base->evaluate(values);
+    term.power = term.power->evaluate(values);
 
-    return term->simplified();
+    return term.simplified();
 }
 
 mlp::OwnedToken mlp::Term::simplified() const {
@@ -179,7 +181,7 @@ mlp::OwnedToken mlp::Term::simplified() const {
         if (term->coefficient == base) {
             if (typeid(*term->power) == typeid(Expression)) {
                 auto &power = dynamic_cast<Expression &>(*term->power);
-                power += std::make_unique<Constant>(1);
+                power += Constant{1};
                 term->coefficient = 1;
             }
         }
@@ -240,14 +242,14 @@ mlp::OwnedToken mlp::Term::derivative(
         return derivative;
     }
 
-    auto terms_1 = std::make_unique<Terms>();
-    *terms_1 *= OwnedToken(this->power->clone());
-    *terms_1 *= this->base->derivative(variable, 1);
-    *terms_1 /= OwnedToken(this->base->clone());
+    Terms terms_1{};
+    terms_1 *= OwnedToken(this->power->clone());
+    terms_1 *= this->base->derivative(variable, 1);
+    terms_1 /= OwnedToken(this->base->clone());
 
-    auto terms_2 = std::make_unique<Terms>();
-    *terms_2 *= this->power->derivative(variable, 1);
-    *terms_2 *=
+    Terms terms_2{};
+    terms_2 *= this->power->derivative(variable, 1);
+    terms_2 *=
         std::make_unique<Function>("ln", OwnedToken(this->base->clone()));
 
     auto expression = std::make_unique<Expression>();
@@ -267,8 +269,8 @@ mlp::OwnedToken mlp::Term::derivative(
 mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
-        *terms *= Owned<Variable>(variable.clone());
-        *terms *= Owned<Term>(this->clone());
+        *terms *= Variable(variable);
+        *terms *= Term(*this);
 
         return terms;
     }
@@ -295,7 +297,7 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
         } else if (!this->power->is_dependent_on(variable)) {
             auto expression = std::make_unique<Expression>();
             *expression += OwnedToken(this->power->clone());
-            *expression += std::make_unique<Constant>(1);
+            *expression += Constant(1);
 
             terms *= std::make_unique<Term>(
                 std::move(*this->base->clone()) ^
@@ -314,11 +316,11 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
     if (!this->base->is_dependent_on(variable) &&
         this->power->is_linear_of(variable)) {
         Terms terms{};
-        terms *= Owned<Term>(this->clone());
+        terms *= Term(*this);
 
         if (power_type == typeid(Variable) &&
             dynamic_cast<Variable const &>(*this->power) != variable)
-            terms *= Owned<Variable>(variable.clone());
+            terms *= Variable(variable);
 
         else if (power_type != typeid(Variable))
             terms /= this->power->derivative(variable, 1)->simplified();

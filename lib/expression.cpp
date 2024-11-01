@@ -8,13 +8,17 @@
 #include <ranges>
 #include <sstream>
 
+mlp::Expression::Expression(Expression const &expression) {
+    for (auto const &[operation, token] : expression.tokens)
+        this->add_token(operation, OwnedToken(token->clone()));
+}
+
 gsl::owner<mlp::Expression *> mlp::Expression::clone() const {
-    auto *expression = new Expression();
+    return new Expression(*this);
+}
 
-    for (auto const &[operation, token] : this->tokens)
-        expression->add_token(operation, OwnedToken(token->clone()));
-
-    return expression;
+gsl::owner<mlp::Expression *> mlp::Expression::move() && {
+    return new Expression(std::move(*this));
 }
 
 void mlp::Expression::add_token(Sign const sign, OwnedToken &&token) {
@@ -54,8 +58,16 @@ mlp::Expression::operator std::string() const {
 }
 
 mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
-    if (typeid(*token) == typeid(Expression)) {
-        for (auto &[sign, t] : dynamic_cast<Expression &>(*token).tokens)
+    return *this += std::move(*token.release());
+}
+
+mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
+    return *this -= std::move(*token.release());
+}
+
+mlp::Expression &mlp::Expression::operator+=(Token &&token) {
+    if (typeid(token) == typeid(Expression)) {
+        for (auto &[sign, t] : dynamic_cast<Expression &>(token).tokens)
             if (sign == Sign::pos)
                 *this += std::move(t);
             else
@@ -64,8 +76,8 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
         return *this;
     }
 
-    if (typeid(*token) == typeid(Constant)) {
-        auto const &constant = dynamic_cast<Constant const &>(*token);
+    if (typeid(token) == typeid(Constant)) {
+        auto const &constant = dynamic_cast<Constant const &>(token);
 
         if (constant == 0)
             return *this;
@@ -97,8 +109,8 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
         }
     }
 
-    if (typeid(*token) == typeid(Variable)) {
-        auto const &variable = dynamic_cast<Variable const &>(*token);
+    if (typeid(token) == typeid(Variable)) {
+        auto const &variable = dynamic_cast<Variable const &>(token);
 
         for (std::size_t i = 0; i < this->tokens.size(); ++i) {
             auto &[sign, t] = this->tokens[i];
@@ -110,7 +122,7 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
                 if (sign == Sign::neg) {
                     this->tokens.erase(this->tokens.begin() + i);
                 } else {
-                    t = std::make_unique<Term>(2 * (variable ^ 1));
+                    t = std::make_unique<Term>(2 * variable);
                 }
 
                 return *this;
@@ -134,13 +146,15 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
             }
         }
 
-        this->tokens.emplace_back(Sign::pos, std::move(token));
+        this->tokens.emplace_back(
+            Sign::pos, OwnedToken(std::move(token).move())
+        );
 
         return *this;
     }
 
-    if (typeid(*token) == typeid(Term)) {
-        auto &term = dynamic_cast<Term &>(*token);
+    if (typeid(token) == typeid(Term)) {
+        auto &term = dynamic_cast<Term &>(token);
 
         if (term.coefficient == 0)
             return *this;
@@ -154,7 +168,9 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
         if (typeid(*term.base) != typeid(Variable) ||
             typeid(*term.power) != typeid(Constant) ||
             dynamic_cast<Constant const &>(*term.power) != 1) {
-            this->tokens.emplace_back(Sign::pos, std::move(token));
+            this->tokens.emplace_back(
+                Sign::pos, OwnedToken(std::move(token).move())
+            );
 
             return *this;
         }
@@ -172,11 +188,11 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
 
                 if (sign == Sign::pos) {
                     temp = std::make_unique<Term>(
-                        (1 + term.coefficient) * (variable ^ 1)
+                        (1 + term.coefficient) * variable
                     );
                 } else {
                     temp = std::make_unique<Term>(
-                        (1 - term.coefficient) * (variable ^ 1)
+                        (1 - term.coefficient) * variable
                     );
                 }
 
@@ -213,8 +229,8 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
         }
     }
 
-    if (typeid(*token) == typeid(Terms)) {
-        auto &terms = dynamic_cast<Terms &>(*token);
+    if (typeid(token) == typeid(Terms)) {
+        auto &terms = dynamic_cast<Terms &>(token);
 
         if (terms.coefficient == 0)
             return *this;
@@ -226,14 +242,14 @@ mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
         }
     }
 
-    this->tokens.emplace_back(Sign::pos, std::move(token));
+    this->tokens.emplace_back(Sign::pos, OwnedToken(std::move(token).move()));
 
     return *this;
 }
 
-mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
-    if (typeid(*token) == typeid(Expression)) {
-        for (auto &[sign, t] : dynamic_cast<Expression &>(*token).tokens)
+mlp::Expression &mlp::Expression::operator-=(Token &&token) {
+    if (typeid(token) == typeid(Expression)) {
+        for (auto &[sign, t] : dynamic_cast<Expression &>(token).tokens)
             if (sign == Sign::pos)
                 *this -= std::move(t);
             else
@@ -242,8 +258,8 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
         return *this;
     }
 
-    if (typeid(*token) == typeid(Constant)) {
-        auto const &constant = dynamic_cast<Constant const &>(*token);
+    if (typeid(token) == typeid(Constant)) {
+        auto const &constant = dynamic_cast<Constant const &>(token);
 
         if (constant == 0)
             return *this;
@@ -275,8 +291,8 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
         }
     }
 
-    if (typeid(*token) == typeid(Variable)) {
-        auto const &variable = dynamic_cast<Variable const &>(*token);
+    if (typeid(token) == typeid(Variable)) {
+        auto const &variable = dynamic_cast<Variable const &>(token);
 
         for (std::size_t i = 0; i < this->tokens.size(); ++i) {
             auto &[sign, t] = this->tokens[i];
@@ -289,7 +305,7 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
                 if (sign == Sign::pos) {
                     this->tokens.erase(this->tokens.begin() + i);
                 } else {
-                    t = std::make_unique<Term>(2 * (variable ^ 1));
+                    t = std::make_unique<Term>(2 * variable);
                 }
 
                 return *this;
@@ -313,13 +329,15 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
             }
         }
 
-        this->tokens.emplace_back(Sign::neg, std::move(token));
+        this->tokens.emplace_back(
+            Sign::neg, OwnedToken(std::move(token).move())
+        );
 
         return *this;
     }
 
-    if (typeid(*token) == typeid(Term)) {
-        auto &term = dynamic_cast<Term &>(*token);
+    if (typeid(token) == typeid(Term)) {
+        auto &term = dynamic_cast<Term &>(token);
 
         if (term.coefficient == 0)
             return *this;
@@ -333,7 +351,9 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
         if (typeid(*term.base) != typeid(Variable) ||
             typeid(*term.power) != typeid(Constant) ||
             dynamic_cast<Constant const &>(*term.power) != 1) {
-            this->tokens.emplace_back(Sign::neg, std::move(token));
+            this->tokens.emplace_back(
+                Sign::neg, OwnedToken(std::move(token).move())
+            );
 
             return *this;
         }
@@ -351,11 +371,11 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
 
                 if (sign == Sign::pos) {
                     temp = std::make_unique<Term>(
-                        (1 - term.coefficient) * (variable ^ 1)
+                        (1 - term.coefficient) * variable
                     );
                 } else {
                     temp = std::make_unique<Term>(
-                        (1 + term.coefficient) * (variable ^ 1)
+                        (1 + term.coefficient) * variable
                     );
                 }
 
@@ -392,8 +412,8 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
         }
     }
 
-    if (typeid(*token) == typeid(Terms)) {
-        auto &terms = dynamic_cast<Terms &>(*token);
+    if (typeid(token) == typeid(Terms)) {
+        auto &terms = dynamic_cast<Terms &>(token);
 
         if (terms.coefficient == 0)
             return *this;
@@ -405,7 +425,7 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
         }
     }
 
-    this->tokens.emplace_back(Sign::neg, std::move(token));
+    this->tokens.emplace_back(Sign::neg, OwnedToken(std::move(token).move()));
 
     return *this;
 }
@@ -440,12 +460,12 @@ bool mlp::Expression::is_linear_of(Variable const &variable) const {
 
 mlp::OwnedToken
 mlp::Expression::evaluate(std::map<Variable, SharedToken> const &values) const {
-    auto const expression = Owned<Expression>(this->clone());
+    Expression expression{*this};
 
-    for (auto &term : expression->tokens | std::views::values)
+    for (auto &term : expression.tokens | std::views::values)
         term = term->evaluate(values);
 
-    return expression->simplified();
+    return expression.simplified();
 }
 
 mlp::OwnedToken mlp::Expression::simplified() const {
@@ -453,9 +473,9 @@ mlp::OwnedToken mlp::Expression::simplified() const {
         return std::make_unique<Constant>(0);
 
     if (this->tokens.size() == 1) {
-        auto const expression = Owned<Expression>(this->clone());
+        Expression expression{*this};
 
-        auto &&[sign, term] = expression->pop_token();
+        auto &&[sign, term] = expression.pop_token();
 
         if (sign == Sign::pos)
             return term->simplified();
@@ -510,8 +530,8 @@ mlp::OwnedToken mlp::Expression::derivative(
 mlp::OwnedToken mlp::Expression::integral(Variable const &variable) {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
-        *terms *= Owned<Variable>(variable.clone());
-        *terms *= Owned<Expression>(this->clone());
+        *terms *= Variable(variable);
+        *terms *= Expression(*this);
 
         return terms;
     }

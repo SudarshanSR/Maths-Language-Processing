@@ -16,7 +16,11 @@ struct Term final : Token {
 
     Term(Term const &term);
 
+    Term(Term &&) = default;
+
     [[nodiscard]] gsl::owner<Term *> clone() const override;
+
+    [[nodiscard]] gsl::owner<Term *> move() && override;
 
     explicit operator std::string() const override;
 

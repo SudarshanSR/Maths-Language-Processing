@@ -10,7 +10,13 @@ class Variable final : public Token {
   public:
     explicit Variable(char var);
 
+    Variable(Variable const &) = default;
+
+    Variable(Variable &&) = default;
+
     [[nodiscard]] gsl::owner<Variable *> clone() const override;
+
+    [[nodiscard]] gsl::owner<Variable *> move() && override;
 
     explicit operator std::string() const override;
 

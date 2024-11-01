@@ -43,18 +43,24 @@ mlp::Terms mlp::Terms::operator-() const {
 }
 
 mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
-    if (typeid(*token) == typeid(Constant)) {
-        this->coefficient *= dynamic_cast<Constant const &>(*token);
+    return *this *= std::move(*token.release());
+}
+
+mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
+    return *this /= std::move(*token.release());
+}
+
+mlp::Terms &mlp::Terms::operator*=(Token &&token) {
+    if (typeid(token) == typeid(Constant)) {
+        this->coefficient *= dynamic_cast<Constant const &>(token);
 
         return *this;
     }
 
-    if (typeid(*token) == typeid(Variable)) {
-        auto const &variable = dynamic_cast<Variable const &>(*token);
+    if (typeid(token) == typeid(Variable)) {
+        auto const &variable = dynamic_cast<Variable const &>(token);
 
-        for (std::size_t i = 0; i < this->terms.size(); ++i) {
-            OwnedToken &term = this->terms[i];
-
+        for (OwnedToken &term : this->terms) {
             if (typeid(*term) == typeid(Variable)) {
                 if (auto const &v = dynamic_cast<Variable const &>(*term);
                     v != variable)
@@ -90,13 +96,13 @@ mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
             }
         }
 
-        this->terms.push_back(std::move(token));
+        this->terms.emplace_back(std::move(token).move());
 
         return *this;
     }
 
-    if (typeid(*token) == typeid(Term)) {
-        auto &term = dynamic_cast<Term &>(*token);
+    if (typeid(token) == typeid(Term)) {
+        auto &term = dynamic_cast<Term &>(token);
 
         if (term.coefficient != 1) {
             *this *= term.coefficient;
@@ -104,7 +110,7 @@ mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
         }
 
         if (typeid(*term.base) != typeid(Variable)) {
-            this->terms.push_back(std::move(token));
+            this->terms.emplace_back(std::move(token).move());
 
             return *this;
         }
@@ -129,7 +135,7 @@ mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
 
                 power += std::make_unique<Constant>(1);
                 term.power = term.power->simplified();
-                t = std::move(token);
+                t = OwnedToken(std::move(token).move());
 
                 return *this;
             }
@@ -146,19 +152,19 @@ mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
 
                 power += std::move(term1.power);
                 term.power = term.power->simplified();
-                t = std::move(token);
+                t = OwnedToken(std::move(token).move());
 
                 return *this;
             }
         }
 
-        this->terms.push_back(std::move(token));
+        this->terms.emplace_back(std::move(token).move());
 
         return *this;
     }
 
-    if (typeid(*token) == typeid(Terms)) {
-        auto &terms = dynamic_cast<Terms &>(*token);
+    if (typeid(token) == typeid(Terms)) {
+        auto &terms = dynamic_cast<Terms &>(token);
 
         if (terms.coefficient != 1) {
             *this *= terms.coefficient;
@@ -171,20 +177,20 @@ mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
         return *this;
     }
 
-    this->terms.push_back(std::move(token));
+    this->terms.emplace_back(std::move(token).move());
 
     return *this;
 }
 
-mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
-    if (typeid(*token) == typeid(Constant)) {
-        this->coefficient /= dynamic_cast<Constant const &>(*token);
+mlp::Terms &mlp::Terms::operator/=(Token &&token) {
+    if (typeid(token) == typeid(Constant)) {
+        this->coefficient /= dynamic_cast<Constant const &>(token);
 
         return *this;
     }
 
-    if (typeid(*token) == typeid(Variable)) {
-        auto const &variable = dynamic_cast<Variable const &>(*token);
+    if (typeid(token) == typeid(Variable)) {
+        auto const &variable = dynamic_cast<Variable const &>(token);
 
         for (std::size_t i = 0; i < this->terms.size(); ++i) {
             OwnedToken const &term = this->terms[i];
@@ -224,15 +230,13 @@ mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
             }
         }
 
-        this->terms.push_back(
-            std::make_unique<Term>(std::move(*token.release()) ^ -1)
-        );
+        this->terms.push_back(std::make_unique<Term>(std::move(token) ^ -1));
 
         return *this;
     }
 
-    if (typeid(*token) == typeid(Term)) {
-        auto &term = dynamic_cast<Term &>(*token);
+    if (typeid(token) == typeid(Term)) {
+        auto &term = dynamic_cast<Term &>(token);
 
         if (term.coefficient != 1) {
             *this /= term.coefficient;
@@ -241,7 +245,7 @@ mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
 
         if (typeid(*term.base) != typeid(Variable)) {
             this->terms.push_back(
-                std::make_unique<Term>(std::move(*token.release()) ^ -1)
+                std::make_unique<Term>(std::move(token) ^ -1)
             );
 
             return *this;
@@ -257,9 +261,7 @@ mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
 
         auto &power = dynamic_cast<Expression &>(*term.power);
 
-        for (std::size_t i = 0; i < this->terms.size(); ++i) {
-            OwnedToken &t = this->terms[i];
-
+        for (OwnedToken &t : this->terms) {
             if (typeid(*t) == typeid(Variable)) {
                 if (auto const &v = dynamic_cast<Variable const &>(*t);
                     v != variable)
@@ -267,7 +269,7 @@ mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
 
                 power += std::make_unique<Constant>(1);
                 term.power = term.power->simplified();
-                t = std::move(token);
+                t = OwnedToken(std::move(token).move());
 
                 return *this;
             }
@@ -284,21 +286,19 @@ mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
 
                 power += std::move(term1.power);
                 term.power = term.power->simplified();
-                t = std::move(token);
+                t = OwnedToken(std::move(token).move());
 
                 return *this;
             }
         }
 
-        this->terms.push_back(
-            std::make_unique<Term>(std::move(*token.release()) ^ -1)
-        );
+        this->terms.push_back(std::make_unique<Term>(std::move(token) ^ -1));
 
         return *this;
     }
 
-    if (typeid(*token) == typeid(Terms)) {
-        auto &terms = dynamic_cast<Terms &>(*token);
+    if (typeid(token) == typeid(Terms)) {
+        auto &terms = dynamic_cast<Terms &>(token);
 
         if (terms.coefficient != 1) {
             *this /= terms.coefficient;
@@ -311,9 +311,7 @@ mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
         return *this;
     }
 
-    this->terms.push_back(
-        std::make_unique<Term>(std::move(*token.release()) ^ -1)
-    );
+    this->terms.push_back(std::make_unique<Term>(std::move(token) ^ -1));
 
     return *this;
 }
@@ -372,12 +370,12 @@ bool mlp::Terms::is_linear_of(Variable const &variable) const {
 
 mlp::OwnedToken
 mlp::Terms::evaluate(std::map<Variable, SharedToken> const &values) const {
-    auto const terms = Owned<Terms>(this->clone());
+    Terms terms{*this};
 
-    for (auto &term : terms->terms)
+    for (OwnedToken &term : terms.terms)
         term = term->evaluate(values);
 
-    return terms->simplified();
+    return terms.simplified();
 }
 
 mlp::OwnedToken mlp::Terms::simplified() const {
@@ -401,8 +399,7 @@ mlp::OwnedToken mlp::Terms::simplified() const {
             return term->simplified();
         }
 
-        return (this->coefficient * (std::move(*term.release()) ^ 1))
-            .simplified();
+        return (this->coefficient * std::move(*term.release())).simplified();
     }
 
     auto terms = std::make_unique<Terms>();
@@ -428,8 +425,7 @@ mlp::OwnedToken mlp::Terms::simplified() const {
             return term->simplified();
         }
 
-        return (terms->coefficient * (std::move(*term.release()) ^ 1))
-            .simplified();
+        return (terms->coefficient * std::move(*term.release())).simplified();
     }
 
     return terms;
@@ -444,7 +440,7 @@ mlp::OwnedToken mlp::Terms::derivative(
     if (this->coefficient == 0 || !this->is_dependent_on(variable))
         return std::make_unique<Constant>(0);
 
-    auto result = std::make_unique<Expression>();
+    auto const result = std::make_unique<Expression>();
 
     for (std::size_t i = 0; i < this->terms.size(); ++i) {
         auto term = std::make_unique<Terms>();
@@ -470,7 +466,7 @@ mlp::OwnedToken mlp::Terms::derivative(
         *result += std::move(term);
     }
 
-    Term const end = this->coefficient * (std::move(*result.release()) ^ 1);
+    Term const end = this->coefficient * *result;
 
     auto derivative = end.simplified();
 
@@ -483,8 +479,8 @@ mlp::OwnedToken mlp::Terms::derivative(
 mlp::OwnedToken mlp::Terms::integral(Variable const &variable) {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
-        *terms *= Owned<Variable>(variable.clone());
-        *terms *= Owned<Terms>(this->clone());
+        *terms *= Variable(variable);
+        *terms *= Terms(*this);
 
         return terms;
     }

@@ -10,9 +10,19 @@ class Constant final : public Token {
   public:
     explicit Constant(std::double_t value);
 
+    Constant(Constant const &) = default;
+
+    Constant(Constant &&) = default;
+
+    Constant &operator=(Constant const &) = default;
+
+    Constant &operator=(Constant &&) = default;
+
     Constant &operator=(std::double_t value);
 
     [[nodiscard]] gsl::owner<Constant *> clone() const override;
+
+    [[nodiscard]] gsl::owner<Constant *> move() && override;
 
     explicit operator std::string() const override;
 

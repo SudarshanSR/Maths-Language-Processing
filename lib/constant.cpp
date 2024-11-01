@@ -15,6 +15,10 @@ gsl::owner<mlp::Constant *> mlp::Constant::clone() const {
     return new Constant(this->value);
 }
 
+gsl::owner<mlp::Constant *> mlp::Constant::move() && {
+    return new Constant(std::move(*this));
+}
+
 mlp::Constant::operator std::string() const {
     return std::to_string(this->value);
 }
@@ -39,7 +43,7 @@ mlp::Constant::evaluate(std::map<Variable, SharedToken> const &values) const {
 }
 
 mlp::OwnedToken mlp::Constant::simplified() const {
-    return std::unique_ptr<Constant>(this->clone());
+    return Owned<Constant>(this->clone());
 }
 
 mlp::OwnedToken
@@ -48,7 +52,7 @@ mlp::Constant::derivative(Variable const &, std::uint32_t const) const {
 }
 
 mlp::OwnedToken mlp::Constant::integral(Variable const &variable) {
-    return std::make_unique<Term>(*this * (variable ^ 1));
+    return std::make_unique<Term>(*this * variable);
 }
 
 namespace mlp {

@@ -18,6 +18,8 @@ class Function final : public Token {
 
     [[nodiscard]] gsl::owner<Function *> clone() const override;
 
+    [[nodiscard]] gsl::owner<Function *> move() && override;
+
     explicit operator std::string() const override;
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;

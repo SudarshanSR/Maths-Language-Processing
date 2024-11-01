@@ -4,6 +4,8 @@
 #include "constant.h"
 #include "token.h"
 
+#include <vector>
+
 namespace mlp {
 class Terms final : public Token {
     std::vector<OwnedToken> terms;
@@ -13,7 +15,13 @@ class Terms final : public Token {
 
     Terms() = default;
 
+    Terms(Terms const &);
+
+    Terms(Terms &&) = default;
+
     [[nodiscard]] gsl::owner<Terms *> clone() const override;
+
+    [[nodiscard]] gsl::owner<Terms *> move() && override;
 
     explicit operator std::string() const override;
 
@@ -22,6 +30,10 @@ class Terms final : public Token {
     Terms &operator*=(OwnedToken &&token);
 
     Terms &operator/=(OwnedToken &&token);
+
+    Terms &operator*=(Token &&token);
+
+    Terms &operator/=(Token &&token);
 
     Terms &operator*=(std::double_t scalar);
 

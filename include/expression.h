@@ -3,6 +3,8 @@
 
 #include "token.h"
 
+#include <vector>
+
 namespace mlp {
 class Expression final : public Token {
     std::vector<std::pair<Sign, OwnedToken>> tokens;
@@ -10,7 +12,13 @@ class Expression final : public Token {
   public:
     Expression() = default;
 
+    Expression(Expression const &);
+
+    Expression(Expression &&) = default;
+
     [[nodiscard]] gsl::owner<Expression *> clone() const override;
+
+    [[nodiscard]] gsl::owner<Expression *> move() && override;
 
     void add_token(Sign sign, OwnedToken &&token);
 
@@ -23,6 +31,10 @@ class Expression final : public Token {
     Expression &operator+=(OwnedToken &&token);
 
     Expression &operator-=(OwnedToken &&token);
+
+    Expression &operator+=(Token &&token);
+
+    Expression &operator-=(Token &&token);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 

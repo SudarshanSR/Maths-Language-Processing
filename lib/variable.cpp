@@ -7,7 +7,11 @@
 mlp::Variable::Variable(char const var) : var(var) {}
 
 gsl::owner<mlp::Variable *> mlp::Variable::clone() const {
-    return new Variable(this->var);
+    return new Variable(*this);
+}
+
+gsl::owner<mlp::Variable *> mlp::Variable::move() && {
+    return new Variable(std::move(*this));
 }
 
 mlp::Variable::operator std::string() const { return {this->var}; }
@@ -49,8 +53,8 @@ mlp::OwnedToken mlp::Variable::integral(Variable const &variable) {
         return std::make_unique<Term>((variable ^ 2) / 2);
 
     auto terms = std::make_unique<Terms>();
-    *terms *= Owned<Variable>(variable.clone());
-    *terms *= Owned<Variable>(this->clone());
+    *terms *= Variable(variable);
+    *terms *= Variable(*this);
 
     return terms;
 }

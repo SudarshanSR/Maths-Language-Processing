@@ -61,6 +61,8 @@ struct Exponentiable {
     [[nodiscard]] virtual Term operator^(OwnedToken &&exponent) && = 0;
 };
 
+class Expression;
+
 struct Token : Dependable<Variable>,
                Evaluatable<Variable, SharedToken, OwnedToken>,
                Simplifiable<OwnedToken>,
@@ -68,6 +70,8 @@ struct Token : Dependable<Variable>,
                Integrable,
                Exponentiable {
     [[nodiscard]] virtual gsl::owner<Token *> clone() const = 0;
+
+    [[nodiscard]] virtual gsl::owner<Token *> move() && = 0;
 
     explicit virtual operator std::string() const = 0;
 
@@ -82,13 +86,29 @@ struct Token : Dependable<Variable>,
     [[nodiscard]] Term operator^(Token const &exponent) && override;
 
     [[nodiscard]] Term operator^(OwnedToken &&exponent) && override;
+
+    friend Term operator*(std::double_t lhs, Token const &rhs);
+
+    friend Term operator*(Token const &lhs, std::double_t rhs);
+
+    friend Term operator*(std::double_t lhs, Token &&rhs);
+
+    friend Term operator*(Token &&lhs, std::double_t rhs);
+
+    friend Expression operator+(Token &&lhs, Token &&rhs);
 };
 
 enum class Sign { pos, neg };
 
 OwnedToken tokenise(std::string expression);
 
-std::ostream &operator<<(std::ostream &os, Token const &token);
+template <typename T>
+    requires std::is_base_of_v<Token, T>
+std::ostream &operator<<(std::ostream &os, T const &token) {
+    os << static_cast<std::string>(token);
+
+    return os;
+}
 
 std::ostream &operator<<(std::ostream &os, Sign sign);
 } // namespace mlp

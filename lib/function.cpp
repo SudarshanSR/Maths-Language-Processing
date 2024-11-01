@@ -98,7 +98,11 @@ mlp::Function::Function(Function const &function)
     : function(function.function), parameter(function.parameter->clone()) {}
 
 gsl::owner<mlp::Function *> mlp::Function::clone() const {
-    return new Function(this->function, OwnedToken(this->parameter->clone()));
+    return new Function(*this);
+}
+
+gsl::owner<mlp::Function *> mlp::Function::move() && {
+    return new Function(std::move(*this));
 }
 
 mlp::Function::operator std::string() const {
@@ -169,8 +173,8 @@ mlp::OwnedToken mlp::Function::derivative(
 mlp::OwnedToken mlp::Function::integral(Variable const &variable) {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
-        *terms *= Owned<Variable>(variable.clone());
-        *terms *= Owned<Function>(this->clone());
+        *terms *= Variable(variable);
+        *terms *= Function(*this);
 
         return terms;
     }

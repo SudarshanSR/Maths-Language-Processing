@@ -224,11 +224,13 @@ mlp::Term mlp::Token::operator^(std::double_t exponent) && {
 }
 
 mlp::Term mlp::Token::operator^(Token const &exponent) && {
-    return {1, OwnedToken(this), OwnedToken(exponent.clone())};
+    return {
+        1, OwnedToken(std::move(*this).move()), OwnedToken(exponent.clone())
+    };
 }
 
 mlp::Term mlp::Token::operator^(OwnedToken &&exponent) && {
-    return {1, OwnedToken(this), std::move(exponent)};
+    return {1, OwnedToken(std::move(*this).move()), std::move(exponent)};
 }
 
 mlp::OwnedToken mlp::tokenise(std::string expression) {
@@ -395,10 +397,26 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 }
 
 namespace mlp {
-std::ostream &operator<<(std::ostream &os, Token const &token) {
-    os << static_cast<std::string>(token);
+Term operator*(std::double_t const lhs, Token const &rhs) {
+    return lhs * (rhs ^ 1);
+}
 
-    return os;
+Term operator*(Token const &lhs, std::double_t const rhs) { return rhs * lhs; }
+
+Term operator*(std::double_t const lhs, Token &&rhs) {
+    return lhs * (std::move(rhs) ^ 1);
+}
+
+Term operator*(Token &&lhs, std::double_t const rhs) {
+    return rhs * std::move(lhs);
+}
+
+Expression operator+(Token &&lhs, Token &&rhs) {
+    Expression result;
+    result += std::move(lhs);
+    result += std::move(rhs);
+
+    return result;
 }
 
 std::ostream &operator<<(std::ostream &os, Sign const sign) {
