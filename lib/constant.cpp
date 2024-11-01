@@ -1,4 +1,7 @@
-#include "token.h"
+#include "../include/constant.h"
+
+#include "../include/term.h"
+#include "../include/variable.h"
 
 mlp::Constant::Constant(std::double_t const value) : value(value) {}
 
@@ -20,6 +23,32 @@ mlp::Constant::operator double() const { return this->value; }
 
 mlp::Constant mlp::Constant::operator-() const {
     return Constant{-this->value};
+}
+
+bool mlp::Constant::is_dependent_on(Variable const &variable) const {
+    return false;
+}
+
+bool mlp::Constant::is_linear_of(Variable const &variable) const {
+    return false;
+}
+
+mlp::OwnedToken
+mlp::Constant::evaluate(std::map<Variable, SharedToken> const &values) const {
+    return std::make_unique<Constant>(*this);
+}
+
+mlp::OwnedToken mlp::Constant::simplified() const {
+    return std::unique_ptr<Constant>(this->clone());
+}
+
+mlp::OwnedToken
+mlp::Constant::derivative(Variable const &, std::uint32_t const) const {
+    return std::make_unique<Constant>(0);
+}
+
+mlp::OwnedToken mlp::Constant::integral(Variable const &variable) {
+    return std::make_unique<Term>(*this * (variable ^ 1));
 }
 
 namespace mlp {

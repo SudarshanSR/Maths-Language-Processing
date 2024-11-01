@@ -1,5 +1,11 @@
-#include "token.h"
+#include "../include/expression.h"
 
+#include "../include/constant.h"
+#include "../include/term.h"
+#include "../include/terms.h"
+#include "../include/variable.h"
+
+#include <ranges>
 #include <sstream>
 
 gsl::owner<mlp::Expression *> mlp::Expression::clone() const {
@@ -402,4 +408,118 @@ mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
     this->tokens.emplace_back(Sign::neg, std::move(token));
 
     return *this;
+}
+
+bool mlp::Expression::is_dependent_on(Variable const &variable) const {
+    return std::ranges::any_of(
+        this->tokens,
+        [variable](std::pair<Sign, OwnedToken> const &term) -> bool {
+            return term.second->is_dependent_on(variable);
+        }
+    );
+}
+
+bool mlp::Expression::is_linear_of(Variable const &variable) const {
+    if (!this->is_dependent_on(variable))
+        return false;
+
+    bool is_linear = false;
+
+    for (OwnedToken const &token : this->tokens | std::views::values) {
+        if (typeid(*token) == typeid(Constant))
+            continue;
+
+        if (!token->is_linear_of(variable))
+            return false;
+
+        is_linear = true;
+    }
+
+    return is_linear;
+}
+
+mlp::OwnedToken
+mlp::Expression::evaluate(std::map<Variable, SharedToken> const &values) const {
+    auto const expression = Owned<Expression>(this->clone());
+
+    for (auto &term : expression->tokens | std::views::values)
+        term = term->evaluate(values);
+
+    return expression->simplified();
+}
+
+mlp::OwnedToken mlp::Expression::simplified() const {
+    if (this->tokens.empty())
+        return std::make_unique<Constant>(0);
+
+    if (this->tokens.size() == 1) {
+        auto const expression = Owned<Expression>(this->clone());
+
+        auto &&[sign, term] = expression->pop_token();
+
+        if (sign == Sign::pos)
+            return term->simplified();
+
+        return (-(std::move(*term.release()) ^ 1)).simplified();
+    }
+
+    auto expression = std::make_unique<Expression>();
+
+    std::vector<std::pair<Sign, OwnedToken>> const &tokens = expression->tokens;
+
+    for (auto const &[sign, t] : this->tokens)
+        expression->add_token(sign, t->simplified());
+
+    if (tokens.empty())
+        return std::make_unique<Constant>(0);
+
+    if (tokens.size() == 1) {
+        auto &&[sign, term] = expression->pop_token();
+
+        if (sign == Sign::pos)
+            return term->simplified();
+
+        return (-(std::move(*term.release()) ^ 1)).simplified();
+    }
+
+    return expression;
+}
+
+mlp::OwnedToken mlp::Expression::derivative(
+    Variable const &variable, std::uint32_t const order
+) const {
+    if (!order)
+        return OwnedToken(this->clone());
+
+    if (!this->is_dependent_on(variable))
+        return std::make_unique<Constant>(0);
+
+    Expression result{};
+
+    for (auto const &[operation, token] : this->tokens)
+        result.add_token(operation, token->derivative(variable, 1));
+
+    auto derivative = result.simplified();
+
+    if (order > 1)
+        return derivative->derivative(variable, order - 1)->simplified();
+
+    return derivative;
+}
+
+mlp::OwnedToken mlp::Expression::integral(Variable const &variable) {
+    if (!this->is_dependent_on(variable)) {
+        auto terms = std::make_unique<Terms>();
+        *terms *= Owned<Variable>(variable.clone());
+        *terms *= Owned<Expression>(this->clone());
+
+        return terms;
+    }
+
+    Expression result{};
+
+    for (auto const &[operation, term] : this->tokens)
+        result.add_token(operation, term->integral(variable));
+
+    return result.simplified();
 }

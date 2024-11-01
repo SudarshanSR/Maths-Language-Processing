@@ -1,4 +1,11 @@
-#include "token.h"
+#include "../include/token.h"
+
+#include "../include/constant.h"
+#include "../include/expression.h"
+#include "../include/function.h"
+#include "../include/term.h"
+#include "../include/terms.h"
+#include "../include/variable.h"
 
 #include <algorithm>
 #include <map>
@@ -8,6 +15,63 @@
 #include <set>
 #include <sstream>
 #include <utility>
+
+namespace mlp {
+struct Operation final {
+    enum op { add, sub, mul, div, pow } operation;
+
+    explicit Operation(op operation);
+
+    Operation(Operation const &) = default;
+
+    static std::optional<Operation> from_char(char operation);
+
+    explicit operator std::string() const;
+
+    bool operator==(Operation const &) const = default;
+};
+} // namespace mlp
+
+mlp::Operation::Operation(op const operation) : operation(operation) {}
+
+std::optional<mlp::Operation> mlp::Operation::from_char(char const operation) {
+    switch (operation) {
+    case '+':
+        return Operation(add);
+
+    case '-':
+        return Operation(sub);
+
+    case '*':
+        return Operation(mul);
+
+    case '/':
+        return Operation(div);
+
+    case '^':
+        return Operation(pow);
+
+    default:
+        return {};
+    }
+}
+
+mlp::Operation::operator std::string() const {
+    switch (this->operation) {
+    case add:
+        return "+";
+    case sub:
+        return "-";
+    case mul:
+        return "*";
+    case div:
+        return "/";
+    case pow:
+        return "^";
+    }
+
+    return "";
+}
 
 namespace {
 std::map<char, char> const k_parenthesis_map{
@@ -123,6 +187,25 @@ get_next_token(std::string const &expression, std::size_t &i) {
     throw std::runtime_error("Expression is not valid!");
 }
 } // namespace
+
+mlp::OwnedToken mlp::Differentiable::derivative(
+    Variable const &variable, std::uint32_t const order,
+    std::map<Variable, SharedToken> const &values
+) const {
+    return this->derivative(variable, order)->evaluate(values);
+}
+
+mlp::OwnedToken mlp::Integrable::integral(
+    Variable const &variable, SharedToken const &from, SharedToken const &to
+) {
+    auto const integral = this->integral(variable);
+
+    Expression result{};
+    result += integral->evaluate({{variable, to}});
+    result -= integral->evaluate({{variable, from}});
+
+    return result.simplified();
+}
 
 mlp::Term mlp::Token::operator^(std::double_t exponent) const & {
     return {1, OwnedToken(this->clone()), std::make_unique<Constant>(exponent)};
