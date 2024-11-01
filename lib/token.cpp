@@ -223,8 +223,6 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
     std::vector<OwnedToken> denominator;
     bool last = false;
 
-    Operation op{Operation::add};
-
     for (std::size_t i = 0; i < expression.size(); ++i) {
         std::size_t const copy = i;
 
@@ -268,7 +266,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         if (operation.operation == Operation::add ||
             operation.operation == Operation::sub) {
             Sign const sign =
-                op.operation == Operation::add ? Sign::pos : Sign::neg;
+                operation.operation == Operation::add ? Sign::pos : Sign::neg;
 
             if (!numerator.empty()) {
                 Terms terms{};
@@ -279,7 +277,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 for (OwnedToken &t : denominator)
                     terms /= std::move(t);
 
-                result.add_token(sign, terms.simplified());
+                result.add_token(s, terms.simplified());
 
                 numerator.clear();
                 denominator.clear();
@@ -290,8 +288,6 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
 
             else
                 result -= Constant(1);
-
-            op = operation;
 
             s = sign;
             numerator.push_back(std::move(next_term));

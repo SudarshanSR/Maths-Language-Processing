@@ -454,7 +454,7 @@ bool mlp::Expression::is_linear_of(Variable const &variable) const {
     bool is_linear = false;
 
     for (OwnedToken const &token : this->tokens | std::views::values) {
-        if (typeid(*token) == typeid(Constant))
+        if (!token->is_linear_of(variable))
             continue;
 
         if (!token->is_linear_of(variable))
