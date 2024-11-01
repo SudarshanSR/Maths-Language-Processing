@@ -16,6 +16,10 @@ class Expression final : public Token {
 
     Expression(Expression &&) = default;
 
+    Expression &operator=(Expression const &) = default;
+
+    Expression &operator=(Expression &&) = default;
+
     [[nodiscard]] gsl::owner<Expression *> clone() const override;
 
     [[nodiscard]] gsl::owner<Expression *> move() && override;
@@ -27,6 +31,10 @@ class Expression final : public Token {
     [[nodiscard]] bool empty() const;
 
     explicit operator std::string() const override;
+
+    Expression &operator+=(Token const &token);
+
+    Expression &operator-=(Token const &token);
 
     Expression &operator+=(OwnedToken &&token);
 
@@ -50,6 +58,10 @@ class Expression final : public Token {
 
     [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
+
+[[nodiscard]] Expression operator+(Expression lhs, Token const &rhs);
+
+[[nodiscard]] Expression operator-(Expression lhs, Token const &rhs);
 } // namespace mlp
 
 #endif // EXPRESSION_H

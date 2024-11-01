@@ -57,6 +57,14 @@ mlp::Expression::operator std::string() const {
     return result.str();
 }
 
+mlp::Expression &mlp::Expression::operator+=(Token const &token) {
+    return *this += std::move(*token.clone());
+}
+
+mlp::Expression &mlp::Expression::operator-=(Token const &token) {
+    return *this -= std::move(*token.clone());
+}
+
 mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
     return *this += std::move(*token.release());
 }
@@ -542,4 +550,12 @@ mlp::OwnedToken mlp::Expression::integral(Variable const &variable) {
         result.add_token(operation, term->integral(variable));
 
     return result.simplified();
+}
+
+mlp::Expression mlp::operator+(Expression lhs, Token const &rhs) {
+    return std::move(lhs += rhs);
+}
+
+mlp::Expression mlp::operator-(Expression lhs, Token const &rhs) {
+    return std::move(lhs -= rhs);
 }

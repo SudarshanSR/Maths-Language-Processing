@@ -411,10 +411,34 @@ Term operator*(Token &&lhs, std::double_t const rhs) {
     return rhs * std::move(lhs);
 }
 
-Expression operator+(Token &&lhs, Token &&rhs) {
+Expression operator+(Token const &lhs, Token const &rhs) {
     Expression result;
-    result += std::move(lhs);
-    result += std::move(rhs);
+    result += lhs;
+    result += rhs;
+
+    return result;
+}
+
+Expression operator-(Token const &lhs, Token const &rhs) {
+    Expression result;
+    result += lhs;
+    result += rhs;
+
+    return result;
+}
+
+Terms operator*(Token const &lhs, Token const &rhs) {
+    Terms result;
+    result *= lhs;
+    result *= rhs;
+
+    return result;
+}
+
+Terms operator/(Token const &lhs, Token const &rhs) {
+    Terms result;
+    result *= lhs;
+    result *= rhs;
 
     return result;
 }

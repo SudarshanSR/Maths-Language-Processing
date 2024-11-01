@@ -27,6 +27,10 @@ class Terms final : public Token {
 
     Terms operator-() const;
 
+    Terms &operator*=(Token const &token);
+
+    Terms &operator/=(Token const &token);
+
     Terms &operator*=(OwnedToken &&token);
 
     Terms &operator/=(OwnedToken &&token);

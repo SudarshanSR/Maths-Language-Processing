@@ -52,7 +52,7 @@ mlp::Constant::derivative(Variable const &, std::uint32_t const) const {
 }
 
 mlp::OwnedToken mlp::Constant::integral(Variable const &variable) {
-    return std::make_unique<Term>(*this * variable);
+    return std::make_unique<Term>(this->value * variable);
 }
 
 namespace mlp {

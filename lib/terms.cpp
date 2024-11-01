@@ -42,6 +42,14 @@ mlp::Terms mlp::Terms::operator-() const {
     return terms;
 }
 
+mlp::Terms &mlp::Terms::operator*=(Token const &token) {
+    return *this *= std::move(*token.clone());
+}
+
+mlp::Terms &mlp::Terms::operator/=(Token const &token) {
+    return *this /= std::move(*token.clone());
+}
+
 mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
     return *this *= std::move(*token.release());
 }
@@ -125,16 +133,14 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
 
         auto &power = dynamic_cast<Expression &>(*term.power);
 
-        for (std::size_t i = 0; i < this->terms.size(); ++i) {
-            OwnedToken &t = this->terms[i];
-
+        for (OwnedToken &t : this->terms) {
             if (typeid(*t) == typeid(Variable)) {
                 if (auto const &v = dynamic_cast<Variable const &>(*t);
                     v != variable)
                     continue;
 
                 power += std::make_unique<Constant>(1);
-                term.power = term.power->simplified();
+                term.power = power.simplified();
                 t = OwnedToken(std::move(token).move());
 
                 return *this;
@@ -151,12 +157,14 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
                     continue;
 
                 power += std::move(term1.power);
-                term.power = term.power->simplified();
+                term.power = power.simplified();
                 t = OwnedToken(std::move(token).move());
 
                 return *this;
             }
         }
+
+        term.power = power.simplified();
 
         this->terms.emplace_back(std::move(token).move());
 
@@ -268,7 +276,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
                     continue;
 
                 power += std::make_unique<Constant>(1);
-                term.power = term.power->simplified();
+                term.power = power.simplified();
                 t = OwnedToken(std::move(token).move());
 
                 return *this;
@@ -285,12 +293,14 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
                     continue;
 
                 power += std::move(term1.power);
-                term.power = term.power->simplified();
+                term.power = power.simplified();
                 t = OwnedToken(std::move(token).move());
 
                 return *this;
             }
         }
+
+        term.power = power.simplified();
 
         this->terms.push_back(std::make_unique<Term>(std::move(token) ^ -1));
 
