@@ -196,3 +196,17 @@ mlp::OwnedToken mlp::Function::integral(Variable const &variable) {
 
     throw std::runtime_error("Expression is not integrable!");
 }
+
+mlp::FunctionFactory::FunctionFactory(std::string function)
+    : function(std::move(function)) {}
+
+mlp::Function mlp::FunctionFactory::operator()(Token const &token) const {
+    return Function(this->function, OwnedToken(token.clone()));
+}
+
+mlp::FunctionFactory operator""_f(char const *string, size_t) {
+    if (!k_functions.contains(string))
+        throw std::runtime_error(std::format("Unknown function {}!", string));
+
+    return mlp::FunctionFactory(string);
+}

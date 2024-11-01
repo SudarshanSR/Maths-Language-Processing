@@ -95,8 +95,7 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
                     t.power = std::move(power);
                 }
 
-                dynamic_cast<Expression &>(*t.power) +=
-                    std::make_unique<Constant>(1);
+                dynamic_cast<Expression &>(*t.power) += Constant(1);
 
                 t.power = t.power->simplified();
 
@@ -139,7 +138,7 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
                     v != variable)
                     continue;
 
-                power += std::make_unique<Constant>(1);
+                power += Constant(1);
                 term.power = power.simplified();
                 t = OwnedToken(std::move(token).move());
 
@@ -230,7 +229,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
                 }
 
                 auto &power = dynamic_cast<Expression &>(*t.power);
-                power -= std::make_unique<Constant>(1);
+                power -= Constant(1);
 
                 t.power = t.power->simplified();
 
@@ -275,7 +274,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
                     v != variable)
                     continue;
 
-                power += std::make_unique<Constant>(1);
+                power += Constant(1);
                 term.power = power.simplified();
                 t = OwnedToken(std::move(token).move());
 

@@ -36,6 +36,17 @@ class Function final : public Token {
 
     [[nodiscard]] OwnedToken integral(Variable const &variable) override;
 };
+
+class FunctionFactory final {
+    std::string function;
+
+  public:
+    explicit FunctionFactory(std::string function);
+
+    Function operator()(Token const &token) const;
+};
 } // namespace mlp
+
+mlp::FunctionFactory operator""_f(char const *string, size_t);
 
 #endif // FUNCTION_H

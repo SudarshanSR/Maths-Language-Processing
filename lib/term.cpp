@@ -14,8 +14,15 @@ mlp::Term::Term(
     : coefficient(coefficient), base(std::move(base)), power(std::move(power)) {
 }
 
+mlp::Term::Term(std::double_t const coefficient, Token &&base, Token &&power)
+    : coefficient(coefficient), base(std::move(base).move()),
+      power(std::move(power).move()) {}
+
 mlp::Term::Term(OwnedToken &&base, OwnedToken &&power)
     : base(std::move(base)), power(std::move(power)) {}
+
+mlp::Term::Term(Token &&base, Token &&power)
+    : base(std::move(base).move()), power(std::move(power).move()) {}
 
 mlp::Term::Term(Term const &term)
     : coefficient(term.coefficient), base(term.base->clone()),

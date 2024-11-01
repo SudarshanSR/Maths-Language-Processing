@@ -207,32 +207,6 @@ mlp::OwnedToken mlp::Integrable::integral(
     return result.simplified();
 }
 
-mlp::Term mlp::Token::operator^(std::double_t exponent) const & {
-    return {1, OwnedToken(this->clone()), std::make_unique<Constant>(exponent)};
-}
-
-mlp::Term mlp::Token::operator^(Token const &exponent) const & {
-    return {1, OwnedToken(this->clone()), OwnedToken(exponent.clone())};
-}
-
-mlp::Term mlp::Token::operator^(OwnedToken &&exponent) const & {
-    return {1, OwnedToken(this->clone()), std::move(exponent)};
-}
-
-mlp::Term mlp::Token::operator^(std::double_t exponent) && {
-    return {1, OwnedToken(this), std::make_unique<Constant>(exponent)};
-}
-
-mlp::Term mlp::Token::operator^(Token const &exponent) && {
-    return {
-        1, OwnedToken(std::move(*this).move()), OwnedToken(exponent.clone())
-    };
-}
-
-mlp::Term mlp::Token::operator^(OwnedToken &&exponent) && {
-    return {1, OwnedToken(std::move(*this).move()), std::move(exponent)};
-}
-
 mlp::OwnedToken mlp::tokenise(std::string expression) {
     Expression result{};
 
@@ -312,10 +286,10 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
             }
 
             else if (sign == s)
-                result.add_token(Sign::pos, std::make_unique<Constant>(1));
+                result += Constant(1);
 
             else
-                result.add_token(Sign::neg, std::make_unique<Constant>(1));
+                result -= Constant(1);
 
             op = operation;
 
@@ -438,7 +412,7 @@ Terms operator*(Token const &lhs, Token const &rhs) {
 Terms operator/(Token const &lhs, Token const &rhs) {
     Terms result;
     result *= lhs;
-    result *= rhs;
+    result /= rhs;
 
     return result;
 }
@@ -447,6 +421,32 @@ std::ostream &operator<<(std::ostream &os, Sign const sign) {
     os << to_string(sign);
 
     return os;
+}
+
+Term operator^(Token const &lhs, std::double_t const rhs) {
+    return {1, OwnedToken(lhs.clone()), std::make_unique<Constant>(rhs)};
+}
+
+Term operator^(Token const &lhs, Token const &rhs) {
+    return {1, OwnedToken(lhs.clone()), OwnedToken(rhs.clone())};
+}
+
+Term operator^(Token const &lhs, OwnedToken &&rhs) {
+    return {1, OwnedToken(lhs.clone()), std::move(rhs)};
+}
+
+Term operator^(Token &&lhs, std::double_t const rhs) {
+    return {
+        1, OwnedToken(std::move(lhs).move()), std::make_unique<Constant>(rhs)
+    };
+}
+
+Term operator^(Token &&lhs, Token const &rhs) {
+    return {1, OwnedToken(std::move(lhs).move()), OwnedToken(rhs.clone())};
+}
+
+Term operator^(Token &&lhs, OwnedToken &&rhs) {
+    return {1, OwnedToken(std::move(lhs).move()), std::move(rhs)};
 }
 } // namespace mlp
 
