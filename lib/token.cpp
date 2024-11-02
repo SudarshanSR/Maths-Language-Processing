@@ -197,7 +197,7 @@ mlp::OwnedToken mlp::Differentiable::derivative(
 
 mlp::OwnedToken mlp::Integrable::integral(
     Variable const &variable, SharedToken const &from, SharedToken const &to
-) {
+) const {
     auto const integral = this->integral(variable);
 
     Expression result{};
@@ -337,19 +337,17 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         OwnedToken power = std::make_unique<Constant>(1);
 
         for (OwnedToken &p : powers | std::views::reverse)
-            power = std::make_unique<Term>(
-                std::move(*p.release()) ^ std::move(power)
-            );
+            power = std::make_unique<Term>(std::move(*p) ^ std::move(power));
 
         power = power->simplified();
 
         if (!last)
             numerator.back() = std::make_unique<Term>(
-                std::move(*numerator.back().release()) ^ std::move(power)
+                std::move(*numerator.back()) ^ std::move(power)
             );
         else
             denominator.back() = std::make_unique<Term>(
-                std::move(*denominator.back().release()) ^ std::move(power)
+                std::move(*denominator.back()) ^ std::move(power)
             );
     }
 

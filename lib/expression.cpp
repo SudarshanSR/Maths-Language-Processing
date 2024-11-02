@@ -58,19 +58,19 @@ mlp::Expression::operator std::string() const {
 }
 
 mlp::Expression &mlp::Expression::operator+=(Token const &token) {
-    return *this += std::move(*token.clone());
+    return *this += OwnedToken(token.clone());
 }
 
 mlp::Expression &mlp::Expression::operator-=(Token const &token) {
-    return *this -= std::move(*token.clone());
+    return *this -= OwnedToken(token.clone());
 }
 
 mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
-    return *this += std::move(*token.release());
+    return *this += std::move(*token);
 }
 
 mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
-    return *this -= std::move(*token.release());
+    return *this -= std::move(*token);
 }
 
 mlp::Expression &mlp::Expression::operator+=(Token &&token) {
@@ -488,7 +488,7 @@ mlp::OwnedToken mlp::Expression::simplified() const {
         if (sign == Sign::pos)
             return term->simplified();
 
-        return (-(std::move(*term.release()) ^ 1)).simplified();
+        return (-(std::move(*term) ^ 1)).simplified();
     }
 
     auto expression = std::make_unique<Expression>();
@@ -507,7 +507,7 @@ mlp::OwnedToken mlp::Expression::simplified() const {
         if (sign == Sign::pos)
             return term->simplified();
 
-        return (-(std::move(*term.release()) ^ 1)).simplified();
+        return (-(std::move(*term) ^ 1)).simplified();
     }
 
     return expression;

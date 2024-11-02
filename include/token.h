@@ -38,7 +38,7 @@ struct Integrable {
 
     [[nodiscard]] OwnedToken integral(
         Variable const &variable, SharedToken const &from, SharedToken const &to
-    );
+    ) const;
 
     [[nodiscard]] virtual OwnedToken
     integral(Variable const &variable) const = 0;

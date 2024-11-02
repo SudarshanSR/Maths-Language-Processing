@@ -43,19 +43,19 @@ mlp::Terms mlp::Terms::operator-() const {
 }
 
 mlp::Terms &mlp::Terms::operator*=(Token const &token) {
-    return *this *= std::move(*token.clone());
+    return *this *= OwnedToken(token.clone());
 }
 
 mlp::Terms &mlp::Terms::operator/=(Token const &token) {
-    return *this /= std::move(*token.clone());
+    return *this /= OwnedToken(token.clone());
 }
 
 mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
-    return *this *= std::move(*token.release());
+    return *this *= std::move(*token);
 }
 
 mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
-    return *this /= std::move(*token.release());
+    return *this /= std::move(*token);
 }
 
 mlp::Terms &mlp::Terms::operator*=(Token &&token) {
@@ -408,7 +408,7 @@ mlp::OwnedToken mlp::Terms::simplified() const {
             return term->simplified();
         }
 
-        return (this->coefficient * std::move(*term.release())).simplified();
+        return (this->coefficient * std::move(*term)).simplified();
     }
 
     auto terms = std::make_unique<Terms>();
@@ -434,7 +434,7 @@ mlp::OwnedToken mlp::Terms::simplified() const {
             return term->simplified();
         }
 
-        return (terms->coefficient * std::move(*term.release())).simplified();
+        return (terms->coefficient * std::move(*term)).simplified();
     }
 
     return terms;
