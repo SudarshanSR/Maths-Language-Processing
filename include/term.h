@@ -1,10 +1,11 @@
 #ifndef TERM_H
 #define TERM_H
 
-#include "constant.h"
 #include "token.h"
 
 namespace mlp {
+class Constant;
+
 struct Term final : Token {
     std::double_t coefficient{1};
     OwnedToken base;

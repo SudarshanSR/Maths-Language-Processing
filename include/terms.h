@@ -1,12 +1,13 @@
 #ifndef TERMS_H
 #define TERMS_H
 
-#include "constant.h"
 #include "token.h"
 
 #include <vector>
 
 namespace mlp {
+class Constant;
+
 class Terms final : public Token {
     std::vector<OwnedToken> terms;
 
