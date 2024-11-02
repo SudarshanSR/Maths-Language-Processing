@@ -10,6 +10,9 @@ class Expression final : public Token {
     std::vector<std::pair<Sign, OwnedToken>> tokens;
 
   public:
+    using Token::derivative;
+    using Token::integral;
+
     Expression() = default;
 
     Expression(Expression const &);
@@ -56,7 +59,15 @@ class Expression final : public Token {
     [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
+
+    Expression &operator*=(Token const &token);
+
+    Expression &operator*=(Expression const &rhs);
+
+    friend Expression operator*(Expression lhs, Expression const &rhs);
+
+    friend Expression operator*(Expression lhs, Token const &rhs);
 };
 
 [[nodiscard]] Expression operator+(Expression lhs, Token const &rhs);

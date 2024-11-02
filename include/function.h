@@ -10,6 +10,9 @@ class Function final : public Token {
     OwnedToken parameter;
 
   public:
+    using Token::derivative;
+    using Token::integral;
+
     explicit Function(std::string function, OwnedToken &&parameter);
 
     Function(Function const &function);
@@ -34,7 +37,7 @@ class Function final : public Token {
     [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 };
 
 class FunctionFactory final {

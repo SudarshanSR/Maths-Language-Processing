@@ -51,7 +51,7 @@ mlp::Constant::derivative(Variable const &, std::uint32_t const) const {
     return std::make_unique<Constant>(0);
 }
 
-mlp::OwnedToken mlp::Constant::integral(Variable const &variable) {
+mlp::OwnedToken mlp::Constant::integral(Variable const &variable) const {
     return std::make_unique<Term>(this->value * variable);
 }
 

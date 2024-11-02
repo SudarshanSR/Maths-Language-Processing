@@ -10,6 +10,9 @@ struct Term final : Token {
     OwnedToken base;
     OwnedToken power;
 
+    using Token::derivative;
+    using Token::integral;
+
     Term(std::double_t coefficient, OwnedToken &&base, OwnedToken &&power);
 
     Term(std::double_t coefficient, Token &&base, Token &&power);
@@ -66,7 +69,7 @@ struct Term final : Token {
     [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 };
 } // namespace mlp
 

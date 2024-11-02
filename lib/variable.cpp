@@ -48,7 +48,7 @@ mlp::OwnedToken mlp::Variable::derivative(
     return std::make_unique<Constant>(*this == variable && order == 1 ? 1 : 0);
 }
 
-mlp::OwnedToken mlp::Variable::integral(Variable const &variable) {
+mlp::OwnedToken mlp::Variable::integral(Variable const &variable) const {
     if (*this == variable)
         return std::make_unique<Term>((variable ^ 2) / 2);
 

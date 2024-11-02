@@ -535,7 +535,7 @@ mlp::OwnedToken mlp::Expression::derivative(
     return derivative;
 }
 
-mlp::OwnedToken mlp::Expression::integral(Variable const &variable) {
+mlp::OwnedToken mlp::Expression::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
         *terms *= Variable(variable);
@@ -552,10 +552,43 @@ mlp::OwnedToken mlp::Expression::integral(Variable const &variable) {
     return result.simplified();
 }
 
+mlp::Expression &mlp::Expression::operator*=(Token const &token) {
+    for (auto &[sign, t] : this->tokens) {
+        auto temp = std::make_unique<Terms>(*t * token);
+
+        if (temp->coefficient < 0) {
+            temp->coefficient = -temp->coefficient;
+
+            sign = sign == Sign::pos ? Sign::neg : Sign::pos;
+        }
+
+        t = std::move(temp);
+    }
+
+    return *this;
+}
+
+mlp::Expression &mlp::Expression::operator*=(Expression const &rhs) {
+    Expression expression;
+
+    for (auto &[sign, t] : this->tokens)
+        expression.add_token(sign, std::make_unique<Expression>(rhs * *t));
+
+    return *this = std::move(expression);
+}
+
 mlp::Expression mlp::operator+(Expression lhs, Token const &rhs) {
     return std::move(lhs += rhs);
 }
 
 mlp::Expression mlp::operator-(Expression lhs, Token const &rhs) {
     return std::move(lhs -= rhs);
+}
+
+mlp::Expression mlp::operator*(Expression lhs, Expression const &rhs) {
+    return std::move(lhs *= rhs);
+}
+
+mlp::Expression mlp::operator*(Expression lhs, Token const &rhs) {
+    return std::move(lhs *= rhs);
 }

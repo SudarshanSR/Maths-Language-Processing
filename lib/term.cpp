@@ -273,7 +273,7 @@ mlp::OwnedToken mlp::Term::derivative(
     return derivative;
 }
 
-mlp::OwnedToken mlp::Term::integral(Variable const &variable) {
+mlp::OwnedToken mlp::Term::integral(Variable const &variable) const {
     if (!this->is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
         *terms *= Variable(variable);

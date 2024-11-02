@@ -40,7 +40,8 @@ struct Integrable {
         Variable const &variable, SharedToken const &from, SharedToken const &to
     );
 
-    [[nodiscard]] virtual OwnedToken integral(Variable const &variable) = 0;
+    [[nodiscard]] virtual OwnedToken
+    integral(Variable const &variable) const = 0;
 };
 
 struct Term;
@@ -86,6 +87,8 @@ class Expression;
 class Terms;
 
 [[nodiscard]] Terms operator*(Token const &lhs, Token const &rhs);
+
+[[nodiscard]] Expression operator*(Token const &lhs, Expression rhs);
 
 [[nodiscard]] Terms operator/(Token const &lhs, Token const &rhs);
 

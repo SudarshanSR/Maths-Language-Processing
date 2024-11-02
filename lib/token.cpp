@@ -405,6 +405,10 @@ Terms operator*(Token const &lhs, Token const &rhs) {
     return result;
 }
 
+Expression operator*(Token const &lhs, Expression rhs) {
+    return std::move(rhs *= lhs);
+}
+
 Terms operator/(Token const &lhs, Token const &rhs) {
     Terms result;
     result *= lhs;

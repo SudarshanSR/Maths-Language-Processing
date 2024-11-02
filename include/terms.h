@@ -11,6 +11,9 @@ class Terms final : public Token {
     std::vector<OwnedToken> terms;
 
   public:
+    using Token::derivative;
+    using Token::integral;
+
     std::double_t coefficient{1};
 
     Terms() = default;
@@ -71,7 +74,7 @@ class Terms final : public Token {
     [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 };
 } // namespace mlp
 

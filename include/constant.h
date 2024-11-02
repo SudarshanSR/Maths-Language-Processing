@@ -8,6 +8,9 @@ class Constant final : public Token {
     std::double_t value;
 
   public:
+    using Token::derivative;
+    using Token::integral;
+
     explicit Constant(std::double_t value);
 
     Constant(Constant const &) = default;
@@ -112,7 +115,7 @@ class Constant final : public Token {
     [[nodiscard]] OwnedToken
     derivative(Variable const &variable, std::uint32_t order) const override;
 
-    [[nodiscard]] OwnedToken integral(Variable const &variable) override;
+    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 };
 } // namespace mlp
 

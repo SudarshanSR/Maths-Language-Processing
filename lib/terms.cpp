@@ -485,20 +485,27 @@ mlp::OwnedToken mlp::Terms::derivative(
     return derivative;
 }
 
-mlp::OwnedToken mlp::Terms::integral(Variable const &variable) {
-    if (!this->is_dependent_on(variable)) {
+mlp::OwnedToken mlp::Terms::integral(Variable const &variable) const {
+    auto simplified = this->simplified();
+
+    if (typeid(*simplified) != typeid(Terms))
+        return simplified->integral(variable);
+
+    auto &t = dynamic_cast<Terms &>(*simplified);
+
+    if (!t.is_dependent_on(variable)) {
         auto terms = std::make_unique<Terms>();
         *terms *= Variable(variable);
-        *terms *= Terms(*this);
+        *terms *= Terms(t);
 
         return terms;
     }
 
-    if (this->is_linear_of(variable)) {
+    if (t.is_linear_of(variable)) {
         Terms terms{};
-        terms.coefficient = this->coefficient;
+        terms.coefficient = t.coefficient;
 
-        for (OwnedToken const &token : this->terms)
+        for (OwnedToken const &token : t.terms)
             terms *= token->is_linear_of(variable)
                          ? token->integral(variable)
                          : Owned<Token>(token->clone());
