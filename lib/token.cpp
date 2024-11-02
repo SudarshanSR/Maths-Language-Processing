@@ -392,7 +392,7 @@ Expression operator+(Token const &lhs, Token const &rhs) {
 Expression operator-(Token const &lhs, Token const &rhs) {
     Expression result;
     result += lhs;
-    result += rhs;
+    result -= rhs;
 
     return result;
 }
