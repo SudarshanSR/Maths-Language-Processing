@@ -29,7 +29,9 @@ class Expression final : public Token {
 
     void add_token(Sign sign, OwnedToken &&token);
 
-    [[nodiscard]] std::pair<Sign, OwnedToken> pop_token();
+    void add_token(Sign sign, Token const &token);
+
+    void add_token(Sign sign, Token &&token);
 
     [[nodiscard]] bool empty() const;
 

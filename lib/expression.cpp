@@ -22,19 +22,19 @@ gsl::owner<mlp::Expression *> mlp::Expression::move() && {
 }
 
 void mlp::Expression::add_token(Sign const sign, OwnedToken &&token) {
+    this->add_token(sign, std::move(*token));
+}
+
+void mlp::Expression::add_token(Sign const sign, Token const &token) {
+    this->add_token(sign, OwnedToken(token.clone()));
+}
+
+void mlp::Expression::add_token(Sign const sign, Token &&token) {
     if (sign == Sign::pos)
         *this += std::move(token);
 
     else
         *this -= std::move(token);
-}
-
-std::pair<mlp::Sign, mlp::OwnedToken> mlp::Expression::pop_token() {
-    auto token = std::move(this->tokens.back());
-
-    this->tokens.pop_back();
-
-    return token;
 }
 
 bool mlp::Expression::empty() const { return this->tokens.empty(); }
@@ -483,12 +483,14 @@ mlp::OwnedToken mlp::Expression::simplified() const {
     if (this->tokens.size() == 1) {
         Expression expression{*this};
 
-        auto &&[sign, term] = expression.pop_token();
+        auto &&[sign, term] = std::move(expression.tokens.back());
+
+        expression.tokens.pop_back();
 
         if (sign == Sign::pos)
             return term->simplified();
 
-        return (-(std::move(*term) ^ 1)).simplified();
+        return (-std::move(*term)).simplified();
     }
 
     auto expression = std::make_unique<Expression>();
@@ -502,12 +504,14 @@ mlp::OwnedToken mlp::Expression::simplified() const {
         return std::make_unique<Constant>(0);
 
     if (tokens.size() == 1) {
-        auto &&[sign, term] = expression->pop_token();
+        auto &&[sign, term] = std::move(expression->tokens.back());
+
+        expression->tokens.pop_back();
 
         if (sign == Sign::pos)
-            return term->simplified();
+            return std::move(term);
 
-        return (-(std::move(*term) ^ 1)).simplified();
+        return std::make_unique<Term>(-*term);
     }
 
     return expression;
@@ -554,7 +558,7 @@ mlp::OwnedToken mlp::Expression::integral(Variable const &variable) const {
 
 mlp::Expression &mlp::Expression::operator*=(Token const &token) {
     for (auto &[sign, t] : this->tokens) {
-        auto temp = std::make_unique<Terms>(*t * token);
+        auto const temp = std::make_unique<Terms>(*t * token);
 
         if (temp->coefficient < 0) {
             temp->coefficient = -temp->coefficient;
@@ -562,7 +566,7 @@ mlp::Expression &mlp::Expression::operator*=(Token const &token) {
             sign = sign == Sign::pos ? Sign::neg : Sign::pos;
         }
 
-        t = std::move(temp);
+        t = temp->simplified();
     }
 
     return *this;
@@ -572,7 +576,7 @@ mlp::Expression &mlp::Expression::operator*=(Expression const &rhs) {
     Expression expression;
 
     for (auto &[sign, t] : this->tokens)
-        expression.add_token(sign, std::make_unique<Expression>(rhs * *t));
+        expression.add_token(sign, rhs * *t);
 
     return *this = std::move(expression);
 }

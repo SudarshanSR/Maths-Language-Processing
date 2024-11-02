@@ -337,17 +337,17 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         OwnedToken power = std::make_unique<Constant>(1);
 
         for (OwnedToken &p : powers | std::views::reverse)
-            power = std::make_unique<Term>(std::move(*p) ^ std::move(power));
+            power = std::make_unique<Term>(std::move(*p) ^ std::move(*power));
 
         power = power->simplified();
 
         if (!last)
             numerator.back() = std::make_unique<Term>(
-                std::move(*numerator.back()) ^ std::move(power)
+                std::move(*numerator.back()) ^ std::move(*power)
             );
         else
             denominator.back() = std::make_unique<Term>(
-                std::move(*denominator.back()) ^ std::move(power)
+                std::move(*denominator.back()) ^ std::move(*power)
             );
     }
 
@@ -415,6 +415,10 @@ Terms operator/(Token const &lhs, Token const &rhs) {
     return result;
 }
 
+Term operator-(Token const &token) {
+    return {-1, OwnedToken(token.clone()), std::make_unique<Constant>(1)};
+}
+
 std::ostream &operator<<(std::ostream &os, Sign const sign) {
     os << to_string(sign);
 
@@ -429,8 +433,8 @@ Term operator^(Token const &lhs, Token const &rhs) {
     return {1, OwnedToken(lhs.clone()), OwnedToken(rhs.clone())};
 }
 
-Term operator^(Token const &lhs, OwnedToken &&rhs) {
-    return {1, OwnedToken(lhs.clone()), std::move(rhs)};
+Term operator^(Token const &lhs, Token &&rhs) {
+    return {1, OwnedToken(lhs.clone()), OwnedToken(std::move(rhs).move())};
 }
 
 Term operator^(Token &&lhs, std::double_t const rhs) {
@@ -443,8 +447,10 @@ Term operator^(Token &&lhs, Token const &rhs) {
     return {1, OwnedToken(std::move(lhs).move()), OwnedToken(rhs.clone())};
 }
 
-Term operator^(Token &&lhs, OwnedToken &&rhs) {
-    return {1, OwnedToken(std::move(lhs).move()), std::move(rhs)};
+Term operator^(Token &&lhs, Token &&rhs) {
+    return {
+        1, OwnedToken(std::move(lhs).move()), OwnedToken(std::move(rhs).move())
+    };
 }
 } // namespace mlp
 

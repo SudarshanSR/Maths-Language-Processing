@@ -91,17 +91,19 @@ class Terms;
 
 [[nodiscard]] Terms operator/(Token const &lhs, Token const &rhs);
 
+[[nodiscard]] Term operator-(Token const &token);
+
 Term operator^(Token const &lhs, std::double_t rhs);
 
 Term operator^(Token const &lhs, Token const &rhs);
 
-Term operator^(Token const &lhs, OwnedToken &&rhs);
+Term operator^(Token const &lhs, Token &&rhs);
 
 Term operator^(Token &&lhs, std::double_t rhs);
 
 Term operator^(Token &&lhs, Token const &rhs);
 
-Term operator^(Token &&lhs, OwnedToken &&rhs);
+Term operator^(Token &&lhs, Token &&rhs);
 
 std::ostream &operator<<(std::ostream &os, Sign sign);
 } // namespace mlp

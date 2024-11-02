@@ -475,9 +475,7 @@ mlp::OwnedToken mlp::Terms::derivative(
         *result += std::move(term);
     }
 
-    Term const end = this->coefficient * *result;
-
-    auto derivative = end.simplified();
+    auto derivative = (this->coefficient * *result).simplified();
 
     if (order > 1)
         return derivative->derivative(variable, order - 1)->simplified();

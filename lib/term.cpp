@@ -307,8 +307,7 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) const {
             *expression += Constant(1);
 
             terms *= std::make_unique<Term>(
-                std::move(*this->base->clone()) ^
-                OwnedToken(expression->clone())
+                std::move(*this->base->clone()) ^ *expression
             );
             terms /= std::move(expression);
         } else {
