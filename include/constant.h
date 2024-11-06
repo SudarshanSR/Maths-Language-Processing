@@ -31,77 +31,25 @@ class Constant final : public Token {
 
     explicit(false) operator std::double_t() const;
 
-    Constant operator-() const;
+    [[nodiscard]] Constant operator-() const;
 
-    friend bool operator==(Constant const &lhs, Constant const &rhs);
+    Constant &operator++();
 
-    friend bool operator!=(Constant const &lhs, Constant const &rhs);
+    Constant &operator--();
 
-    friend bool operator>(Constant const &lhs, Constant const &rhs);
+    Constant &operator+=(std::double_t rhs);
 
-    friend bool operator>=(Constant const &lhs, Constant const &rhs);
+    Constant &operator-=(std::double_t rhs);
 
-    friend bool operator<(Constant const &lhs, Constant const &rhs);
+    Constant &operator*=(std::double_t rhs);
 
-    friend bool operator<=(Constant const &lhs, Constant const &rhs);
+    Constant &operator/=(std::double_t rhs);
 
-    friend Constant &operator++(Constant &lhs);
+    Constant &operator^=(std::double_t rhs);
 
-    friend Constant operator++(Constant &lhs, int);
+    bool operator==(Constant const &) const;
 
-    friend Constant &operator+=(Constant &lhs, Constant const &rhs);
-
-    friend Constant &operator+=(Constant &lhs, std::double_t rhs);
-
-    friend Constant operator+(Constant lhs, Constant const &rhs);
-
-    friend Constant operator+(Constant lhs, std::double_t rhs);
-
-    friend Constant operator+(std::double_t lhs, Constant rhs);
-
-    friend Constant &operator--(Constant &lhs);
-
-    friend Constant operator--(Constant &lhs, int);
-
-    friend Constant &operator-=(Constant &lhs, Constant const &rhs);
-
-    friend Constant &operator-=(Constant &lhs, std::double_t rhs);
-
-    friend Constant operator-(Constant lhs, Constant const &rhs);
-
-    friend Constant operator-(Constant lhs, std::double_t rhs);
-
-    friend Constant operator-(std::double_t lhs, Constant rhs);
-
-    friend Constant &operator*=(Constant &lhs, Constant const &rhs);
-
-    friend Constant &operator*=(Constant &lhs, std::double_t rhs);
-
-    friend Constant operator*(Constant lhs, Constant const &rhs);
-
-    friend Constant operator*(Constant lhs, std::double_t rhs);
-
-    friend Constant operator*(std::double_t lhs, Constant rhs);
-
-    friend Constant &operator/=(Constant &lhs, Constant const &rhs);
-
-    friend Constant &operator/=(Constant &lhs, std::double_t rhs);
-
-    friend Constant operator/(Constant lhs, Constant const &rhs);
-
-    friend Constant operator/(Constant lhs, std::double_t rhs);
-
-    friend Constant operator/(std::double_t lhs, Constant rhs);
-
-    friend Constant &operator^=(Constant &lhs, Constant const &rhs);
-
-    friend Constant &operator^=(Constant &lhs, std::double_t rhs);
-
-    friend Constant operator^(Constant lhs, Constant const &rhs);
-
-    friend Constant operator^(Constant lhs, std::double_t rhs);
-
-    friend Constant operator^(std::double_t lhs, Constant rhs);
+    bool operator>(Constant const &) const;
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
@@ -117,6 +65,32 @@ class Constant final : public Token {
 
     [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 };
+
+Constant operator++(Constant &lhs, int);
+
+Constant operator--(Constant &lhs, int);
+
+Constant operator+(Constant lhs, std::double_t rhs);
+
+Constant operator+(std::double_t lhs, Constant rhs);
+
+Constant operator-(Constant lhs, std::double_t rhs);
+
+Constant operator-(std::double_t lhs, Constant rhs);
+
+Constant operator*(Constant lhs, std::double_t rhs);
+
+Constant operator*(std::double_t lhs, Constant rhs);
+
+Constant operator/(Constant lhs, std::double_t rhs);
+
+Constant operator/(std::double_t lhs, Constant rhs);
+
+Constant operator^(Constant lhs, Constant const &rhs);
+
+Constant operator^(Constant lhs, std::double_t rhs);
+
+Constant operator^(std::double_t lhs, Constant rhs);
 } // namespace mlp
 
 #endif // CONSTANT_H

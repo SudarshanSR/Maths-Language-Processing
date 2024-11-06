@@ -207,6 +207,10 @@ mlp::OwnedToken mlp::Integrable::integral(
     return result.simplified();
 }
 
+mlp::Term mlp::Token::operator-() const {
+    return {-1, OwnedToken(this->clone()), std::make_unique<Constant>(1)};
+}
+
 mlp::OwnedToken mlp::tokenise(std::string expression) {
     Expression result{};
 
@@ -395,6 +399,10 @@ Expression operator-(Token const &lhs, Token const &rhs) {
     return result;
 }
 
+Expression operator*(std::double_t const lhs, Expression rhs) {
+    return std::move(rhs *= Constant(lhs));
+}
+
 Terms operator*(Token const &lhs, Token const &rhs) {
     Terms result;
     result *= lhs;
@@ -413,10 +421,6 @@ Terms operator/(Token const &lhs, Token const &rhs) {
     result /= rhs;
 
     return result;
-}
-
-Term operator-(Token const &token) {
-    return {-1, OwnedToken(token.clone()), std::make_unique<Constant>(1)};
 }
 
 std::ostream &operator<<(std::ostream &os, Sign const sign) {

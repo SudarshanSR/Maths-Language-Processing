@@ -57,6 +57,18 @@ mlp::Expression::operator std::string() const {
     return result.str();
 }
 
+mlp::Expression mlp::Expression::operator-() const {
+    Expression expression;
+
+    for (auto const &[sign, token] : this->tokens)
+        if (sign == Sign::pos)
+            expression -= *token;
+        else
+            expression += *token;
+
+    return expression;
+}
+
 mlp::Expression &mlp::Expression::operator+=(Token const &token) {
     return *this += OwnedToken(token.clone());
 }
@@ -150,6 +162,14 @@ mlp::Expression &mlp::Expression::operator+=(Token &&token) {
                 if (term.coefficient == 0)
                     this->tokens.erase(this->tokens.begin() + i);
 
+                if (term.coefficient < 0) {
+                    sign = sign == Sign::pos ? Sign::neg : Sign::pos;
+                    term.coefficient = -term.coefficient;
+                }
+
+                if (term.coefficient == 1)
+                    t = std::move(term.base);
+
                 return *this;
             }
         }
@@ -204,16 +224,19 @@ mlp::Expression &mlp::Expression::operator+=(Token &&token) {
                     );
                 }
 
+                if (temp->coefficient == 0)
+                    this->tokens.erase(this->tokens.begin() + i);
+
                 if (temp->coefficient < 0) {
                     sign = sign == Sign::pos ? Sign::neg : Sign::pos;
-
                     temp->coefficient = -temp->coefficient;
                 }
 
-                t = std::move(temp);
+                if (temp->coefficient == 1)
+                    t = std::move(temp->base);
 
-                if (term.coefficient == 0)
-                    this->tokens.erase(this->tokens.begin() + i);
+                else
+                    t = std::move(temp);
 
                 return *this;
             }
@@ -231,6 +254,14 @@ mlp::Expression &mlp::Expression::operator+=(Token &&token) {
 
                 if (term_.coefficient == 0)
                     this->tokens.erase(this->tokens.begin() + i);
+
+                if (term_.coefficient < 0) {
+                    sign = sign == Sign::pos ? Sign::neg : Sign::pos;
+                    term_.coefficient = -term_.coefficient;
+                }
+
+                if (term_.coefficient == 1)
+                    t = std::move(term_.base);
 
                 return *this;
             }
@@ -333,6 +364,14 @@ mlp::Expression &mlp::Expression::operator-=(Token &&token) {
                 if (term.coefficient == 0)
                     this->tokens.erase(this->tokens.begin() + i);
 
+                if (term.coefficient < 0) {
+                    sign = sign == Sign::pos ? Sign::neg : Sign::pos;
+                    term.coefficient = -term.coefficient;
+                }
+
+                if (term.coefficient == 1)
+                    t = std::move(term.base);
+
                 return *this;
             }
         }
@@ -387,16 +426,19 @@ mlp::Expression &mlp::Expression::operator-=(Token &&token) {
                     );
                 }
 
+                if (temp->coefficient == 0)
+                    this->tokens.erase(this->tokens.begin() + i);
+
                 if (temp->coefficient < 0) {
                     sign = sign == Sign::pos ? Sign::neg : Sign::pos;
-
                     temp->coefficient = -temp->coefficient;
                 }
 
-                t = std::move(temp);
+                if (temp->coefficient == 1)
+                    t = std::move(temp->base);
 
-                if (term.coefficient == 0)
-                    this->tokens.erase(this->tokens.begin() + i);
+                else
+                    t = std::move(temp);
 
                 return *this;
             }
@@ -414,6 +456,14 @@ mlp::Expression &mlp::Expression::operator-=(Token &&token) {
 
                 if (term_.coefficient == 0)
                     this->tokens.erase(this->tokens.begin() + i);
+
+                if (term.coefficient < 0) {
+                    sign = sign == Sign::pos ? Sign::neg : Sign::pos;
+                    term.coefficient = -term.coefficient;
+                }
+
+                if (term.coefficient == 1)
+                    t = std::move(term.base);
 
                 return *this;
             }

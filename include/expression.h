@@ -37,6 +37,8 @@ class Expression final : public Token {
 
     explicit operator std::string() const override;
 
+    [[nodiscard]] Expression operator-() const;
+
     Expression &operator+=(Token const &token);
 
     Expression &operator-=(Token const &token);
@@ -66,15 +68,15 @@ class Expression final : public Token {
     Expression &operator*=(Token const &token);
 
     Expression &operator*=(Expression const &rhs);
-
-    friend Expression operator*(Expression lhs, Expression const &rhs);
-
-    friend Expression operator*(Expression lhs, Token const &rhs);
 };
 
 [[nodiscard]] Expression operator+(Expression lhs, Token const &rhs);
 
 [[nodiscard]] Expression operator-(Expression lhs, Token const &rhs);
+
+[[nodiscard]] Expression operator*(Expression lhs, Expression const &rhs);
+
+[[nodiscard]] Expression operator*(Expression lhs, Token const &rhs);
 } // namespace mlp
 
 #endif // EXPRESSION_H

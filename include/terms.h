@@ -29,7 +29,7 @@ class Terms final : public Token {
 
     explicit operator std::string() const override;
 
-    Terms operator-() const;
+    [[nodiscard]] Terms operator-() const;
 
     Terms &operator*=(Token const &token);
 

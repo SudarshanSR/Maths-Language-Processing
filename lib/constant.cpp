@@ -29,6 +29,56 @@ mlp::Constant mlp::Constant::operator-() const {
     return Constant{-this->value};
 }
 
+mlp::Constant &mlp::Constant::operator++() {
+    ++this->value;
+
+    return *this;
+}
+
+mlp::Constant &mlp::Constant::operator--() {
+    --this->value;
+
+    return *this;
+}
+
+mlp::Constant &mlp::Constant::operator+=(std::double_t const rhs) {
+    this->value += rhs;
+
+    return *this;
+}
+
+mlp::Constant &mlp::Constant::operator-=(std::double_t const rhs) {
+    this->value -= rhs;
+
+    return *this;
+}
+
+mlp::Constant &mlp::Constant::operator*=(std::double_t const rhs) {
+    this->value *= rhs;
+
+    return *this;
+}
+
+mlp::Constant &mlp::Constant::operator/=(std::double_t const rhs) {
+    this->value /= rhs;
+
+    return *this;
+}
+
+mlp::Constant &mlp::Constant::operator^=(std::double_t const rhs) {
+    this->value = std::pow(this->value, rhs);
+
+    return *this;
+}
+
+bool mlp::Constant::operator==(Constant const &rhs) const {
+    return this->value == rhs.value;
+}
+
+bool mlp::Constant::operator>(Constant const &rhs) const {
+    return this->value > rhs.value;
+}
+
 bool mlp::Constant::is_dependent_on(Variable const &variable) const {
     return false;
 }
@@ -56,48 +106,16 @@ mlp::OwnedToken mlp::Constant::integral(Variable const &variable) const {
 }
 
 namespace mlp {
-bool operator==(Constant const &lhs, Constant const &rhs) {
-    return lhs.value == rhs.value;
+Constant operator++(Constant &lhs, int) {
+    Constant temp = lhs;
+    ++lhs;
+    return temp;
 }
 
-bool operator!=(Constant const &lhs, Constant const &rhs) {
-    return !(lhs == rhs);
-}
-
-bool operator<(Constant const &lhs, Constant const &rhs) {
-    return lhs.value < rhs.value;
-}
-
-bool operator>=(Constant const &lhs, Constant const &rhs) {
-    return !(lhs < rhs);
-}
-
-bool operator>(Constant const &lhs, Constant const &rhs) { return rhs < lhs; }
-
-bool operator<=(Constant const &lhs, Constant const &rhs) { return rhs >= lhs; }
-
-Constant &operator++(Constant &lhs) {
-    ++lhs.value;
-
-    return lhs;
-}
-
-Constant operator++(Constant &lhs, int) { return ++lhs; }
-
-Constant &operator+=(Constant &lhs, Constant const &rhs) {
-    lhs.value += rhs.value;
-
-    return lhs;
-}
-
-Constant &operator+=(Constant &lhs, std::double_t const rhs) {
-    lhs.value += rhs;
-
-    return lhs;
-}
-
-Constant operator+(Constant lhs, Constant const &rhs) {
-    return std::move(lhs += rhs);
+Constant operator--(Constant &lhs, int) {
+    Constant temp = lhs;
+    --lhs;
+    return temp;
 }
 
 Constant operator+(Constant lhs, std::double_t const rhs) {
@@ -108,52 +126,12 @@ Constant operator+(std::double_t const lhs, Constant rhs) {
     return std::move(rhs += lhs);
 }
 
-Constant &operator--(Constant &lhs) {
-    --lhs.value;
-
-    return lhs;
-}
-
-Constant operator--(Constant &lhs, int) { return --lhs; }
-
-Constant &operator-=(Constant &lhs, Constant const &rhs) {
-    lhs.value -= rhs.value;
-
-    return lhs;
-}
-
-Constant &operator-=(Constant &lhs, std::double_t const rhs) {
-    lhs.value -= rhs;
-
-    return lhs;
-}
-
-Constant operator-(Constant lhs, Constant const &rhs) {
-    return std::move(lhs -= rhs);
-}
-
 Constant operator-(Constant lhs, std::double_t const rhs) {
     return std::move(lhs -= rhs);
 }
 
 Constant operator-(std::double_t const lhs, Constant rhs) {
     return std::move(rhs -= lhs);
-}
-
-Constant &operator*=(Constant &lhs, Constant const &rhs) {
-    lhs.value *= rhs.value;
-
-    return lhs;
-}
-
-Constant &operator*=(Constant &lhs, std::double_t const rhs) {
-    lhs.value *= rhs;
-
-    return lhs;
-}
-
-Constant operator*(Constant lhs, Constant const &rhs) {
-    return std::move(lhs *= rhs);
 }
 
 Constant operator*(Constant lhs, std::double_t const rhs) {
@@ -164,40 +142,12 @@ Constant operator*(std::double_t const lhs, Constant rhs) {
     return std::move(rhs *= lhs);
 }
 
-Constant &operator/=(Constant &lhs, Constant const &rhs) {
-    lhs.value /= rhs.value;
-
-    return lhs;
-}
-
-Constant &operator/=(Constant &lhs, std::double_t const rhs) {
-    lhs.value /= rhs;
-
-    return lhs;
-}
-
-Constant operator/(Constant lhs, Constant const &rhs) {
-    return std::move(lhs /= rhs);
-}
-
 Constant operator/(Constant lhs, std::double_t const rhs) {
     return std::move(lhs /= rhs);
 }
 
 Constant operator/(std::double_t const lhs, Constant rhs) {
     return std::move(rhs /= lhs);
-}
-
-Constant &operator^=(Constant &lhs, Constant const &rhs) {
-    lhs.value = std::pow(lhs.value, rhs.value);
-
-    return lhs;
-}
-
-Constant &operator^=(Constant &lhs, std::double_t const rhs) {
-    lhs.value = std::pow(lhs.value, rhs);
-
-    return lhs;
 }
 
 Constant operator^(Constant lhs, Constant const &rhs) {

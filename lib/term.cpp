@@ -60,6 +60,13 @@ mlp::Term::operator std::string() const {
     return result.str();
 }
 
+mlp::Term mlp::Term::operator-() const {
+    return {
+        -this->coefficient, OwnedToken(this->base->clone()),
+        OwnedToken(this->power->clone())
+    };
+}
+
 mlp::Term &mlp::Term::operator*=(std::double_t const rhs) {
     this->coefficient *= rhs;
 

@@ -56,13 +56,7 @@ struct Token : Dependable<Variable>,
 
     explicit virtual operator std::string() const = 0;
 
-    friend Term operator*(std::double_t lhs, Token const &rhs);
-
-    friend Term operator*(Token const &lhs, std::double_t rhs);
-
-    friend Term operator*(std::double_t lhs, Token &&rhs);
-
-    friend Term operator*(Token &&lhs, std::double_t rhs);
+    [[nodiscard]] Term operator-() const;
 };
 
 enum class Sign { pos, neg };
@@ -77,11 +71,21 @@ std::ostream &operator<<(std::ostream &os, T const &token) {
     return os;
 }
 
+[[nodiscard]] Term operator*(std::double_t lhs, Token const &rhs);
+
+[[nodiscard]] Term operator*(Token const &lhs, std::double_t rhs);
+
+[[nodiscard]] Term operator*(std::double_t lhs, Token &&rhs);
+
+[[nodiscard]] Term operator*(Token &&lhs, std::double_t rhs);
+
 class Expression;
 
 [[nodiscard]] Expression operator+(Token const &lhs, Token const &rhs);
 
 [[nodiscard]] Expression operator-(Token const &lhs, Token const &rhs);
+
+[[nodiscard]] Expression operator*(std::double_t lhs, Expression rhs);
 
 class Terms;
 
@@ -90,8 +94,6 @@ class Terms;
 [[nodiscard]] Expression operator*(Token const &lhs, Expression rhs);
 
 [[nodiscard]] Terms operator/(Token const &lhs, Token const &rhs);
-
-[[nodiscard]] Term operator-(Token const &token);
 
 Term operator^(Token const &lhs, std::double_t rhs);
 

@@ -32,6 +32,8 @@ struct Term final : Token {
 
     explicit operator std::string() const override;
 
+    [[nodiscard]] Term operator-() const;
+
     friend Term operator-(Term const &rhs);
 
     Term &operator*=(std::double_t rhs);
