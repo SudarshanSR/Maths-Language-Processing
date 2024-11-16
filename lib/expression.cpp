@@ -533,7 +533,7 @@ mlp::OwnedToken mlp::Expression::simplified() const {
     if (this->tokens.size() == 1) {
         Expression expression{*this};
 
-        auto &&[sign, term] = std::move(expression.tokens.back());
+        auto [sign, term] = std::move(expression.tokens.back());
 
         expression.tokens.pop_back();
 
@@ -554,7 +554,7 @@ mlp::OwnedToken mlp::Expression::simplified() const {
         return std::make_unique<Constant>(0);
 
     if (tokens.size() == 1) {
-        auto &&[sign, term] = std::move(expression->tokens.back());
+        auto [sign, term] = std::move(expression->tokens.back());
 
         expression->tokens.pop_back();
 
