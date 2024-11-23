@@ -267,11 +267,7 @@ mlp::OwnedToken mlp::Term::derivative(
     terms_2 *=
         std::make_unique<Function>("ln", OwnedToken(this->base->clone()));
 
-    auto expression = std::make_unique<Expression>();
-    *expression += std::move(terms_1);
-    *expression += std::move(terms_2);
-
-    result *= std::move(expression);
+    result *= terms_1 + terms_2;
 
     auto derivative = result.simplified();
 
@@ -310,12 +306,10 @@ mlp::OwnedToken mlp::Term::integral(Variable const &variable) const {
                 );
             }
         } else if (!this->power->is_dependent_on(variable)) {
-            auto expression = std::make_unique<Expression>();
-            *expression += OwnedToken(this->power->clone());
-            *expression += Constant(1);
+            auto expression = *this->power + Constant(1);
 
             terms *= std::make_unique<Term>(
-                std::move(*this->base->clone()) ^ *expression
+                std::move(*this->base->clone()) ^ expression
             );
             terms /= std::move(expression);
         } else {
@@ -361,11 +355,9 @@ Term operator*(std::double_t const lhs, Term rhs) { return rhs *= lhs; }
 Term operator*(Term lhs, std::double_t const rhs) { return lhs *= rhs; }
 
 Term operator/(std::double_t const lhs, Term rhs) {
-    rhs /= lhs;
+    rhs.coefficient = lhs / rhs.coefficient;
 
-    Expression power{};
-    power -= std::move(rhs.power);
-    rhs.power = power.simplified();
+    rhs.power = (-*rhs.power).simplified();
 
     return rhs;
 }
@@ -377,11 +369,9 @@ Term operator*(Constant const &lhs, Term rhs) { return rhs *= lhs; }
 Term operator*(Term lhs, Constant const &rhs) { return lhs *= rhs; }
 
 Term operator/(Constant const &lhs, Term rhs) {
-    rhs /= lhs;
+    rhs.coefficient = lhs / rhs.coefficient;
 
-    Expression power{};
-    power -= std::move(rhs.power);
-    rhs.power = power.simplified();
+    rhs.power = (-*rhs.power).simplified();
 
     return rhs;
 }
