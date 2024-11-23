@@ -2,11 +2,12 @@
 
 #include "../include/constant.h"
 #include "../include/expression.h"
-#include "../include/function.h"
 #include "../include/terms.h"
 #include "../include/variable.h"
 
 #include <sstream>
+
+import mlp.function;
 
 mlp::Term::Term(
     std::double_t const coefficient, OwnedToken &&base, OwnedToken &&power

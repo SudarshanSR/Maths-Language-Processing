@@ -19,13 +19,13 @@ add_library(variable lib/variable.cpp)
 target_sources(variable PUBLIC include/variable.h)
 target_link_libraries(variable PRIVATE token)
 
-add_library(function lib/function.cpp)
-target_sources(function PUBLIC include/function.h)
-target_link_libraries(function PRIVATE token)
-
 add_library(term lib/term.cpp)
 target_sources(term PUBLIC include/term.h)
 target_link_libraries(term PRIVATE token)
+
+add_library(function lib/function.cpp)
+target_sources(function PUBLIC FILE_SET CXX_MODULES FILES include/function.ixx)
+target_link_libraries(function PRIVATE token)
 
 add_library(terms lib/terms.cpp)
 target_sources(terms PUBLIC include/terms.h)

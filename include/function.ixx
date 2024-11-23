@@ -1,10 +1,11 @@
-#ifndef FUNCTION_H
-#define FUNCTION_H
+module;
 
 #include "token.h"
 
+export module mlp.function;
+
 namespace mlp {
-class Function final : public Token {
+export class Function final : public Token {
     std::string function;
 
     OwnedToken parameter;
@@ -50,6 +51,4 @@ class FunctionFactory final {
 };
 } // namespace mlp
 
-mlp::FunctionFactory operator""_f(char const *string, size_t);
-
-#endif // FUNCTION_H
+export mlp::FunctionFactory operator""_f(char const *string, size_t);

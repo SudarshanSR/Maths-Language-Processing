@@ -1,10 +1,12 @@
-#include "../include/function.h"
+module;
 
 #include "../include/constant.h"
 #include "../include/terms.h"
 #include "../include/variable.h"
 
 #include <sstream>
+
+module mlp.function;
 
 namespace {
 std::map<std::string, std::double_t (*)(std::double_t)> k_functions{

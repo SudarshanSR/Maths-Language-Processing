@@ -2,7 +2,6 @@
 
 #include "../include/constant.h"
 #include "../include/expression.h"
-#include "../include/function.h"
 #include "../include/term.h"
 #include "../include/terms.h"
 #include "../include/variable.h"
@@ -15,6 +14,8 @@
 #include <set>
 #include <sstream>
 #include <utility>
+
+import mlp.function;
 
 namespace mlp {
 struct Operation final {
