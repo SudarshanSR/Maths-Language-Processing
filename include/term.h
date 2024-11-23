@@ -4,8 +4,6 @@
 #include "token.h"
 
 namespace mlp {
-class Constant;
-
 struct Term final : Token {
     std::double_t coefficient{1};
     OwnedToken base;
@@ -47,18 +45,6 @@ struct Term final : Token {
     friend Term operator/(std::double_t lhs, Term rhs);
 
     friend Term operator/(Term lhs, std::double_t rhs);
-
-    Term &operator*=(Constant const &rhs);
-
-    friend Term operator*(Constant const &lhs, Term rhs);
-
-    friend Term operator*(Term lhs, Constant const &rhs);
-
-    Term &operator/=(Constant const &rhs);
-
-    friend Term operator/(Constant const &lhs, Term rhs);
-
-    friend Term operator/(Term lhs, Constant const &rhs);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 

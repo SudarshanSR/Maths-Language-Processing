@@ -5,7 +5,7 @@
 
 namespace mlp {
 class Constant final : public Token {
-    std::double_t value;
+    std::double_t value_;
 
   public:
     using Token::derivative;
@@ -22,6 +22,8 @@ class Constant final : public Token {
     Constant &operator=(Constant &&) = default;
 
     Constant &operator=(std::double_t value);
+
+    [[nodiscard]] std::double_t value() const { return this->value_; }
 
     [[nodiscard]] gsl::owner<Constant *> clone() const override;
 

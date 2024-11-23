@@ -3,16 +3,16 @@
 #include "../include/term.h"
 #include "../include/variable.h"
 
-mlp::Constant::Constant(std::double_t const value) : value(value) {}
+mlp::Constant::Constant(std::double_t const value) : value_(value) {}
 
 mlp::Constant &mlp::Constant::operator=(std::double_t const value) {
-    this->value = value;
+    this->value_ = value;
 
     return *this;
 }
 
 gsl::owner<mlp::Constant *> mlp::Constant::clone() const {
-    return new Constant(this->value);
+    return new Constant(this->value_);
 }
 
 gsl::owner<mlp::Constant *> mlp::Constant::move() && {
@@ -20,63 +20,63 @@ gsl::owner<mlp::Constant *> mlp::Constant::move() && {
 }
 
 mlp::Constant::operator std::string() const {
-    return std::to_string(this->value);
+    return std::to_string(this->value_);
 }
 
-mlp::Constant::operator double() const { return this->value; }
+mlp::Constant::operator double() const { return this->value_; }
 
 mlp::Constant mlp::Constant::operator-() const {
-    return Constant{-this->value};
+    return Constant{-this->value_};
 }
 
 mlp::Constant &mlp::Constant::operator++() {
-    ++this->value;
+    ++this->value_;
 
     return *this;
 }
 
 mlp::Constant &mlp::Constant::operator--() {
-    --this->value;
+    --this->value_;
 
     return *this;
 }
 
 mlp::Constant &mlp::Constant::operator+=(std::double_t const rhs) {
-    this->value += rhs;
+    this->value_ += rhs;
 
     return *this;
 }
 
 mlp::Constant &mlp::Constant::operator-=(std::double_t const rhs) {
-    this->value -= rhs;
+    this->value_ -= rhs;
 
     return *this;
 }
 
 mlp::Constant &mlp::Constant::operator*=(std::double_t const rhs) {
-    this->value *= rhs;
+    this->value_ *= rhs;
 
     return *this;
 }
 
 mlp::Constant &mlp::Constant::operator/=(std::double_t const rhs) {
-    this->value /= rhs;
+    this->value_ /= rhs;
 
     return *this;
 }
 
 mlp::Constant &mlp::Constant::operator^=(std::double_t const rhs) {
-    this->value = std::pow(this->value, rhs);
+    this->value_ = std::pow(this->value_, rhs);
 
     return *this;
 }
 
 bool mlp::Constant::operator==(Constant const &rhs) const {
-    return this->value == rhs.value;
+    return this->value_ == rhs.value_;
 }
 
 bool mlp::Constant::operator>(Constant const &rhs) const {
-    return this->value > rhs.value;
+    return this->value_ > rhs.value_;
 }
 
 bool mlp::Constant::is_dependent_on(Variable const &variable) const {
@@ -102,7 +102,7 @@ mlp::Constant::derivative(Variable const &, std::uint32_t const) const {
 }
 
 mlp::OwnedToken mlp::Constant::integral(Variable const &variable) const {
-    return std::make_unique<Term>(this->value * variable);
+    return std::make_unique<Term>(this->value_ * variable);
 }
 
 namespace mlp {

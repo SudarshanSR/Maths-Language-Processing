@@ -74,19 +74,7 @@ mlp::Term &mlp::Term::operator*=(std::double_t const rhs) {
     return *this;
 }
 
-mlp::Term &mlp::Term::operator*=(Constant const &rhs) {
-    this->coefficient *= rhs;
-
-    return *this;
-}
-
 mlp::Term &mlp::Term::operator/=(std::double_t const rhs) {
-    this->coefficient /= rhs;
-
-    return *this;
-}
-
-mlp::Term &mlp::Term::operator/=(Constant const &rhs) {
     this->coefficient /= rhs;
 
     return *this;
@@ -228,7 +216,7 @@ mlp::OwnedToken mlp::Term::derivative(
 
         Terms terms{};
         terms *= std::make_unique<Term>(
-            this->coefficient * power * (*this->base ^ power - 1.0)
+            this->coefficient * power.value() * (*this->base ^ power - 1.0)
         );
         terms *= this->base->derivative(variable, 1);
 
@@ -363,18 +351,4 @@ Term operator/(std::double_t const lhs, Term rhs) {
 }
 
 Term operator/(Term lhs, std::double_t const rhs) { return lhs /= rhs; }
-
-Term operator*(Constant const &lhs, Term rhs) { return rhs *= lhs; }
-
-Term operator*(Term lhs, Constant const &rhs) { return lhs *= rhs; }
-
-Term operator/(Constant const &lhs, Term rhs) {
-    rhs.coefficient = lhs / rhs.coefficient;
-
-    rhs.power = (-*rhs.power).simplified();
-
-    return rhs;
-}
-
-Term operator/(Term lhs, Constant const &rhs) { return lhs /= rhs; }
 } // namespace mlp

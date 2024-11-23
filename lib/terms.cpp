@@ -337,18 +337,6 @@ mlp::Terms &mlp::Terms::operator/=(std::double_t const scalar) {
     return *this;
 }
 
-mlp::Terms &mlp::Terms::operator*=(Constant const &rhs) {
-    this->coefficient *= rhs;
-
-    return *this;
-}
-
-mlp::Terms &mlp::Terms::operator/=(Constant const &rhs) {
-    this->coefficient /= rhs;
-
-    return *this;
-}
-
 bool mlp::Terms::is_dependent_on(Variable const &variable) const {
     return std::ranges::any_of(
         this->terms,
@@ -524,18 +512,6 @@ Terms operator*(Terms lhs, std::double_t const rhs) {
 }
 
 Terms operator/(Terms lhs, std::double_t const rhs) {
-    return std::move(lhs /= rhs);
-}
-
-Terms operator*(Constant const &lhs, Terms rhs) {
-    return std::move(rhs *= lhs);
-}
-
-Terms operator*(Terms lhs, Constant const &rhs) {
-    return std::move(lhs *= rhs);
-}
-
-Terms operator/(Terms lhs, Constant const &rhs) {
     return std::move(lhs /= rhs);
 }
 } // namespace mlp

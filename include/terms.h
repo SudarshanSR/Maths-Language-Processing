@@ -6,8 +6,6 @@
 #include <vector>
 
 namespace mlp {
-class Constant;
-
 class Terms final : public Token {
     std::vector<OwnedToken> terms;
 
@@ -54,14 +52,6 @@ class Terms final : public Token {
     friend Terms operator/(std::double_t lhs, Terms rhs);
 
     friend Terms operator/(Terms lhs, std::double_t rhs);
-
-    Terms &operator*=(Constant const &rhs);
-
-    friend Terms operator*(Terms lhs, Constant const &rhs);
-
-    Terms &operator/=(Constant const &rhs);
-
-    friend Terms operator/(Terms lhs, Constant const &rhs);
 
     [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
 
