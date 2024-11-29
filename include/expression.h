@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace mlp {
-class Expression final : public Token {
+class Expression final {
     std::vector<std::pair<Sign, OwnedToken>> tokens;
 
   public:
@@ -16,25 +16,25 @@ class Expression final : public Token {
 
     Expression(Expression &&) = default;
 
-    Expression &operator=(Expression const &) = default;
+    Expression &operator=(Expression const &);
 
     Expression &operator=(Expression &&) = default;
-
-    [[nodiscard]] gsl::owner<Expression *> clone() const override;
-
-    [[nodiscard]] gsl::owner<Expression *> move() && override;
-
-    void add_token(Sign sign, OwnedToken &&token);
 
     void add_token(Sign sign, Token const &token);
 
     void add_token(Sign sign, Token &&token);
 
+    void add_token(Sign sign, OwnedToken &&token);
+
     [[nodiscard]] bool empty() const;
 
-    explicit operator std::string() const override;
+    explicit operator std::string() const;
 
     [[nodiscard]] Expression operator-() const;
+
+    Expression &operator+=(Token &&token);
+
+    Expression &operator-=(Token &&token);
 
     Expression &operator+=(Token const &token);
 
@@ -44,26 +44,21 @@ class Expression final : public Token {
 
     Expression &operator-=(OwnedToken &&token);
 
-    Expression &operator+=(Token &&token);
-
-    Expression &operator-=(Token &&token);
-
     friend bool
     is_dependent_on(Expression const &token, Variable const &variable);
 
     friend bool is_linear_of(Expression const &token, Variable const &variable);
 
-    friend token evaluate(
-        Expression const &token, std::map<Variable, SharedToken> const &values
-    );
+    friend Token
+    evaluate(Expression const &token, std::map<Variable, Token> const &values);
 
-    friend token simplified(Expression const &token);
+    friend Token simplified(Expression const &token);
 
-    friend token derivative(
+    friend Token derivative(
         Expression const &token, Variable const &variable, std::uint32_t order
     );
 
-    friend token integral(Expression const &token, Variable const &variable);
+    friend Token integral(Expression const &token, Variable const &variable);
 
     Expression &operator*=(Token const &token);
 

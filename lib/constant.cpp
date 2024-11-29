@@ -6,20 +6,14 @@
 #include "../include/terms.h"
 #include "../include/variable.h"
 
+#include <map>
+
 mlp::Constant::Constant(std::double_t const value) : value_(value) {}
 
 mlp::Constant &mlp::Constant::operator=(std::double_t const value) {
     this->value_ = value;
 
     return *this;
-}
-
-gsl::owner<mlp::Constant *> mlp::Constant::clone() const {
-    return new Constant(this->value_);
-}
-
-gsl::owner<mlp::Constant *> mlp::Constant::move() && {
-    return new Constant(std::move(*this));
 }
 
 mlp::Constant::operator std::string() const {
@@ -86,14 +80,14 @@ bool mlp::is_dependent_on(Constant const &, Variable const &) { return false; }
 
 bool mlp::is_linear_of(Constant const &, Variable const &) { return false; }
 
-mlp::token
-mlp::evaluate(Constant const &token, std::map<Variable, SharedToken> const &) {
+mlp::Token
+mlp::evaluate(Constant const &token, std::map<Variable, Token> const &) {
     return token;
 }
 
-mlp::token mlp::simplified(Constant const &token) { return token; }
+mlp::Token mlp::simplified(Constant const &token) { return token; }
 
-mlp::token mlp::derivative(
+mlp::Token mlp::derivative(
     Constant const &token, Variable const &, std::uint32_t const order
 ) {
     if (!order)
@@ -102,7 +96,7 @@ mlp::token mlp::derivative(
     return Constant(0);
 }
 
-mlp::token mlp::integral(Constant const &token, Variable const &variable) {
+mlp::Token mlp::integral(Constant const &token, Variable const &variable) {
     return token.value() * variable;
 }
 

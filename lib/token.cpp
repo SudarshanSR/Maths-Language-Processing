@@ -13,7 +13,6 @@
 #include <ranges>
 #include <regex>
 #include <set>
-#include <sstream>
 #include <utility>
 
 namespace mlp {
@@ -85,10 +84,10 @@ std::set<std::string> k_functions{
     "asech", "acsch", "acoth", "ln",
 };
 
-std::variant<mlp::Operation, mlp::OwnedToken>
+std::variant<mlp::Operation, std::optional<mlp::Token>>
 get_next_token(std::string const &expression, std::size_t &i) {
     if (i >= expression.size())
-        return nullptr;
+        return std::optional<mlp::Token>{};
 
     char character = expression[i];
 
@@ -105,12 +104,12 @@ get_next_token(std::string const &expression, std::size_t &i) {
         }
 
         if (i >= expression.size())
-            return std::make_unique<mlp::Constant>(std::stoull(number));
+            return mlp::Constant(std::stoull(number));
 
         if (character != '.') {
             --i;
 
-            return std::make_unique<mlp::Constant>(std::stoull(number));
+            return mlp::Constant(std::stoull(number));
         }
 
         do {
@@ -122,7 +121,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
         if (i < expression.size())
             --i;
 
-        return std::make_unique<mlp::Constant>(std::stold(number));
+        return mlp::Constant(std::stold(number));
     }
 
     if (k_parenthesis_map.contains(character)) {
@@ -150,7 +149,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
 
         std::size_t const end = i - start;
 
-        return mlp::tokenise(expression.substr(start, end));
+        return std::move(mlp::tokenise(expression.substr(start, end)));
     }
 
     for (std::size_t const offset : {5, 4, 3, 2}) {
@@ -169,30 +168,28 @@ get_next_token(std::string const &expression, std::size_t &i) {
         if (std::holds_alternative<mlp::Operation>(token))
             throw std::runtime_error("Expression is not valid!");
 
-        auto &parameter = std::get<mlp::OwnedToken>(token);
+        auto &parameter = std::get<std::optional<mlp::Token>>(token);
 
         if (!parameter)
             throw std::runtime_error("Expression is not valid!");
 
-        return std::make_unique<mlp::Function>(fn, std::move(parameter));
+        return mlp::Function(
+            fn, std::make_unique<mlp::Token>(std::move(*parameter))
+        );
     }
 
     if (character == 'e')
-        return std::make_unique<mlp::Constant>(std::numbers::e);
+        return mlp::Constant(std::numbers::e);
 
     if (('A' <= character && character <= 'Z') ||
         ('a' <= character && character <= 'z'))
-        return std::make_unique<mlp::Variable>(character);
+        return mlp::Variable(character);
 
     throw std::runtime_error("Expression is not valid!");
 }
 } // namespace
 
-mlp::Term mlp::Token::operator-() const {
-    return {-1, OwnedToken(this->clone()), std::make_unique<Constant>(1)};
-}
-
-bool mlp::is_dependent_on(token const &token, Variable const &variable) {
+bool mlp::is_dependent_on(Token const &token, Variable const &variable) {
     return std::visit(
         [&variable](auto &&var) -> bool {
             return is_dependent_on(var, variable);
@@ -201,83 +198,64 @@ bool mlp::is_dependent_on(token const &token, Variable const &variable) {
     );
 }
 
-bool mlp::is_linear_of(token const &token, Variable const &variable) {
+bool mlp::is_linear_of(Token const &token, Variable const &variable) {
     return std::visit(
         [&variable](auto &&var) -> bool { return is_linear_of(var, variable); },
         token
     );
 }
 
-mlp::token mlp::evaluate(
-    token const &token, std::map<Variable, SharedToken> const &values
-) {
+mlp::Token
+mlp::evaluate(Token const &token, std::map<Variable, Token> const &values) {
     return std::visit(
-        [&values](auto &&val) -> mlp::token { return evaluate(val, values); },
-        token
+        [&values](auto &&val) -> Token { return evaluate(val, values); }, token
     );
 }
 
-mlp::token mlp::simplified(Token const &token) {
-    return simplified(to_variant(token));
-}
-
-mlp::token mlp::simplified(token const &token) {
+mlp::Token mlp::simplified(Token const &token) {
     return std::visit(
-        [](auto &&var) -> mlp::token { return simplified(var); }, token
+        [](auto &&var) -> Token { return simplified(var); }, token
     );
 }
 
-mlp::token mlp::derivative(
-    token const &token, Variable const &variable, std::uint32_t const order,
-    std::map<Variable, SharedToken> const &values
+mlp::Token mlp::derivative(
+    Token const &token, Variable const &variable, std::uint32_t const order,
+    std::map<Variable, Token> const &values
 ) {
     return evaluate(derivative(token, variable, order), values);
 }
 
-mlp::token mlp::derivative(
-    token const &token, Variable const &variable, std::uint32_t const order
+mlp::Token mlp::derivative(
+    Token const &token, Variable const &variable, std::uint32_t const order
 ) {
     return std::visit(
-        [&variable, &order](auto &&val) -> mlp::token {
+        [&variable, &order](auto &&val) -> Token {
             return derivative(val, variable, order);
         },
         token
     );
 }
 
-mlp::token mlp::integral(Token const &token, Variable const &variable) {
-    return integral(to_variant(token), variable);
-}
-
-mlp::token mlp::integral(token const &token, Variable const &variable) {
+mlp::Token mlp::integral(Token const &token, Variable const &variable) {
     return std::visit(
-        [&variable](auto &&val) -> mlp::token {
-            return integral(val, variable);
-        },
+        [&variable](auto &&val) -> Token { return integral(val, variable); },
         token
     );
 }
 
-mlp::token mlp::integral(
-    Token const &token, Variable const &variable, SharedToken const &from,
-    SharedToken const &to
-) {
-    return integral(to_variant(token), variable, from, to);
-}
-
-mlp::token mlp::integral(
-    token const &token, Variable const &variable, SharedToken const &from,
-    SharedToken const &to
+mlp::Token mlp::integral(
+    Token const &token, Variable const &variable, Token const &from,
+    Token const &to
 ) {
     auto const &integral = mlp::integral(token, variable);
 
     return simplified(
-        from_variant(evaluate(integral, {{variable, to}})) -
-        from_variant(evaluate(integral, {{variable, from}}))
+        evaluate(integral, {{variable, to}}) -
+        evaluate(integral, {{variable, from}})
     );
 }
 
-mlp::OwnedToken mlp::tokenise(std::string expression) {
+mlp::Token mlp::tokenise(std::string expression) {
     Expression result{};
 
     auto e = std::ranges::remove(expression, ' ');
@@ -289,22 +267,23 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
     );
 
     auto s = Sign::pos;
-    std::vector<OwnedToken> numerator;
-    std::vector<OwnedToken> denominator;
+    std::vector<Token> numerator;
+    std::vector<Token> denominator;
     bool last = false;
 
     for (std::size_t i = 0; i < expression.size(); ++i) {
         std::size_t const copy = i;
 
-        auto token = get_next_token(expression, i);
+        std::variant<Operation, std::optional<Token>> token =
+            get_next_token(expression, i);
 
         if (!std::holds_alternative<Operation>(token)) {
-            auto &term = std::get<OwnedToken>(token);
+            auto &term = std::get<std::optional<Token>>(token);
 
             if (!term)
                 continue;
 
-            numerator.push_back(std::move(term));
+            numerator.push_back(std::move(*term));
 
             continue;
         }
@@ -323,12 +302,13 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
             continue;
         }
 
-        auto next = get_next_token(expression, ++i);
+        std::variant<Operation, std::optional<Token>> next =
+            get_next_token(expression, ++i);
 
         if (std::holds_alternative<Operation>(next))
             throw std::runtime_error("Expression is not valid!");
 
-        auto &next_term = std::get<OwnedToken>(next);
+        auto &next_term = std::get<std::optional<Token>>(next);
 
         if (!next_term)
             throw std::runtime_error("Expression is not valid!");
@@ -341,13 +321,13 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
             if (!numerator.empty()) {
                 Terms terms{};
 
-                for (OwnedToken &t : numerator)
+                for (Token &t : numerator)
                     terms *= std::move(t);
 
-                for (OwnedToken &t : denominator)
+                for (Token &t : denominator)
                     terms /= std::move(t);
 
-                result.add_token(s, from_variant(simplified(terms)));
+                result.add_token(s, simplified(terms));
 
                 numerator.clear();
                 denominator.clear();
@@ -360,29 +340,29 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 result -= Constant(1);
 
             s = sign;
-            numerator.push_back(std::move(next_term));
+            numerator.push_back(std::move(*next_term));
 
             continue;
         }
 
         if (operation.operation == Operation::mul) {
-            numerator.push_back(std::move(next_term));
+            numerator.push_back(std::move(*next_term));
             last = false;
 
             continue;
         }
 
         if (operation.operation == Operation::div) {
-            denominator.push_back(std::move(next_term));
+            denominator.push_back(std::move(*next_term));
             last = true;
 
             continue;
         }
 
-        std::vector<OwnedToken> powers;
+        std::vector<Token> powers;
 
         while (true) {
-            powers.push_back(std::move(next_term));
+            powers.push_back(std::move(*next_term));
 
             next = get_next_token(expression, ++i);
 
@@ -404,37 +384,40 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 break;
         }
 
-        OwnedToken power = std::make_unique<Constant>(1);
+        Token power = Constant(1);
 
-        for (OwnedToken &p : powers | std::views::reverse)
-            power = std::make_unique<Term>(std::move(*p) ^ std::move(*power));
+        for (Token &p : powers | std::views::reverse)
+            power = std::move(p) ^ std::move(power);
 
-        power = OwnedToken(from_variant(simplified(*power)).move());
+        power = std::move(simplified(power));
 
         if (!last)
-            numerator.back() = std::make_unique<Term>(
-                std::move(*numerator.back()) ^ std::move(*power)
-            );
+            numerator.back() = std::move(numerator.back()) ^ std::move(power);
         else
-            denominator.back() = std::make_unique<Term>(
-                std::move(*denominator.back()) ^ std::move(*power)
-            );
+            denominator.back() =
+                std::move(denominator.back()) ^ std::move(power);
     }
 
     Terms terms{};
 
-    for (OwnedToken &t : numerator)
+    for (Token &t : numerator)
         terms *= std::move(t);
 
-    for (OwnedToken &t : denominator)
+    for (Token &t : denominator)
         terms /= std::move(t);
 
-    result.add_token(s, from_variant(simplified(terms)));
+    result.add_token(s, simplified(terms));
 
-    return OwnedToken(from_variant(simplified(result)).move());
+    return simplified(result);
 }
 
 namespace mlp {
+Term operator-(Token const &token) {
+    return {
+        -1, std::make_unique<Token>(token), std::make_unique<Token>(Constant(1))
+    };
+}
+
 Term operator*(std::double_t const lhs, Token const &rhs) {
     return lhs * (rhs ^ 1);
 }
@@ -495,69 +478,56 @@ std::ostream &operator<<(std::ostream &os, Sign const sign) {
     return os;
 }
 
-token to_variant(Token const &token) {
-    if (typeid(token) == typeid(Constant))
-        return dynamic_cast<Constant const &>(token);
-
-    if (typeid(token) == typeid(Variable))
-        return dynamic_cast<Variable const &>(token);
-
-    if (typeid(token) == typeid(Function))
-        return dynamic_cast<Function const &>(token);
-
-    if (typeid(token) == typeid(Term))
-        return dynamic_cast<Term const &>(token);
-
-    if (typeid(token) == typeid(Terms))
-        return dynamic_cast<Terms const &>(token);
-
-    if (typeid(token) == typeid(Expression))
-        return dynamic_cast<Expression const &>(token);
-
-    throw std::runtime_error("Invalid token");
-}
-
-Token const &from_variant(token const &token) {
-    return std::visit(
-        [](auto const &var) -> Token const & { return var; }, token
-    );
-}
-
-Token &&from_variant(token &&token) {
-    return std::visit(
-        [](auto &&var) -> Token && { return std::move(var); }, token
-    );
-}
-
 Term operator^(Token const &lhs, std::double_t const rhs) {
-    return {1, OwnedToken(lhs.clone()), std::make_unique<Constant>(rhs)};
+    return {
+        1, std::make_unique<Token>(lhs), std::make_unique<Token>(Constant(rhs))
+    };
 }
 
 Term operator^(Token const &lhs, Token const &rhs) {
-    return {1, OwnedToken(lhs.clone()), OwnedToken(rhs.clone())};
+    return {1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
 }
 
 Term operator^(Token const &lhs, Token &&rhs) {
-    return {1, OwnedToken(lhs.clone()), OwnedToken(std::move(rhs).move())};
+    return {
+        1, std::make_unique<Token>(lhs), std::make_unique<Token>(std::move(rhs))
+    };
 }
 
 Term operator^(Token &&lhs, std::double_t const rhs) {
     return {
-        1, OwnedToken(std::move(lhs).move()), std::make_unique<Constant>(rhs)
+        1, std::make_unique<Token>(std::move(lhs)),
+        std::make_unique<Token>(Constant(rhs))
     };
 }
 
 Term operator^(Token &&lhs, Token const &rhs) {
-    return {1, OwnedToken(std::move(lhs).move()), OwnedToken(rhs.clone())};
+    return {
+        1, std::make_unique<Token>(std::move(lhs)), std::make_unique<Token>(rhs)
+    };
 }
 
 Term operator^(Token &&lhs, Token &&rhs) {
     return {
-        1, OwnedToken(std::move(lhs).move()), OwnedToken(std::move(rhs).move())
+        1, std::make_unique<Token>(std::move(lhs)),
+        std::make_unique<Token>(std::move(rhs))
     };
 }
 } // namespace mlp
 
+std::string to_string(mlp::Token const &token) {
+    return std::visit(
+        [](auto &&var) -> std::string { return static_cast<std::string>(var); },
+        token
+    );
+}
+
 std::string to_string(mlp::Sign const sign) {
     return sign == mlp::Sign::pos ? "+" : "-";
+}
+
+std::ostream &mlp::operator<<(std::ostream &os, Token const &token) {
+    os << to_string(token);
+
+    return os;
 }

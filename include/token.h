@@ -3,88 +3,52 @@
 
 #include <cmath>
 #include <map>
-#include <ostream>
 #include <string>
 
 #include <gsl/gsl>
 
 namespace mlp {
-struct Token;
-
-template <typename T> using Owned = std::unique_ptr<T>;
-
-using SharedToken = std::shared_ptr<Token>;
-using OwnedToken = Owned<Token>;
-
-class Variable;
-
-struct Term;
-
-struct Token {
-    virtual ~Token() = default;
-
-    [[nodiscard]] virtual gsl::owner<Token *> clone() const = 0;
-
-    [[nodiscard]] virtual gsl::owner<Token *> move() && = 0;
-
-    explicit virtual operator std::string() const = 0;
-
-    [[nodiscard]] Term operator-() const;
-};
-
 class Constant;
+class Variable;
 class Function;
+struct Term;
 class Terms;
 class Expression;
 
-using token =
+using Token =
     std::variant<Constant, Variable, Function, Term, Terms, Expression>;
+using OwnedToken = std::unique_ptr<Token>;
 
 [[nodiscard]] bool
-is_dependent_on(token const &token, Variable const &variable);
+is_dependent_on(Token const &token, Variable const &variable);
 
-[[nodiscard]] bool is_linear_of(token const &token, Variable const &variable);
+[[nodiscard]] bool is_linear_of(Token const &token, Variable const &variable);
 
-[[nodiscard]] token
-evaluate(token const &token, std::map<Variable, SharedToken> const &values);
+[[nodiscard]] Token
+evaluate(Token const &token, std::map<Variable, Token> const &values);
 
-[[nodiscard]] token simplified(Token const &token);
+[[nodiscard]] Token simplified(Token const &token);
 
-[[nodiscard]] token simplified(token const &token);
-
-[[nodiscard]] token derivative(
-    token const &token, Variable const &variable, std::uint32_t order,
-    std::map<Variable, SharedToken> const &values
+[[nodiscard]] Token derivative(
+    Token const &token, Variable const &variable, std::uint32_t order,
+    std::map<Variable, Token> const &values
 );
 
-[[nodiscard]] token
-derivative(token const &token, Variable const &variable, std::uint32_t order);
+[[nodiscard]] Token
+derivative(Token const &token, Variable const &variable, std::uint32_t order);
 
-[[nodiscard]] token integral(Token const &token, Variable const &variable);
+[[nodiscard]] Token integral(Token const &token, Variable const &variable);
 
-[[nodiscard]] token integral(token const &token, Variable const &variable);
-
-[[nodiscard]] token integral(
-    Token const &token, Variable const &variable, SharedToken const &from,
-    SharedToken const &to
-);
-
-[[nodiscard]] token integral(
-    token const &token, Variable const &variable, SharedToken const &from,
-    SharedToken const &to
+[[nodiscard]] Token integral(
+    Token const &token, Variable const &variable, Token const &from,
+    Token const &to
 );
 
 enum class Sign { pos, neg };
 
-OwnedToken tokenise(std::string expression);
+Token tokenise(std::string expression);
 
-template <typename T>
-    requires std::is_base_of_v<Token, T>
-std::ostream &operator<<(std::ostream &os, T const &token) {
-    os << static_cast<std::string>(token);
-
-    return os;
-}
+[[nodiscard]] Term operator-(Token const &token);
 
 [[nodiscard]] Term operator*(std::double_t lhs, Token const &rhs);
 
@@ -119,14 +83,14 @@ Term operator^(Token &&lhs, Token const &rhs);
 Term operator^(Token &&lhs, Token &&rhs);
 
 std::ostream &operator<<(std::ostream &os, Sign sign);
-
-[[nodiscard]] token to_variant(Token const &token);
-
-[[nodiscard]] Token const &from_variant(token const &token);
-
-[[nodiscard]] Token &&from_variant(token &&token);
 } // namespace mlp
 
+[[nodiscard]] std::string to_string(mlp::Token const &token);
+
 std::string to_string(mlp::Sign sign);
+
+namespace mlp {
+std::ostream &operator<<(std::ostream &os, Token const &token);
+} // namespace mlp
 
 #endif

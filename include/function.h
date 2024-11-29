@@ -4,7 +4,7 @@
 #include "token.h"
 
 namespace mlp {
-class Function final : public Token {
+class Function final {
     std::string function;
 
     OwnedToken parameter;
@@ -16,28 +16,27 @@ class Function final : public Token {
 
     Function(Function &&function) = default;
 
-    [[nodiscard]] gsl::owner<Function *> clone() const override;
+    Function &operator=(Function const &function);
 
-    [[nodiscard]] gsl::owner<Function *> move() && override;
+    Function &operator=(Function &&function) = default;
 
-    explicit operator std::string() const override;
+    explicit operator std::string() const;
 
     friend bool
     is_dependent_on(Function const &token, Variable const &variable);
 
     friend bool is_linear_of(Function const &token, Variable const &variable);
 
-    friend token evaluate(
-        Function const &token, std::map<Variable, SharedToken> const &values
-    );
+    friend Token
+    evaluate(Function const &token, std::map<Variable, Token> const &values);
 
-    friend token simplified(Function const &token);
+    friend Token simplified(Function const &token);
 
-    friend token derivative(
+    friend Token derivative(
         Function const &token, Variable const &variable, std::uint32_t order
     );
 
-    friend token integral(Function const &token, Variable const &variable);
+    friend Token integral(Function const &token, Variable const &variable);
 };
 
 class FunctionFactory final {

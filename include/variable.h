@@ -4,7 +4,7 @@
 #include "token.h"
 
 namespace mlp {
-class Variable final : public Token {
+class Variable final {
     char var;
 
   public:
@@ -14,11 +14,11 @@ class Variable final : public Token {
 
     Variable(Variable &&) = default;
 
-    [[nodiscard]] gsl::owner<Variable *> clone() const override;
+    Variable &operator=(Variable const &) = default;
 
-    [[nodiscard]] gsl::owner<Variable *> move() && override;
+    Variable &operator=(Variable &&) = default;
 
-    explicit operator std::string() const override;
+    explicit operator std::string() const;
 
     bool operator==(Variable const &) const;
 
@@ -31,16 +31,16 @@ is_dependent_on(Variable const &token, Variable const &variable);
 [[nodiscard]] bool
 is_linear_of(Variable const &token, Variable const &variable);
 
-[[nodiscard]] token
-evaluate(Variable const &token, std::map<Variable, SharedToken> const &values);
+[[nodiscard]] Token
+evaluate(Variable const &token, std::map<Variable, Token> const &values);
 
-[[nodiscard]] token simplified(Variable const &token);
+[[nodiscard]] Token simplified(Variable const &token);
 
-[[nodiscard]] token derivative(
+[[nodiscard]] Token derivative(
     Variable const &token, Variable const &variable, std::uint32_t order
 );
 
-[[nodiscard]] token integral(Variable const &token, Variable const &variable);
+[[nodiscard]] Token integral(Variable const &token, Variable const &variable);
 } // namespace mlp
 
 #endif // VARIABLE_H

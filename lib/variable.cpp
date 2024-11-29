@@ -6,15 +6,9 @@
 #include "../include/term.h"
 #include "../include/terms.h"
 
+#include <map>
+
 mlp::Variable::Variable(char const var) : var(var) {}
-
-gsl::owner<mlp::Variable *> mlp::Variable::clone() const {
-    return new Variable(*this);
-}
-
-gsl::owner<mlp::Variable *> mlp::Variable::move() && {
-    return new Variable(std::move(*this));
-}
 
 mlp::Variable::operator std::string() const { return {this->var}; }
 
@@ -30,15 +24,14 @@ bool mlp::is_linear_of(Variable const &token, Variable const &variable) {
     return is_dependent_on(token, variable);
 }
 
-mlp::token mlp::evaluate(
-    Variable const &token, std::map<Variable, SharedToken> const &values
-) {
-    return values.contains(token) ? to_variant(*values.at(token)) : token;
+mlp::Token
+mlp::evaluate(Variable const &token, std::map<Variable, Token> const &values) {
+    return values.contains(token) ? values.at(token) : token;
 }
 
-mlp::token mlp::simplified(Variable const &token) { return token; }
+mlp::Token mlp::simplified(Variable const &token) { return token; }
 
-mlp::token mlp::derivative(
+mlp::Token mlp::derivative(
     Variable const &token, Variable const &variable, std::uint32_t const order
 ) {
     if (!order)
@@ -47,7 +40,7 @@ mlp::token mlp::derivative(
     return Constant(token == variable && order == 1 ? 1 : 0);
 }
 
-mlp::token mlp::integral(Variable const &token, Variable const &variable) {
+mlp::Token mlp::integral(Variable const &token, Variable const &variable) {
     if (token == variable)
         return (variable ^ 2) / 2;
 

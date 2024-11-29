@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace mlp {
-class Terms final : public Token {
+class Terms final {
     std::vector<OwnedToken> terms;
 
   public:
@@ -18,11 +18,11 @@ class Terms final : public Token {
 
     Terms(Terms &&) = default;
 
-    [[nodiscard]] gsl::owner<Terms *> clone() const override;
+    Terms &operator=(Terms const &);
 
-    [[nodiscard]] gsl::owner<Terms *> move() && override;
+    Terms &operator=(Terms &&) = default;
 
-    explicit operator std::string() const override;
+    explicit operator std::string() const;
 
     [[nodiscard]] Terms operator-() const;
 
@@ -54,16 +54,16 @@ class Terms final : public Token {
 
     friend bool is_linear_of(Terms const &token, Variable const &variable);
 
-    friend token
-    evaluate(Terms const &token, std::map<Variable, SharedToken> const &values);
+    friend Token
+    evaluate(Terms const &token, std::map<Variable, Token> const &values);
 
-    friend token simplified(Terms const &token);
+    friend Token simplified(Terms const &token);
 
-    friend token derivative(
+    friend Token derivative(
         Terms const &token, Variable const &variable, std::uint32_t order
     );
 
-    friend token integral(Terms const &token, Variable const &variable);
+    friend Token integral(Terms const &token, Variable const &variable);
 };
 } // namespace mlp
 

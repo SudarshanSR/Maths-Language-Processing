@@ -6,6 +6,7 @@
 #include "../include/terms.h"
 #include "../include/variable.h"
 
+#include <map>
 #include <sstream>
 
 namespace {
@@ -97,21 +98,19 @@ mlp::Function::Function(std::string function, OwnedToken &&parameter)
     : function(std::move(function)), parameter(std::move(parameter)) {}
 
 mlp::Function::Function(Function const &function)
-    : function(function.function), parameter(function.parameter->clone()) {}
+    : function(function.function), parameter(new Token(*function.parameter)) {}
 
-gsl::owner<mlp::Function *> mlp::Function::clone() const {
-    return new Function(*this);
-}
+mlp::Function &mlp::Function::operator=(Function const &function) {
+    this->function = function.function;
+    *this->parameter = *function.parameter;
 
-gsl::owner<mlp::Function *> mlp::Function::move() && {
-    return new Function(std::move(*this));
+    return *this;
 }
 
 mlp::Function::operator std::string() const {
     std::stringstream result;
 
-    result << this->function << '('
-           << static_cast<std::string>(*this->parameter) << ')';
+    result << this->function << '(' << to_string(*this->parameter) << ')';
 
     return result.str();
 }
@@ -120,48 +119,43 @@ mlp::FunctionFactory::FunctionFactory(std::string function)
     : function(std::move(function)) {}
 
 mlp::Function mlp::FunctionFactory::operator()(Token const &token) const {
-    return Function(this->function, OwnedToken(token.clone()));
+    return Function(this->function, std::make_unique<Token>(token));
 }
 
 namespace mlp {
 bool is_dependent_on(Function const &token, Variable const &variable) {
-    return is_dependent_on(to_variant(*token.parameter), variable);
+    return is_dependent_on(*token.parameter, variable);
 }
 
 bool is_linear_of(Function const &, Variable const &) { return false; }
 
-token evaluate(
-    Function const &token, std::map<Variable, SharedToken> const &values
-) {
-    auto param = evaluate(to_variant(*token.parameter), values);
+Token evaluate(Function const &token, std::map<Variable, Token> const &values) {
+    auto param = evaluate(*token.parameter, values);
 
     if (std::holds_alternative<Constant>(param))
         return Constant(k_functions.at(token.function)(std::get<Constant>(param)
         ));
 
-    return Function(
-        token.function, OwnedToken(from_variant(std::move(param)).move())
-    );
+    return Function(token.function, std::make_unique<Token>(std::move(param)));
 }
 
-token simplified(Function const &token) {
-    mlp::token simplified = mlp::simplified(*token.parameter);
+Token simplified(Function const &token) {
+    Token simplified = mlp::simplified(*token.parameter);
 
     if (std::holds_alternative<Constant>(simplified))
         return evaluate(
             Function(
-                token.function,
-                OwnedToken(from_variant(std::move(simplified)).move())
+                token.function, std::make_unique<Token>(std::move(simplified))
             ),
             {}
         );
 
     return Function(
-        token.function, OwnedToken(from_variant(std::move(simplified)).move())
+        token.function, std::make_unique<Token>(std::move(simplified))
     );
 }
 
-token derivative(
+Token derivative(
     Function const &token, Variable const &variable, std::uint32_t const order
 ) {
     if (!order)
@@ -170,16 +164,16 @@ token derivative(
     if (!is_dependent_on(token, variable))
         return Constant(0);
 
-    auto parameter = static_cast<std::string>(*token.parameter);
+    auto parameter = to_string(*token.parameter);
 
     auto derivative = simplified(
-        *tokenise(
+        tokenise(
             std::vformat(
                 k_function_map.at(token.function),
                 std::make_format_args(parameter)
             )
         ) *
-        from_variant(mlp::derivative(to_variant(*token.parameter), variable, 1))
+        mlp::derivative(*token.parameter, variable, 1)
     );
 
     if (order > 1)
@@ -188,21 +182,21 @@ token derivative(
     return derivative;
 }
 
-token integral(Function const &token, Variable const &variable) {
+Token integral(Function const &token, Variable const &variable) {
     if (!is_dependent_on(token, variable))
         return variable * token;
 
-    if (is_linear_of(to_variant(*token.parameter), variable)) {
-        auto string = static_cast<std::string>(*token.parameter);
+    if (is_linear_of(*token.parameter, variable)) {
+        auto string = to_string(*token.parameter);
 
         return simplified(
-            *tokenise(
+            tokenise(
                 std::vformat(
                     k_function_map.at(token.function),
                     std::make_format_args(string)
                 )
             ) *
-            from_variant(derivative(to_variant(*token.parameter), variable, 1))
+            derivative(*token.parameter, variable, 1)
         );
     }
 

@@ -6,7 +6,20 @@
 #include "../include/term.h"
 #include "../include/variable.h"
 
+#include <map>
 #include <sstream>
+
+mlp::Terms::Terms(Terms const &terms) { *this = terms; }
+
+mlp::Terms &mlp::Terms::operator=(Terms const &terms) {
+    this->coefficient = terms.coefficient;
+    this->terms.clear();
+
+    for (auto const &term : terms.terms)
+        *this *= *term;
+
+    return *this;
+}
 
 mlp::Terms::operator std::string() const {
     std::stringstream result;
@@ -22,7 +35,7 @@ mlp::Terms::operator std::string() const {
     result << '(';
 
     for (std::size_t i = 0; i < this->terms.size(); ++i) {
-        result << static_cast<std::string>(*this->terms[i]);
+        result << to_string(*this->terms[i]);
 
         if (i != this->terms.size() - 1)
             result << '*';
@@ -38,17 +51,17 @@ mlp::Terms mlp::Terms::operator-() const {
     terms.coefficient = -this->coefficient;
 
     for (OwnedToken const &token : this->terms)
-        terms *= OwnedToken(token->clone());
+        terms *= *token;
 
     return terms;
 }
 
 mlp::Terms &mlp::Terms::operator*=(Token const &token) {
-    return *this *= OwnedToken(token.clone());
+    return *this *= std::make_unique<Token>(token);
 }
 
 mlp::Terms &mlp::Terms::operator/=(Token const &token) {
-    return *this /= OwnedToken(token.clone());
+    return *this /= std::make_unique<Token>(token);
 }
 
 mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
@@ -60,119 +73,116 @@ mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
 }
 
 mlp::Terms &mlp::Terms::operator*=(Token &&token) {
-    if (typeid(token) == typeid(Constant)) {
-        this->coefficient *= dynamic_cast<Constant const &>(token);
+    if (std::holds_alternative<Constant>(token)) {
+        this->coefficient *= std::get<Constant>(token);
 
         return *this;
     }
 
-    if (typeid(token) == typeid(Variable)) {
-        auto const &variable = dynamic_cast<Variable const &>(token);
+    if (std::holds_alternative<Variable>(token)) {
+        auto const &variable = std::get<Variable>(token);
 
         for (OwnedToken &term : this->terms) {
-            if (typeid(*term) == typeid(Variable)) {
-                if (auto const &v = dynamic_cast<Variable const &>(*term);
-                    v != variable)
+            if (std::holds_alternative<Variable>(*term)) {
+                if (auto const &v = std::get<Variable>(*term); v != variable)
                     continue;
 
-                term = std::make_unique<Term>(variable ^ 2);
+                *term = variable ^ 2;
 
                 return *this;
             }
 
-            if (typeid(*term) == typeid(Term)) {
-                auto &t = dynamic_cast<Term &>(*term);
+            if (std::holds_alternative<Term>(*term)) {
+                auto &t = std::get<Term>(*term);
 
-                if (typeid(*t.base) != typeid(Variable))
+                if (!std::holds_alternative<Variable>(*t.base))
                     continue;
 
-                if (auto const &v = dynamic_cast<Variable const &>(*t.base);
-                    variable != v)
+                if (auto const &v = std::get<Variable>(*t.base); variable != v)
                     continue;
 
-                if (typeid(*t.power) != typeid(Expression)) {
-                    auto power = std::make_unique<Expression>();
-                    *power += std::move(t.power);
-                    t.power = std::move(power);
+                if (!std::holds_alternative<Expression>(*t.power)) {
+                    Expression power{};
+                    power += std::move(t.power);
+                    *t.power = std::move(power);
                 }
 
-                dynamic_cast<Expression &>(*t.power) += Constant(1);
+                std::get<Expression>(*t.power) += Constant(1);
 
-                t.power = OwnedToken(from_variant(simplified(*t.power)).move());
+                *t.power = simplified(*t.power);
 
                 return *this;
             }
         }
 
-        this->terms.emplace_back(std::move(token).move());
+        this->terms.emplace_back(new Token(std::move(token)));
 
         return *this;
     }
 
-    if (typeid(token) == typeid(Term)) {
-        auto &term = dynamic_cast<Term &>(token);
+    if (std::holds_alternative<Term>(token)) {
+        auto &term = std::get<Term>(token);
 
         if (term.coefficient != 1) {
             *this *= term.coefficient;
             term.coefficient = 1;
         }
 
-        if (typeid(*term.base) != typeid(Variable)) {
-            this->terms.emplace_back(std::move(token).move());
+        if (!std::holds_alternative<Variable>(*term.base)) {
+            this->terms.emplace_back(new Token(std::move(token)));
 
             return *this;
         }
 
-        auto const &variable = dynamic_cast<Variable const &>(*term.base);
+        auto const &variable = std::get<Variable>(*term.base);
 
-        if (typeid(*term.power) != typeid(Expression)) {
-            auto power = std::make_unique<Expression>();
-            *power += std::move(term.power);
-            term.power = std::move(power);
+        if (!std::holds_alternative<Expression>(*term.power)) {
+            Expression power{};
+            power += std::move(term.power);
+            *term.power = std::move(power);
         }
 
-        auto &power = dynamic_cast<Expression &>(*term.power);
+        auto &power = std::get<Expression>(*term.power);
 
         for (OwnedToken &t : this->terms) {
-            if (typeid(*t) == typeid(Variable)) {
-                if (auto const &v = dynamic_cast<Variable const &>(*t);
-                    v != variable)
+            if (std::holds_alternative<Variable>(*t)) {
+                if (auto const &v = std::get<Variable>(*t); v != variable)
                     continue;
 
                 power += Constant(1);
-                term.power = OwnedToken(from_variant(simplified(power)).move());
-                t = OwnedToken(std::move(token).move());
+                *term.power = simplified(power);
+                *t = std::move(token);
 
                 return *this;
             }
 
-            if (typeid(*t) == typeid(Term)) {
-                auto &term1 = dynamic_cast<Term &>(*t);
+            if (std::holds_alternative<Term>(*t)) {
+                auto &term1 = std::get<Term>(*t);
 
-                if (typeid(*term1.base) != typeid(Variable))
+                if (!std::holds_alternative<Variable>(*term1.base))
                     continue;
 
-                if (auto const &v = dynamic_cast<Variable const &>(*term1.base);
+                if (auto const &v = std::get<Variable>(*term1.base);
                     variable != v)
                     continue;
 
                 power += std::move(term1.power);
-                term.power = OwnedToken(from_variant(simplified(power)).move());
-                t = OwnedToken(std::move(token).move());
+                *term.power = simplified(power);
+                *t = std::move(token);
 
                 return *this;
             }
         }
 
-        term.power = OwnedToken(from_variant(simplified(power)).move());
+        *term.power = simplified(power);
 
-        this->terms.emplace_back(std::move(token).move());
+        this->terms.emplace_back(new Token(std::move(token)));
 
         return *this;
     }
 
-    if (typeid(token) == typeid(Terms)) {
-        auto &terms = dynamic_cast<Terms &>(token);
+    if (std::holds_alternative<Terms>(token)) {
+        auto &terms = std::get<Terms>(token);
 
         if (terms.coefficient != 1) {
             *this *= terms.coefficient;
@@ -185,27 +195,26 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
         return *this;
     }
 
-    this->terms.emplace_back(std::move(token).move());
+    this->terms.emplace_back(new Token(std::move(token)));
 
     return *this;
 }
 
 mlp::Terms &mlp::Terms::operator/=(Token &&token) {
-    if (typeid(token) == typeid(Constant)) {
-        this->coefficient /= dynamic_cast<Constant const &>(token);
+    if (std::holds_alternative<Constant>(token)) {
+        this->coefficient /= std::get<Constant>(token);
 
         return *this;
     }
 
-    if (typeid(token) == typeid(Variable)) {
-        auto const &variable = dynamic_cast<Variable const &>(token);
+    if (std::holds_alternative<Variable>(token)) {
+        auto const &variable = std::get<Variable>(token);
 
         for (std::size_t i = 0; i < this->terms.size(); ++i) {
             OwnedToken const &term = this->terms[i];
 
-            if (typeid(*term) == typeid(Variable)) {
-                if (auto const &v = dynamic_cast<Variable const &>(*term);
-                    v != variable)
+            if (std::holds_alternative<Variable>(*term)) {
+                if (auto const &v = std::get<Variable>(*term); v != variable)
                     continue;
 
                 this->terms.erase(this->terms.begin() + i);
@@ -213,102 +222,98 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
                 return *this;
             }
 
-            if (typeid(*term) == typeid(Term)) {
-                auto &t = dynamic_cast<Term &>(*term);
+            if (std::holds_alternative<Term>(*term)) {
+                auto &t = std::get<Term>(*term);
 
-                if (typeid(*t.base) != typeid(Variable))
+                if (!std::holds_alternative<Variable>(*t.base))
                     continue;
 
-                if (auto const &v = dynamic_cast<Variable const &>(*t.base);
-                    variable != v)
+                if (auto const &v = std::get<Variable>(*t.base); variable != v)
                     continue;
 
-                if (typeid(*t.power) != typeid(Expression)) {
-                    auto power = std::make_unique<Expression>();
-                    *power += std::move(t.power);
-                    t.power = std::move(power);
+                if (!std::holds_alternative<Expression>(*t.power)) {
+                    Expression power{};
+                    power += std::move(t.power);
+                    *t.power = std::move(power);
                 }
 
-                auto &power = dynamic_cast<Expression &>(*t.power);
+                auto &power = std::get<Expression>(*t.power);
                 power -= Constant(1);
 
-                t.power = OwnedToken(from_variant(simplified(*t.power)).move());
+                *t.power = simplified(*t.power);
 
                 return *this;
             }
         }
 
-        this->terms.push_back(std::make_unique<Term>(std::move(token) ^ -1));
+        this->terms.emplace_back(new Token(std::move(token) ^ -1));
 
         return *this;
     }
 
-    if (typeid(token) == typeid(Term)) {
-        auto &term = dynamic_cast<Term &>(token);
+    if (std::holds_alternative<Term>(token)) {
+        auto &term = std::get<Term>(token);
 
         if (term.coefficient != 1) {
             *this /= term.coefficient;
             term.coefficient = 1;
         }
 
-        if (typeid(*term.base) != typeid(Variable)) {
-            this->terms.push_back(
-                std::make_unique<Term>(std::move(token) ^ -1)
-            );
+        if (!std::holds_alternative<Variable>(*term.base)) {
+            this->terms.emplace_back(new Token(std::move(token) ^ -1));
 
             return *this;
         }
 
-        auto const &variable = dynamic_cast<Variable const &>(*term.base);
+        auto const &variable = std::get<Variable>(*term.base);
 
-        if (typeid(*term.power) != typeid(Expression)) {
-            auto power = std::make_unique<Expression>();
-            *power -= std::move(term.power);
-            term.power = std::move(power);
+        if (!std::holds_alternative<Expression>(*term.power)) {
+            Expression power{};
+            power -= std::move(term.power);
+            *term.power = std::move(power);
         }
 
-        auto &power = dynamic_cast<Expression &>(*term.power);
+        auto &power = std::get<Expression>(*term.power);
 
         for (OwnedToken &t : this->terms) {
-            if (typeid(*t) == typeid(Variable)) {
-                if (auto const &v = dynamic_cast<Variable const &>(*t);
-                    v != variable)
+            if (std::holds_alternative<Variable>(*t)) {
+                if (auto const &v = std::get<Variable>(*t); v != variable)
                     continue;
 
                 power += Constant(1);
-                term.power = OwnedToken(from_variant(simplified(power)).move());
-                t = OwnedToken(std::move(token).move());
+                *term.power = simplified(power);
+                *t = std::move(token);
 
                 return *this;
             }
 
-            if (typeid(*t) == typeid(Term)) {
-                auto &term1 = dynamic_cast<Term &>(*t);
+            if (std::holds_alternative<Term>(*t)) {
+                auto &term1 = std::get<Term>(*t);
 
-                if (typeid(*term1.base) != typeid(Variable))
+                if (!std::holds_alternative<Variable>(*term1.base))
                     continue;
 
-                if (auto const &v = dynamic_cast<Variable const &>(*term1.base);
+                if (auto const &v = std::get<Variable>(*term1.base);
                     variable != v)
                     continue;
 
                 power += std::move(term1.power);
-                term.power = OwnedToken(from_variant(simplified(power)).move());
-                t = OwnedToken(std::move(token).move());
+                *term.power = simplified(power);
+                *t = std::move(token);
 
                 return *this;
             }
         }
 
-        term.power = OwnedToken(from_variant(simplified(power)).move());
+        *term.power = simplified(power);
 
-        this->terms.push_back(std::make_unique<Term>(std::move(token) ^ -1));
+        this->terms.emplace_back(new Token(std::move(token) ^ -1));
 
         return *this;
     }
 
-    if (typeid(token) == typeid(Terms)) {
-        auto &terms = dynamic_cast<Terms &>(token);
+    if (std::holds_alternative<Terms>(token)) {
+        auto &terms = std::get<Terms>(token);
 
         if (terms.coefficient != 1) {
             *this /= terms.coefficient;
@@ -321,7 +326,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
         return *this;
     }
 
-    this->terms.push_back(std::make_unique<Term>(std::move(token) ^ -1));
+    this->terms.emplace_back(new Token(std::move(token) ^ -1));
 
     return *this;
 }
@@ -343,7 +348,7 @@ bool is_dependent_on(Terms const &token, Variable const &variable) {
     return std::ranges::any_of(
         token.terms,
         [variable](OwnedToken const &term) -> bool {
-            return is_dependent_on(to_variant(*term), variable);
+            return is_dependent_on(*term, variable);
         }
     );
 }
@@ -355,7 +360,7 @@ bool is_linear_of(Terms const &token, Variable const &variable) {
     bool is_linear = false;
 
     for (OwnedToken const &t : token.terms) {
-        if (!is_linear_of(to_variant(*t), variable))
+        if (!is_linear_of(*t, variable))
             continue;
 
         if (is_linear)
@@ -367,20 +372,16 @@ bool is_linear_of(Terms const &token, Variable const &variable) {
     return is_linear;
 }
 
-token evaluate(
-    Terms const &token, std::map<Variable, SharedToken> const &values
-) {
+Token evaluate(Terms const &token, std::map<Variable, Token> const &values) {
     Terms terms{token};
 
     for (OwnedToken &term : terms.terms)
-        term =
-            OwnedToken(from_variant(evaluate(to_variant(*term), values)).move()
-            );
+        *term = evaluate(*term, values);
 
     return simplified(terms);
 }
 
-token simplified(Terms const &token) {
+Token simplified(Terms const &token) {
     if (token.coefficient == 0)
         return Constant(0);
 
@@ -388,52 +389,48 @@ token simplified(Terms const &token) {
         return Constant(token.coefficient);
 
     if (token.terms.size() == 1) {
-        auto term = OwnedToken(token.terms[0]->clone());
+        auto term = *token.terms[0];
 
-        if (typeid(*term) == typeid(Constant))
-            return Constant(
-                token.coefficient * dynamic_cast<Constant const &>(*term)
-            );
+        if (std::holds_alternative<Constant>(term))
+            return Constant(token.coefficient * std::get<Constant>(term));
 
-        if (typeid(*term) == typeid(Term)) {
-            dynamic_cast<Term &>(*term) *= token.coefficient;
+        if (std::holds_alternative<Term>(term)) {
+            std::get<Term>(term) *= token.coefficient;
 
-            return simplified(*term);
+            return simplified(term);
         }
 
-        return simplified(token.coefficient * std::move(*term));
+        return simplified(token.coefficient * std::move(term));
     }
 
     Terms terms{};
     terms.coefficient = token.coefficient;
 
     for (OwnedToken const &token_ : token.terms)
-        terms *= from_variant(simplified(*token_));
+        terms *= simplified(*token_);
 
     if (terms.terms.empty())
         return Constant(terms.coefficient);
 
     if (terms.terms.size() == 1) {
-        auto &term = terms.terms[0];
+        auto term = *terms.terms[0];
 
-        if (typeid(*term) == typeid(Constant))
-            return Constant(
-                terms.coefficient * dynamic_cast<Constant const &>(*term)
-            );
+        if (std::holds_alternative<Constant>(term))
+            return Constant(terms.coefficient * std::get<Constant>(term));
 
-        if (typeid(*term) == typeid(Term)) {
-            dynamic_cast<Term &>(*term) *= terms.coefficient;
+        if (std::holds_alternative<Term>(term)) {
+            std::get<Term>(term) *= terms.coefficient;
 
-            return simplified(*term);
+            return simplified(term);
         }
 
-        return simplified(terms.coefficient * std::move(*term));
+        return simplified(terms.coefficient * std::move(term));
     }
 
     return terms;
 }
 
-token derivative(
+Token derivative(
     Terms const &token, Variable const &variable, std::uint32_t const order
 ) {
     if (!order)
@@ -445,26 +442,25 @@ token derivative(
     Expression result{};
 
     for (std::size_t i = 0; i < token.terms.size(); ++i) {
-        auto term = std::make_unique<Terms>();
+        Terms term{};
 
         for (std::size_t j = 0; j < token.terms.size(); ++j) {
             if (i != j) {
-                *term *= OwnedToken(token.terms[j]->clone());
+                term *= *token.terms[j];
 
                 continue;
             }
 
-            Token const &derivative = from_variant(
-                mlp::derivative(to_variant(*token.terms[i]), variable, 1)
-            );
+            Token const &derivative =
+                mlp::derivative(*token.terms[i], variable, 1);
 
-            if (typeid(derivative) == typeid(Constant)) {
-                *term *= dynamic_cast<Constant const &>(derivative);
+            if (std::holds_alternative<Constant>(derivative)) {
+                term *= std::get<Constant>(derivative).value();
 
                 continue;
             }
 
-            *term *= derivative;
+            term *= derivative;
         }
 
         result += std::move(term);
@@ -478,7 +474,7 @@ token derivative(
     return derivative;
 }
 
-token integral(Terms const &token, Variable const &variable) {
+Token integral(Terms const &token, Variable const &variable) {
     auto const simplified = mlp::simplified(token);
 
     if (!std::holds_alternative<Terms>(simplified))
@@ -494,11 +490,9 @@ token integral(Terms const &token, Variable const &variable) {
         terms.coefficient = t.coefficient;
 
         for (OwnedToken const &token_ : t.terms)
-            terms *= is_linear_of(to_variant(*token_), variable)
-                         ? OwnedToken(
-                               from_variant(integral(*token_, variable)).move()
-                           )
-                         : OwnedToken(token_->clone());
+            terms *= is_linear_of(*token_, variable)
+                         ? integral(*token_, variable)
+                         : *token_;
 
         return mlp::simplified(terms);
     }

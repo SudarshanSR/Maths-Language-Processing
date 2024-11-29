@@ -4,7 +4,7 @@
 #include "token.h"
 
 namespace mlp {
-struct Term final : Token {
+struct Term final {
     std::double_t coefficient{1};
     OwnedToken base;
     OwnedToken power;
@@ -21,11 +21,11 @@ struct Term final : Token {
 
     Term(Term &&) = default;
 
-    [[nodiscard]] gsl::owner<Term *> clone() const override;
+    Term &operator=(Term const &term);
 
-    [[nodiscard]] gsl::owner<Term *> move() && override;
+    Term &operator=(Term &&) = default;
 
-    explicit operator std::string() const override;
+    explicit operator std::string() const;
 
     [[nodiscard]] Term operator-() const;
 
@@ -48,15 +48,15 @@ struct Term final : Token {
 
 [[nodiscard]] bool is_linear_of(Term const &token, Variable const &variable);
 
-[[nodiscard]] token
-evaluate(Term const &token, std::map<Variable, SharedToken> const &values);
+[[nodiscard]] Token
+evaluate(Term const &token, std::map<Variable, Token> const &values);
 
-[[nodiscard]] token simplified(Term const &token);
+[[nodiscard]] Token simplified(Term const &token);
 
-[[nodiscard]] token
+[[nodiscard]] Token
 derivative(Term const &token, Variable const &variable, std::uint32_t order);
 
-[[nodiscard]] token integral(Term const &token, Variable const &variable);
+[[nodiscard]] Token integral(Term const &token, Variable const &variable);
 } // namespace mlp
 
 #endif // TERM_H

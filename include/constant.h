@@ -4,7 +4,7 @@
 #include "token.h"
 
 namespace mlp {
-class Constant final : public Token {
+class Constant final {
     std::double_t value_;
 
   public:
@@ -22,11 +22,7 @@ class Constant final : public Token {
 
     [[nodiscard]] std::double_t value() const { return this->value_; }
 
-    [[nodiscard]] gsl::owner<Constant *> clone() const override;
-
-    [[nodiscard]] gsl::owner<Constant *> move() && override;
-
-    explicit operator std::string() const override;
+    explicit operator std::string() const;
 
     explicit(false) operator std::double_t() const;
 
@@ -55,16 +51,16 @@ class Constant final : public Token {
 
 [[nodiscard]] bool is_linear_of(Constant const &, Variable const &);
 
-[[nodiscard]] token
-evaluate(Constant const &token, std::map<Variable, SharedToken> const &values);
+[[nodiscard]] Token
+evaluate(Constant const &token, std::map<Variable, Token> const &values);
 
-[[nodiscard]] token simplified(Constant const &token);
+[[nodiscard]] Token simplified(Constant const &token);
 
-[[nodiscard]] token derivative(
+[[nodiscard]] Token derivative(
     Constant const &token, Variable const &variable, std::uint32_t order
 );
 
-[[nodiscard]] token integral(Constant const &token, Variable const &variable);
+[[nodiscard]] Token integral(Constant const &token, Variable const &variable);
 
 Constant operator++(Constant &lhs, int);
 
