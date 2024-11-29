@@ -9,9 +9,6 @@ struct Term final : Token {
     OwnedToken base;
     OwnedToken power;
 
-    using Token::derivative;
-    using Token::integral;
-
     Term(std::double_t coefficient, OwnedToken &&base, OwnedToken &&power);
 
     Term(std::double_t coefficient, Token &&base, Token &&power);
@@ -45,21 +42,21 @@ struct Term final : Token {
     friend Term operator/(std::double_t lhs, Term rhs);
 
     friend Term operator/(Term lhs, std::double_t rhs);
-
-    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
-
-    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
-
-    [[nodiscard]] OwnedToken
-    evaluate(std::map<Variable, SharedToken> const &values) const override;
-
-    [[nodiscard]] OwnedToken simplified() const override;
-
-    [[nodiscard]] OwnedToken
-    derivative(Variable const &variable, std::uint32_t order) const override;
-
-    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 };
+
+[[nodiscard]] bool is_dependent_on(Term const &token, Variable const &variable);
+
+[[nodiscard]] bool is_linear_of(Term const &token, Variable const &variable);
+
+[[nodiscard]] token
+evaluate(Term const &token, std::map<Variable, SharedToken> const &values);
+
+[[nodiscard]] token simplified(Term const &token);
+
+[[nodiscard]] token
+derivative(Term const &token, Variable const &variable, std::uint32_t order);
+
+[[nodiscard]] token integral(Term const &token, Variable const &variable);
 } // namespace mlp
 
 #endif // TERM_H

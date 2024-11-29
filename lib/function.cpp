@@ -1,12 +1,12 @@
-module;
+#include "../include/function.h"
 
 #include "../include/constant.h"
+#include "../include/expression.h"
+#include "../include/term.h"
 #include "../include/terms.h"
 #include "../include/variable.h"
 
 #include <sstream>
-
-module mlp.function;
 
 namespace {
 std::map<std::string, std::double_t (*)(std::double_t)> k_functions{
@@ -116,95 +116,99 @@ mlp::Function::operator std::string() const {
     return result.str();
 }
 
-bool mlp::Function::is_dependent_on(Variable const &variable) const {
-    return this->parameter->is_dependent_on(variable);
-}
-
-bool mlp::Function::is_linear_of(Variable const &variable) const {
-    return false;
-}
-
-mlp::OwnedToken
-mlp::Function::evaluate(std::map<Variable, SharedToken> const &values) const {
-    auto param = this->parameter->evaluate(values);
-
-    if (typeid(*param) == typeid(Constant))
-        return std::make_unique<Constant>(k_functions.at(this->function)(
-            dynamic_cast<Constant const &>(*param)
-        ));
-
-    return std::make_unique<Function>(this->function, std::move(param));
-}
-
-mlp::OwnedToken mlp::Function::simplified() const {
-    OwnedToken simplified = this->parameter->simplified();
-
-    if (typeid(*simplified) == typeid(Constant))
-        return Function(this->function, std::move(simplified)).evaluate({});
-
-    return std::make_unique<Function>(this->function, std::move(simplified));
-}
-
-mlp::OwnedToken mlp::Function::derivative(
-    Variable const &variable, std::uint32_t const order
-) const {
-    if (!order)
-        return OwnedToken(this->clone());
-
-    if (!this->is_dependent_on(variable))
-        return std::make_unique<Constant>(0);
-
-    auto parameter = static_cast<std::string>(*this->parameter);
-
-    Terms result{};
-    result *= tokenise(
-        std::vformat(
-            k_function_map.at(this->function), std::make_format_args(parameter)
-        )
-    );
-    result *= this->parameter->derivative(variable, 1);
-
-    auto derivative = result.simplified();
-
-    if (order > 1)
-        return derivative->derivative(variable, order - 1)->simplified();
-
-    return derivative;
-}
-
-mlp::OwnedToken mlp::Function::integral(Variable const &variable) const {
-    if (!this->is_dependent_on(variable)) {
-        auto terms = std::make_unique<Terms>();
-        *terms *= Variable(variable);
-        *terms *= Function(*this);
-
-        return terms;
-    }
-
-    if (this->parameter->is_linear_of(variable)) {
-        Terms terms{};
-
-        auto string = static_cast<std::string>(*this->parameter);
-
-        terms *= tokenise(
-            std::vformat(
-                k_function_map.at(this->function), std::make_format_args(string)
-            )
-        );
-        terms /= this->parameter->derivative(variable, 1)->simplified();
-
-        return terms.simplified();
-    }
-
-    throw std::runtime_error("Expression is not integrable!");
-}
-
 mlp::FunctionFactory::FunctionFactory(std::string function)
     : function(std::move(function)) {}
 
 mlp::Function mlp::FunctionFactory::operator()(Token const &token) const {
     return Function(this->function, OwnedToken(token.clone()));
 }
+
+namespace mlp {
+bool is_dependent_on(Function const &token, Variable const &variable) {
+    return is_dependent_on(to_variant(*token.parameter), variable);
+}
+
+bool is_linear_of(Function const &, Variable const &) { return false; }
+
+token evaluate(
+    Function const &token, std::map<Variable, SharedToken> const &values
+) {
+    auto param = evaluate(to_variant(*token.parameter), values);
+
+    if (std::holds_alternative<Constant>(param))
+        return Constant(k_functions.at(token.function)(std::get<Constant>(param)
+        ));
+
+    return Function(
+        token.function, OwnedToken(from_variant(std::move(param)).move())
+    );
+}
+
+token simplified(Function const &token) {
+    mlp::token simplified = mlp::simplified(*token.parameter);
+
+    if (std::holds_alternative<Constant>(simplified))
+        return evaluate(
+            Function(
+                token.function,
+                OwnedToken(from_variant(std::move(simplified)).move())
+            ),
+            {}
+        );
+
+    return Function(
+        token.function, OwnedToken(from_variant(std::move(simplified)).move())
+    );
+}
+
+token derivative(
+    Function const &token, Variable const &variable, std::uint32_t const order
+) {
+    if (!order)
+        return token;
+
+    if (!is_dependent_on(token, variable))
+        return Constant(0);
+
+    auto parameter = static_cast<std::string>(*token.parameter);
+
+    auto derivative = simplified(
+        *tokenise(
+            std::vformat(
+                k_function_map.at(token.function),
+                std::make_format_args(parameter)
+            )
+        ) *
+        from_variant(mlp::derivative(to_variant(*token.parameter), variable, 1))
+    );
+
+    if (order > 1)
+        return simplified(mlp::derivative(derivative, variable, order - 1));
+
+    return derivative;
+}
+
+token integral(Function const &token, Variable const &variable) {
+    if (!is_dependent_on(token, variable))
+        return variable * token;
+
+    if (is_linear_of(to_variant(*token.parameter), variable)) {
+        auto string = static_cast<std::string>(*token.parameter);
+
+        return simplified(
+            *tokenise(
+                std::vformat(
+                    k_function_map.at(token.function),
+                    std::make_format_args(string)
+                )
+            ) *
+            from_variant(derivative(to_variant(*token.parameter), variable, 1))
+        );
+    }
+
+    throw std::runtime_error("Expression is not integrable!");
+}
+} // namespace mlp
 
 mlp::FunctionFactory operator""_f(char const *string, size_t) {
     if (!k_functions.contains(string))

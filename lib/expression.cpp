@@ -1,6 +1,7 @@
 #include "../include/expression.h"
 
 #include "../include/constant.h"
+#include "../include/function.h"
 #include "../include/term.h"
 #include "../include/terms.h"
 #include "../include/variable.h"
@@ -488,124 +489,6 @@ mlp::Expression &mlp::Expression::operator-=(Token &&token) {
     return *this;
 }
 
-bool mlp::Expression::is_dependent_on(Variable const &variable) const {
-    return std::ranges::any_of(
-        this->tokens,
-        [variable](std::pair<Sign, OwnedToken> const &term) -> bool {
-            return term.second->is_dependent_on(variable);
-        }
-    );
-}
-
-bool mlp::Expression::is_linear_of(Variable const &variable) const {
-    if (!this->is_dependent_on(variable))
-        return false;
-
-    bool is_linear = false;
-
-    for (OwnedToken const &token : this->tokens | std::views::values) {
-        if (!token->is_linear_of(variable))
-            continue;
-
-        if (!token->is_linear_of(variable))
-            return false;
-
-        is_linear = true;
-    }
-
-    return is_linear;
-}
-
-mlp::OwnedToken
-mlp::Expression::evaluate(std::map<Variable, SharedToken> const &values) const {
-    Expression expression{*this};
-
-    for (auto &term : expression.tokens | std::views::values)
-        term = term->evaluate(values);
-
-    return expression.simplified();
-}
-
-mlp::OwnedToken mlp::Expression::simplified() const {
-    if (this->tokens.empty())
-        return std::make_unique<Constant>(0);
-
-    if (this->tokens.size() == 1) {
-        Expression expression{*this};
-
-        auto [sign, term] = std::move(expression.tokens.back());
-
-        expression.tokens.pop_back();
-
-        if (sign == Sign::pos)
-            return term->simplified();
-
-        return (-std::move(*term)).simplified();
-    }
-
-    auto expression = std::make_unique<Expression>();
-
-    std::vector<std::pair<Sign, OwnedToken>> const &tokens = expression->tokens;
-
-    for (auto const &[sign, t] : this->tokens)
-        expression->add_token(sign, t->simplified());
-
-    if (tokens.empty())
-        return std::make_unique<Constant>(0);
-
-    if (tokens.size() == 1) {
-        auto [sign, term] = std::move(expression->tokens.back());
-
-        expression->tokens.pop_back();
-
-        if (sign == Sign::pos)
-            return std::move(term);
-
-        return std::make_unique<Term>(-*term);
-    }
-
-    return expression;
-}
-
-mlp::OwnedToken mlp::Expression::derivative(
-    Variable const &variable, std::uint32_t const order
-) const {
-    if (!order)
-        return OwnedToken(this->clone());
-
-    if (!this->is_dependent_on(variable))
-        return std::make_unique<Constant>(0);
-
-    Expression result{};
-
-    for (auto const &[operation, token] : this->tokens)
-        result.add_token(operation, token->derivative(variable, 1));
-
-    auto derivative = result.simplified();
-
-    if (order > 1)
-        return derivative->derivative(variable, order - 1)->simplified();
-
-    return derivative;
-}
-
-mlp::OwnedToken mlp::Expression::integral(Variable const &variable) const {
-    if (!this->is_dependent_on(variable)) {
-        auto terms = std::make_unique<Terms>();
-        *terms *= Variable(variable);
-        *terms *= Expression(*this);
-
-        return terms;
-    }
-
-    Expression result{};
-
-    for (auto const &[operation, term] : this->tokens)
-        result.add_token(operation, term->integral(variable));
-
-    return result.simplified();
-}
-
 mlp::Expression &mlp::Expression::operator*=(Token const &token) {
     for (auto &[sign, t] : this->tokens) {
         auto const temp = std::make_unique<Terms>(*t * token);
@@ -616,7 +499,7 @@ mlp::Expression &mlp::Expression::operator*=(Token const &token) {
             sign = sign == Sign::pos ? Sign::neg : Sign::pos;
         }
 
-        t = temp->simplified();
+        t = OwnedToken(from_variant(simplified(*temp)).move());
     }
 
     return *this;
@@ -630,6 +513,132 @@ mlp::Expression &mlp::Expression::operator*=(Expression const &rhs) {
 
     return *this = std::move(expression);
 }
+
+namespace mlp {
+bool is_dependent_on(Expression const &token, Variable const &variable) {
+    return std::ranges::any_of(
+        token.tokens,
+        [variable](std::pair<Sign, OwnedToken> const &term) -> bool {
+            return is_dependent_on(to_variant(*term.second), variable);
+        }
+    );
+}
+
+bool is_linear_of(Expression const &token, Variable const &variable) {
+    if (!is_dependent_on(token, variable))
+        return false;
+
+    bool is_linear = false;
+
+    for (OwnedToken const &t : token.tokens | std::views::values) {
+        if (typeid(*t) == typeid(Constant))
+            continue;
+
+        if (!is_linear_of(to_variant(*t), variable))
+            return false;
+
+        is_linear = true;
+    }
+
+    return is_linear;
+}
+
+token evaluate(
+    Expression const &token, std::map<Variable, SharedToken> const &values
+) {
+    Expression expression{token};
+
+    for (auto &term : expression.tokens | std::views::values)
+        term =
+            OwnedToken(from_variant(evaluate(to_variant(*term), values)).move()
+            );
+
+    return simplified(expression);
+}
+
+token simplified(Expression const &token) {
+    if (token.tokens.empty())
+        return Constant(0);
+
+    if (token.tokens.size() == 1) {
+        Expression expression{token};
+
+        if (expression.tokens.empty())
+            return Constant(0);
+
+        auto [sign, term] = std::move(expression.tokens.back());
+
+        expression.tokens.pop_back();
+
+        if (sign == Sign::pos)
+            return simplified(*term);
+
+        return simplified(-std::move(*term));
+    }
+
+    Expression expression{};
+
+    std::vector<std::pair<Sign, OwnedToken>> const &tokens = expression.tokens;
+
+    for (auto const &[sign, t] : token.tokens)
+        expression.add_token(
+            sign, OwnedToken(from_variant(simplified(*t)).move())
+        );
+
+    if (tokens.empty())
+        return Constant(0);
+
+    if (tokens.size() == 1) {
+        auto [sign, term] = std::move(expression.tokens.back());
+
+        expression.tokens.pop_back();
+
+        if (sign == Sign::pos)
+            return to_variant(*term);
+
+        return -*term;
+    }
+
+    return expression;
+}
+
+token derivative(
+    Expression const &token, Variable const &variable, std::uint32_t const order
+) {
+    if (!order)
+        return token;
+
+    if (!is_dependent_on(token, variable))
+        return Constant(0);
+
+    Expression result{};
+
+    for (auto const &[operation, token_] : token.tokens)
+        result.add_token(
+            operation,
+            from_variant(derivative(to_variant(*token_), variable, 1))
+        );
+
+    auto derivative = simplified(result);
+
+    if (order > 1)
+        return simplified(mlp::derivative(derivative, variable, order - 1));
+
+    return derivative;
+}
+
+token integral(Expression const &token, Variable const &variable) {
+    if (!is_dependent_on(token, variable))
+        return variable * token;
+
+    Expression result{};
+
+    for (auto const &[operation, term] : token.tokens)
+        result.add_token(operation, from_variant(integral(*term, variable)));
+
+    return simplified(result);
+}
+} // namespace mlp
 
 mlp::Expression mlp::operator+(Expression lhs, Token const &rhs) {
     return std::move(lhs += rhs);

@@ -10,9 +10,6 @@ class Terms final : public Token {
     std::vector<OwnedToken> terms;
 
   public:
-    using Token::derivative;
-    using Token::integral;
-
     std::double_t coefficient{1};
 
     Terms() = default;
@@ -53,19 +50,20 @@ class Terms final : public Token {
 
     friend Terms operator/(Terms lhs, std::double_t rhs);
 
-    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
+    friend bool is_dependent_on(Terms const &token, Variable const &variable);
 
-    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
+    friend bool is_linear_of(Terms const &token, Variable const &variable);
 
-    [[nodiscard]] OwnedToken
-    evaluate(std::map<Variable, SharedToken> const &values) const override;
+    friend token
+    evaluate(Terms const &token, std::map<Variable, SharedToken> const &values);
 
-    [[nodiscard]] OwnedToken simplified() const override;
+    friend token simplified(Terms const &token);
 
-    [[nodiscard]] OwnedToken
-    derivative(Variable const &variable, std::uint32_t order) const override;
+    friend token derivative(
+        Terms const &token, Variable const &variable, std::uint32_t order
+    );
 
-    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
+    friend token integral(Terms const &token, Variable const &variable);
 };
 } // namespace mlp
 

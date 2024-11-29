@@ -2,6 +2,7 @@
 
 #include "../include/constant.h"
 #include "../include/expression.h"
+#include "../include/function.h"
 #include "../include/term.h"
 #include "../include/terms.h"
 #include "../include/variable.h"
@@ -14,8 +15,6 @@
 #include <set>
 #include <sstream>
 #include <utility>
-
-import mlp.function;
 
 namespace mlp {
 struct Operation final {
@@ -189,27 +188,93 @@ get_next_token(std::string const &expression, std::size_t &i) {
 }
 } // namespace
 
-mlp::OwnedToken mlp::Differentiable::derivative(
-    Variable const &variable, std::uint32_t const order,
-    std::map<Variable, SharedToken> const &values
-) const {
-    return this->derivative(variable, order)->evaluate(values);
-}
-
-mlp::OwnedToken mlp::Integrable::integral(
-    Variable const &variable, SharedToken const &from, SharedToken const &to
-) const {
-    auto const integral = this->integral(variable);
-
-    Expression result{};
-    result += integral->evaluate({{variable, to}});
-    result -= integral->evaluate({{variable, from}});
-
-    return result.simplified();
-}
-
 mlp::Term mlp::Token::operator-() const {
     return {-1, OwnedToken(this->clone()), std::make_unique<Constant>(1)};
+}
+
+bool mlp::is_dependent_on(token const &token, Variable const &variable) {
+    return std::visit(
+        [&variable](auto &&var) -> bool {
+            return is_dependent_on(var, variable);
+        },
+        token
+    );
+}
+
+bool mlp::is_linear_of(token const &token, Variable const &variable) {
+    return std::visit(
+        [&variable](auto &&var) -> bool { return is_linear_of(var, variable); },
+        token
+    );
+}
+
+mlp::token mlp::evaluate(
+    token const &token, std::map<Variable, SharedToken> const &values
+) {
+    return std::visit(
+        [&values](auto &&val) -> mlp::token { return evaluate(val, values); },
+        token
+    );
+}
+
+mlp::token mlp::simplified(Token const &token) {
+    return simplified(to_variant(token));
+}
+
+mlp::token mlp::simplified(token const &token) {
+    return std::visit(
+        [](auto &&var) -> mlp::token { return simplified(var); }, token
+    );
+}
+
+mlp::token mlp::derivative(
+    token const &token, Variable const &variable, std::uint32_t const order,
+    std::map<Variable, SharedToken> const &values
+) {
+    return evaluate(derivative(token, variable, order), values);
+}
+
+mlp::token mlp::derivative(
+    token const &token, Variable const &variable, std::uint32_t const order
+) {
+    return std::visit(
+        [&variable, &order](auto &&val) -> mlp::token {
+            return derivative(val, variable, order);
+        },
+        token
+    );
+}
+
+mlp::token mlp::integral(Token const &token, Variable const &variable) {
+    return integral(to_variant(token), variable);
+}
+
+mlp::token mlp::integral(token const &token, Variable const &variable) {
+    return std::visit(
+        [&variable](auto &&val) -> mlp::token {
+            return integral(val, variable);
+        },
+        token
+    );
+}
+
+mlp::token mlp::integral(
+    Token const &token, Variable const &variable, SharedToken const &from,
+    SharedToken const &to
+) {
+    return integral(to_variant(token), variable, from, to);
+}
+
+mlp::token mlp::integral(
+    token const &token, Variable const &variable, SharedToken const &from,
+    SharedToken const &to
+) {
+    auto const &integral = mlp::integral(token, variable);
+
+    return simplified(
+        from_variant(evaluate(integral, {{variable, to}})) -
+        from_variant(evaluate(integral, {{variable, from}}))
+    );
 }
 
 mlp::OwnedToken mlp::tokenise(std::string expression) {
@@ -282,7 +347,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
                 for (OwnedToken &t : denominator)
                     terms /= std::move(t);
 
-                result.add_token(s, terms.simplified());
+                result.add_token(s, from_variant(simplified(terms)));
 
                 numerator.clear();
                 denominator.clear();
@@ -344,7 +409,7 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
         for (OwnedToken &p : powers | std::views::reverse)
             power = std::make_unique<Term>(std::move(*p) ^ std::move(*power));
 
-        power = power->simplified();
+        power = OwnedToken(from_variant(simplified(*power)).move());
 
         if (!last)
             numerator.back() = std::make_unique<Term>(
@@ -364,9 +429,9 @@ mlp::OwnedToken mlp::tokenise(std::string expression) {
     for (OwnedToken &t : denominator)
         terms /= std::move(t);
 
-    result.add_token(s, terms.simplified());
+    result.add_token(s, from_variant(simplified(terms)));
 
-    return result.simplified();
+    return OwnedToken(from_variant(simplified(result)).move());
 }
 
 namespace mlp {
@@ -428,6 +493,40 @@ std::ostream &operator<<(std::ostream &os, Sign const sign) {
     os << to_string(sign);
 
     return os;
+}
+
+token to_variant(Token const &token) {
+    if (typeid(token) == typeid(Constant))
+        return dynamic_cast<Constant const &>(token);
+
+    if (typeid(token) == typeid(Variable))
+        return dynamic_cast<Variable const &>(token);
+
+    if (typeid(token) == typeid(Function))
+        return dynamic_cast<Function const &>(token);
+
+    if (typeid(token) == typeid(Term))
+        return dynamic_cast<Term const &>(token);
+
+    if (typeid(token) == typeid(Terms))
+        return dynamic_cast<Terms const &>(token);
+
+    if (typeid(token) == typeid(Expression))
+        return dynamic_cast<Expression const &>(token);
+
+    throw std::runtime_error("Invalid token");
+}
+
+Token const &from_variant(token const &token) {
+    return std::visit(
+        [](auto const &var) -> Token const & { return var; }, token
+    );
+}
+
+Token &&from_variant(token &&token) {
+    return std::visit(
+        [](auto &&var) -> Token && { return std::move(var); }, token
+    );
 }
 
 Term operator^(Token const &lhs, std::double_t const rhs) {

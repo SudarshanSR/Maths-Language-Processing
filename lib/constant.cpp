@@ -1,6 +1,9 @@
 #include "../include/constant.h"
 
+#include "../include/expression.h"
+#include "../include/function.h"
 #include "../include/term.h"
+#include "../include/terms.h"
 #include "../include/variable.h"
 
 mlp::Constant::Constant(std::double_t const value) : value_(value) {}
@@ -79,30 +82,28 @@ bool mlp::Constant::operator>(Constant const &rhs) const {
     return this->value_ > rhs.value_;
 }
 
-bool mlp::Constant::is_dependent_on(Variable const &variable) const {
-    return false;
+bool mlp::is_dependent_on(Constant const &, Variable const &) { return false; }
+
+bool mlp::is_linear_of(Constant const &, Variable const &) { return false; }
+
+mlp::token
+mlp::evaluate(Constant const &token, std::map<Variable, SharedToken> const &) {
+    return token;
 }
 
-bool mlp::Constant::is_linear_of(Variable const &variable) const {
-    return false;
+mlp::token mlp::simplified(Constant const &token) { return token; }
+
+mlp::token mlp::derivative(
+    Constant const &token, Variable const &, std::uint32_t const order
+) {
+    if (!order)
+        return token;
+
+    return Constant(0);
 }
 
-mlp::OwnedToken
-mlp::Constant::evaluate(std::map<Variable, SharedToken> const &values) const {
-    return std::make_unique<Constant>(*this);
-}
-
-mlp::OwnedToken mlp::Constant::simplified() const {
-    return Owned<Constant>(this->clone());
-}
-
-mlp::OwnedToken
-mlp::Constant::derivative(Variable const &, std::uint32_t const) const {
-    return std::make_unique<Constant>(0);
-}
-
-mlp::OwnedToken mlp::Constant::integral(Variable const &variable) const {
-    return std::make_unique<Term>(this->value_ * variable);
+mlp::token mlp::integral(Constant const &token, Variable const &variable) {
+    return token.value() * variable;
 }
 
 namespace mlp {

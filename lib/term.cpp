@@ -2,12 +2,11 @@
 
 #include "../include/constant.h"
 #include "../include/expression.h"
+#include "../include/function.h"
 #include "../include/terms.h"
 #include "../include/variable.h"
 
 #include <sstream>
-
-import mlp.function;
 
 mlp::Term::Term(
     std::double_t const coefficient, OwnedToken &&base, OwnedToken &&power
@@ -69,12 +68,22 @@ mlp::Term mlp::Term::operator-() const {
 }
 
 mlp::Term &mlp::Term::operator*=(std::double_t const rhs) {
+    if (rhs == 0) {
+        this->base = std::make_unique<Constant>(1);
+        this->power = std::make_unique<Constant>(1);
+    }
+
     this->coefficient *= rhs;
 
     return *this;
 }
 
 mlp::Term &mlp::Term::operator/=(std::double_t const rhs) {
+    if (rhs == 0) {
+        this->base = std::make_unique<Constant>(1);
+        this->power = std::make_unique<Constant>(1);
+    }
+
     this->coefficient /= rhs;
 
     return *this;
@@ -93,50 +102,55 @@ gsl::owner<mlp::Terms *> mlp::Terms::move() && {
     return new Terms(std::move(*this));
 }
 
-bool mlp::Term::is_dependent_on(Variable const &variable) const {
-    return this->base->is_dependent_on(variable) ||
-           this->power->is_dependent_on(variable);
+bool mlp::is_dependent_on(Term const &token, Variable const &variable) {
+    return is_dependent_on(to_variant(*token.base), variable) ||
+           is_dependent_on(to_variant(*token.power), variable);
 }
 
-bool mlp::Term::is_linear_of(Variable const &variable) const {
-    return this->is_dependent_on(variable) &&
-           typeid(*this->power) == typeid(Constant) &&
-           dynamic_cast<Constant const &>(*this->power) == 1 &&
-           this->base->is_linear_of(variable);
+bool mlp::is_linear_of(Term const &token, Variable const &variable) {
+    return is_dependent_on(token, variable) &&
+           typeid(*token.power) == typeid(Constant) &&
+           dynamic_cast<Constant const &>(*token.power) == 1 &&
+           is_linear_of(to_variant(*token.base), variable);
 }
 
-mlp::OwnedToken
-mlp::Term::evaluate(std::map<Variable, SharedToken> const &values) const {
-    Term term{*this};
+mlp::token mlp::evaluate(
+    Term const &token, std::map<Variable, SharedToken> const &values
+) {
+    Term term{token};
 
-    term.base = term.base->evaluate(values);
-    term.power = term.power->evaluate(values);
+    term.base =
+        OwnedToken(from_variant(evaluate(to_variant(*term.base), values)).move()
+        );
+    term.power = OwnedToken(
+        from_variant(evaluate(to_variant(*term.power), values)).move()
+    );
 
-    return term.simplified();
+    return simplified(term);
 }
 
-mlp::OwnedToken mlp::Term::simplified() const {
-    auto term = Owned<Term>(this->clone());
+mlp::token mlp::simplified(Term const &token) {
+    Term term{token};
 
-    term->base = term->base->simplified();
-    term->power = term->power->simplified();
+    term.base = OwnedToken(from_variant(simplified(*term.base)).move());
+    term.power = OwnedToken(from_variant(simplified(*term.power)).move());
 
-    if (typeid(*term->power) == typeid(Constant)) {
-        auto &power = dynamic_cast<Constant &>(*term->power);
+    if (typeid(*term.power) == typeid(Constant)) {
+        auto &power = dynamic_cast<Constant &>(*term.power);
 
-        if (term->coefficient == 1 && power == 1)
-            return std::move(term->base);
+        if (term.coefficient == 1 && power == 1)
+            return to_variant(*term.base);
 
         if (power == 0)
-            return std::make_unique<Constant>(term->coefficient);
+            return Constant(term.coefficient);
 
-        if (typeid(*term->base) == typeid(Term)) {
-            auto &base = dynamic_cast<Term &>(*term->base);
+        if (typeid(*term.base) == typeid(Term)) {
+            auto &base = dynamic_cast<Term &>(*term.base);
             base.coefficient = base.coefficient ^ power;
 
-            if (term->coefficient != 1) {
-                base.coefficient *= term->coefficient;
-                term->coefficient = 1;
+            if (term.coefficient != 1) {
+                base.coefficient *= term.coefficient;
+                term.coefficient = 1;
             }
 
             if (typeid(*base.power) == typeid(Constant)) {
@@ -156,175 +170,167 @@ mlp::OwnedToken mlp::Term::simplified() const {
             power = 1;
 
             if (power == 1)
-                return std::move(term->base);
+                return to_variant(*term.base);
         }
     }
 
-    if (typeid(*term->base) == typeid(Terms)) {
-        auto &base = dynamic_cast<Terms &>(*term->base);
+    if (typeid(*term.base) == typeid(Terms)) {
+        auto &base = dynamic_cast<Terms &>(*term.base);
 
-        if (term->coefficient != 1) {
-            base.coefficient *= term->coefficient;
-            term->coefficient = 1;
+        if (term.coefficient != 1) {
+            base.coefficient *= term.coefficient;
+            term.coefficient = 1;
         }
     }
 
-    if (typeid(*term->base) == typeid(Constant)) {
-        auto const &base = dynamic_cast<Constant const &>(*term->base);
+    if (typeid(*term.base) == typeid(Constant)) {
+        auto const &base = dynamic_cast<Constant const &>(*term.base);
 
         if (base == 1)
-            return std::make_unique<Constant>(this->coefficient);
+            return Constant(token.coefficient);
 
-        if (typeid(*term->power) == typeid(Constant))
-            return std::make_unique<Constant>(
-                term->coefficient *
-                (base ^ dynamic_cast<Constant const &>(*term->power))
+        if (typeid(*term.power) == typeid(Constant))
+            return Constant(
+                term.coefficient *
+                (base ^ dynamic_cast<Constant const &>(*term.power))
             );
 
-        if (term->coefficient == base) {
-            if (typeid(*term->power) == typeid(Expression)) {
-                auto &power = dynamic_cast<Expression &>(*term->power);
+        if (term.coefficient == base) {
+            if (typeid(*term.power) == typeid(Expression)) {
+                auto &power = dynamic_cast<Expression &>(*term.power);
                 power += Constant{1};
-                term->coefficient = 1;
+                term.coefficient = 1;
             }
         }
     }
 
-    term->base = term->base->simplified();
-    term->power = term->power->simplified();
+    term.base = OwnedToken(from_variant(simplified(*term.base)).move());
+    term.power = OwnedToken(from_variant(simplified(*term.power)).move());
 
     return term;
 }
 
-mlp::OwnedToken mlp::Term::derivative(
-    Variable const &variable, std::uint32_t const order
-) const {
+mlp::token mlp::derivative(
+    Term const &token, Variable const &variable, std::uint32_t const order
+) {
     if (!order)
-        return OwnedToken(this->clone());
+        return token;
 
-    if (!this->is_dependent_on(variable))
-        return std::make_unique<Constant>(0);
+    if (!is_dependent_on(token, variable))
+        return Constant(0);
 
-    auto const &base_type = typeid(*this->base);
+    auto const &base_type = typeid(*token.base);
 
-    if (auto const &power_type = typeid(*this->power);
+    if (auto const &power_type = typeid(*token.power);
         power_type == typeid(Constant)) {
         if (base_type == typeid(Constant))
-            return std::make_unique<Constant>(0);
+            return Constant(0);
 
-        auto const &power = dynamic_cast<Constant const &>(*this->power);
+        auto const &power = dynamic_cast<Constant const &>(*token.power);
 
-        Terms terms{};
-        terms *= std::make_unique<Term>(
-            this->coefficient * power.value() * (*this->base ^ power - 1.0)
+        auto derivative = simplified(
+            token.coefficient * power.value() * (*token.base ^ power - 1.0) *
+            from_variant(mlp::derivative(to_variant(*token.base), variable, 1))
         );
-        terms *= this->base->derivative(variable, 1);
-
-        auto derivative = terms.simplified();
 
         if (order > 1)
-            return derivative->derivative(variable, order - 1)->simplified();
+            return simplified(mlp::derivative(derivative, variable, order - 1));
 
         return derivative;
     }
-
-    Terms result{};
-
-    result *= OwnedToken(this->clone());
 
     if (base_type == typeid(Constant)) {
-        result *=
-            std::make_unique<Function>("ln", OwnedToken(this->base->clone()));
-        result *= this->power->derivative(variable, 1);
-
-        auto derivative = result.simplified();
+        auto derivative = simplified(
+            "ln"_f(*token.base) *
+            from_variant(mlp::derivative(to_variant(*token.power), variable, 1))
+        );
 
         if (order > 1)
-            return derivative->derivative(variable, order - 1)->simplified();
+            return simplified(mlp::derivative(derivative, variable, order - 1));
 
         return derivative;
     }
 
-    Terms terms_1{};
-    terms_1 *= OwnedToken(this->power->clone());
-    terms_1 *= this->base->derivative(variable, 1);
-    terms_1 /= OwnedToken(this->base->clone());
-
-    Terms terms_2{};
-    terms_2 *= this->power->derivative(variable, 1);
-    terms_2 *=
-        std::make_unique<Function>("ln", OwnedToken(this->base->clone()));
-
-    result *= terms_1 + terms_2;
-
-    auto derivative = result.simplified();
+    auto derivative = simplified(
+        token *
+        (*token.power *
+             from_variant(
+                 mlp::derivative(to_variant(*token.base), variable, 1)
+             ) /
+             *token.base +
+         from_variant(mlp::derivative(to_variant(*token.power), variable, 1)) *
+             "ln"_f(*token.base))
+    );
 
     if (order > 1)
-        return derivative->derivative(variable, order - 1)->simplified();
+        return simplified(mlp::derivative(derivative, variable, order - 1));
 
     return derivative;
 }
 
-mlp::OwnedToken mlp::Term::integral(Variable const &variable) const {
-    if (!this->is_dependent_on(variable)) {
-        auto terms = std::make_unique<Terms>();
-        *terms *= Variable(variable);
-        *terms *= Term(*this);
+mlp::token mlp::integral(Term const &token, Variable const &variable) {
+    if (!is_dependent_on(token, variable))
+        return variable * token;
 
-        return terms;
+    auto const &power_type = typeid(*token.power);
+
+    if (power_type == typeid(Constant)) {
+        if (auto const &power = dynamic_cast<Constant const &>(*token.power);
+            power == 1)
+            return token.coefficient *
+                   from_variant(integral(*token.base, variable));
     }
 
-    auto const &power_type = typeid(*this->power);
-
-    if (this->base->is_linear_of(variable)) {
+    if (is_linear_of(to_variant(*token.base), variable)) {
         Terms terms{};
-        terms *= this->coefficient;
+        terms *= token.coefficient;
 
         if (power_type == typeid(Constant)) {
             if (auto const &power =
-                    dynamic_cast<Constant const &>(*this->power);
+                    dynamic_cast<Constant const &>(*token.power);
                 power == -1) {
                 terms *= std::make_unique<Function>(
-                    "ln", OwnedToken(this->base->clone())
+                    "ln", OwnedToken(token.base->clone())
                 );
             } else {
                 terms /= power + 1.0;
                 terms *= std::make_unique<Term>(
-                    std::move(*this->base->clone()) ^ power + 1.0
+                    std::move(*token.base->clone()) ^ power + 1.0
                 );
             }
-        } else if (!this->power->is_dependent_on(variable)) {
-            auto expression = *this->power + Constant(1);
+        } else if (!is_dependent_on(to_variant(*token.power), variable)) {
+            auto expression = *token.power + Constant(1);
 
             terms *= std::make_unique<Term>(
-                std::move(*this->base->clone()) ^ expression
+                std::move(*token.base->clone()) ^ expression
             );
             terms /= std::move(expression);
         } else {
             throw std::runtime_error("Expression is not integrable!");
         }
 
-        terms /= this->base->derivative(variable, 1)->simplified();
+        terms /= from_variant(derivative(to_variant(*token.base), variable, 1));
 
-        return terms.simplified();
+        return simplified(terms);
     }
 
-    if (!this->base->is_dependent_on(variable) &&
-        this->power->is_linear_of(variable)) {
+    if (!is_dependent_on(to_variant(*token.base), variable) &&
+        is_linear_of(to_variant(*token.power), variable)) {
         Terms terms{};
-        terms *= Term(*this);
+        terms *= Term(token);
 
         if (power_type == typeid(Variable) &&
-            dynamic_cast<Variable const &>(*this->power) != variable)
+            dynamic_cast<Variable const &>(*token.power) != variable)
             terms *= Variable(variable);
 
         else if (power_type != typeid(Variable))
-            terms /= this->power->derivative(variable, 1)->simplified();
+            terms /=
+                from_variant(derivative(to_variant(*token.power), variable, 1));
 
         terms /=
-            std::make_unique<Function>("ln", OwnedToken(this->base->clone()));
+            std::make_unique<Function>("ln", OwnedToken(token.base->clone()));
 
-        return terms.simplified();
+        return simplified(terms);
     }
 
     throw std::runtime_error("Expression is not integrable!");
@@ -345,7 +351,7 @@ Term operator*(Term lhs, std::double_t const rhs) { return lhs *= rhs; }
 Term operator/(std::double_t const lhs, Term rhs) {
     rhs.coefficient = lhs / rhs.coefficient;
 
-    rhs.power = (-*rhs.power).simplified();
+    rhs.power = OwnedToken(from_variant(simplified(-*rhs.power)).move());
 
     return rhs;
 }

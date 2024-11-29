@@ -8,9 +8,6 @@ class Constant final : public Token {
     std::double_t value_;
 
   public:
-    using Token::derivative;
-    using Token::integral;
-
     explicit Constant(std::double_t value);
 
     Constant(Constant const &) = default;
@@ -52,21 +49,22 @@ class Constant final : public Token {
     bool operator==(Constant const &) const;
 
     bool operator>(Constant const &) const;
-
-    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
-
-    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
-
-    [[nodiscard]] OwnedToken
-    evaluate(std::map<Variable, SharedToken> const &values) const override;
-
-    [[nodiscard]] OwnedToken simplified() const override;
-
-    [[nodiscard]] OwnedToken
-    derivative(Variable const &variable, std::uint32_t order) const override;
-
-    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 };
+
+[[nodiscard]] bool is_dependent_on(Constant const &, Variable const &);
+
+[[nodiscard]] bool is_linear_of(Constant const &, Variable const &);
+
+[[nodiscard]] token
+evaluate(Constant const &token, std::map<Variable, SharedToken> const &values);
+
+[[nodiscard]] token simplified(Constant const &token);
+
+[[nodiscard]] token derivative(
+    Constant const &token, Variable const &variable, std::uint32_t order
+);
+
+[[nodiscard]] token integral(Constant const &token, Variable const &variable);
 
 Constant operator++(Constant &lhs, int);
 

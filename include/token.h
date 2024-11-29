@@ -1,8 +1,6 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
-#include "interfaces.h"
-
 #include <cmath>
 #include <map>
 #include <ostream>
@@ -20,36 +18,11 @@ using OwnedToken = Owned<Token>;
 
 class Variable;
 
-struct Differentiable {
-    virtual ~Differentiable() = default;
-
-    [[nodiscard]] OwnedToken derivative(
-        Variable const &variable, std::uint32_t order,
-        std::map<Variable, SharedToken> const &values
-    ) const;
-
-    [[nodiscard]] virtual OwnedToken
-    derivative(Variable const &variable, std::uint32_t order) const = 0;
-};
-
-struct Integrable {
-    virtual ~Integrable() = default;
-
-    [[nodiscard]] OwnedToken integral(
-        Variable const &variable, SharedToken const &from, SharedToken const &to
-    ) const;
-
-    [[nodiscard]] virtual OwnedToken
-    integral(Variable const &variable) const = 0;
-};
-
 struct Term;
 
-struct Token : Dependable<Variable>,
-               Evaluatable<Variable, SharedToken, OwnedToken>,
-               Simplifiable<OwnedToken>,
-               Differentiable,
-               Integrable {
+struct Token {
+    virtual ~Token() = default;
+
     [[nodiscard]] virtual gsl::owner<Token *> clone() const = 0;
 
     [[nodiscard]] virtual gsl::owner<Token *> move() && = 0;
@@ -58,6 +31,48 @@ struct Token : Dependable<Variable>,
 
     [[nodiscard]] Term operator-() const;
 };
+
+class Constant;
+class Function;
+class Terms;
+class Expression;
+
+using token =
+    std::variant<Constant, Variable, Function, Term, Terms, Expression>;
+
+[[nodiscard]] bool
+is_dependent_on(token const &token, Variable const &variable);
+
+[[nodiscard]] bool is_linear_of(token const &token, Variable const &variable);
+
+[[nodiscard]] token
+evaluate(token const &token, std::map<Variable, SharedToken> const &values);
+
+[[nodiscard]] token simplified(Token const &token);
+
+[[nodiscard]] token simplified(token const &token);
+
+[[nodiscard]] token derivative(
+    token const &token, Variable const &variable, std::uint32_t order,
+    std::map<Variable, SharedToken> const &values
+);
+
+[[nodiscard]] token
+derivative(token const &token, Variable const &variable, std::uint32_t order);
+
+[[nodiscard]] token integral(Token const &token, Variable const &variable);
+
+[[nodiscard]] token integral(token const &token, Variable const &variable);
+
+[[nodiscard]] token integral(
+    Token const &token, Variable const &variable, SharedToken const &from,
+    SharedToken const &to
+);
+
+[[nodiscard]] token integral(
+    token const &token, Variable const &variable, SharedToken const &from,
+    SharedToken const &to
+);
 
 enum class Sign { pos, neg };
 
@@ -79,15 +94,11 @@ std::ostream &operator<<(std::ostream &os, T const &token) {
 
 [[nodiscard]] Term operator*(Token &&lhs, std::double_t rhs);
 
-class Expression;
-
 [[nodiscard]] Expression operator+(Token const &lhs, Token const &rhs);
 
 [[nodiscard]] Expression operator-(Token const &lhs, Token const &rhs);
 
 [[nodiscard]] Expression operator*(std::double_t lhs, Expression rhs);
-
-class Terms;
 
 [[nodiscard]] Terms operator*(Token const &lhs, Token const &rhs);
 
@@ -108,6 +119,12 @@ Term operator^(Token &&lhs, Token const &rhs);
 Term operator^(Token &&lhs, Token &&rhs);
 
 std::ostream &operator<<(std::ostream &os, Sign sign);
+
+[[nodiscard]] token to_variant(Token const &token);
+
+[[nodiscard]] Token const &from_variant(token const &token);
+
+[[nodiscard]] Token &&from_variant(token &&token);
 } // namespace mlp
 
 std::string to_string(mlp::Sign sign);

@@ -8,9 +8,6 @@ class Variable final : public Token {
     char var;
 
   public:
-    using Token::derivative;
-    using Token::integral;
-
     explicit Variable(char var);
 
     Variable(Variable const &) = default;
@@ -26,21 +23,24 @@ class Variable final : public Token {
     bool operator==(Variable const &) const;
 
     friend bool operator<(Variable const &lhs, Variable const &rhs);
-
-    [[nodiscard]] bool is_dependent_on(Variable const &variable) const override;
-
-    [[nodiscard]] bool is_linear_of(Variable const &variable) const override;
-
-    [[nodiscard]] OwnedToken
-    evaluate(std::map<Variable, SharedToken> const &values) const override;
-
-    [[nodiscard]] OwnedToken simplified() const override;
-
-    [[nodiscard]] OwnedToken
-    derivative(Variable const &variable, std::uint32_t order) const override;
-
-    [[nodiscard]] OwnedToken integral(Variable const &variable) const override;
 };
+
+[[nodiscard]] bool
+is_dependent_on(Variable const &token, Variable const &variable);
+
+[[nodiscard]] bool
+is_linear_of(Variable const &token, Variable const &variable);
+
+[[nodiscard]] token
+evaluate(Variable const &token, std::map<Variable, SharedToken> const &values);
+
+[[nodiscard]] token simplified(Variable const &token);
+
+[[nodiscard]] token derivative(
+    Variable const &token, Variable const &variable, std::uint32_t order
+);
+
+[[nodiscard]] token integral(Variable const &token, Variable const &variable);
 } // namespace mlp
 
 #endif // VARIABLE_H

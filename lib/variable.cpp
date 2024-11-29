@@ -1,6 +1,8 @@
 #include "../include/variable.h"
 
 #include "../include/constant.h"
+#include "../include/expression.h"
+#include "../include/function.h"
 #include "../include/term.h"
 #include "../include/terms.h"
 
@@ -20,43 +22,36 @@ bool mlp::Variable::operator==(Variable const &variable) const {
     return this->var == variable.var;
 }
 
-bool mlp::Variable::is_dependent_on(Variable const &variable) const {
-    return *this == variable;
+bool mlp::is_dependent_on(Variable const &token, Variable const &variable) {
+    return token == variable;
 }
 
-bool mlp::Variable::is_linear_of(Variable const &variable) const {
-    return this->is_dependent_on(variable);
+bool mlp::is_linear_of(Variable const &token, Variable const &variable) {
+    return is_dependent_on(token, variable);
 }
 
-mlp::OwnedToken
-mlp::Variable::evaluate(std::map<Variable, SharedToken> const &values) const {
-    return OwnedToken(
-        values.contains(*this) ? values.at(*this)->clone() : this->clone()
-    );
+mlp::token mlp::evaluate(
+    Variable const &token, std::map<Variable, SharedToken> const &values
+) {
+    return values.contains(token) ? to_variant(*values.at(token)) : token;
 }
 
-mlp::OwnedToken mlp::Variable::simplified() const {
-    return std::unique_ptr<Variable>(this->clone());
-}
+mlp::token mlp::simplified(Variable const &token) { return token; }
 
-mlp::OwnedToken mlp::Variable::derivative(
-    Variable const &variable, std::uint32_t const order
-) const {
+mlp::token mlp::derivative(
+    Variable const &token, Variable const &variable, std::uint32_t const order
+) {
     if (!order)
-        return Owned<Variable>(this->clone());
+        return token;
 
-    return std::make_unique<Constant>(*this == variable && order == 1 ? 1 : 0);
+    return Constant(token == variable && order == 1 ? 1 : 0);
 }
 
-mlp::OwnedToken mlp::Variable::integral(Variable const &variable) const {
-    if (*this == variable)
-        return std::make_unique<Term>((variable ^ 2) / 2);
+mlp::token mlp::integral(Variable const &token, Variable const &variable) {
+    if (token == variable)
+        return (variable ^ 2) / 2;
 
-    auto terms = std::make_unique<Terms>();
-    *terms *= Variable(variable);
-    *terms *= Variable(*this);
-
-    return terms;
+    return token * variable;
 }
 
 namespace mlp {

@@ -2,6 +2,7 @@
 
 #include "../include/constant.h"
 #include "../include/expression.h"
+#include "../include/function.h"
 #include "../include/term.h"
 #include "../include/variable.h"
 
@@ -97,7 +98,7 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
 
                 dynamic_cast<Expression &>(*t.power) += Constant(1);
 
-                t.power = t.power->simplified();
+                t.power = OwnedToken(from_variant(simplified(*t.power)).move());
 
                 return *this;
             }
@@ -139,7 +140,7 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
                     continue;
 
                 power += Constant(1);
-                term.power = power.simplified();
+                term.power = OwnedToken(from_variant(simplified(power)).move());
                 t = OwnedToken(std::move(token).move());
 
                 return *this;
@@ -156,14 +157,14 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
                     continue;
 
                 power += std::move(term1.power);
-                term.power = power.simplified();
+                term.power = OwnedToken(from_variant(simplified(power)).move());
                 t = OwnedToken(std::move(token).move());
 
                 return *this;
             }
         }
 
-        term.power = power.simplified();
+        term.power = OwnedToken(from_variant(simplified(power)).move());
 
         this->terms.emplace_back(std::move(token).move());
 
@@ -231,7 +232,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
                 auto &power = dynamic_cast<Expression &>(*t.power);
                 power -= Constant(1);
 
-                t.power = t.power->simplified();
+                t.power = OwnedToken(from_variant(simplified(*t.power)).move());
 
                 return *this;
             }
@@ -275,7 +276,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
                     continue;
 
                 power += Constant(1);
-                term.power = power.simplified();
+                term.power = OwnedToken(from_variant(simplified(power)).move());
                 t = OwnedToken(std::move(token).move());
 
                 return *this;
@@ -292,14 +293,14 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
                     continue;
 
                 power += std::move(term1.power);
-                term.power = power.simplified();
+                term.power = OwnedToken(from_variant(simplified(power)).move());
                 t = OwnedToken(std::move(token).move());
 
                 return *this;
             }
         }
 
-        term.power = power.simplified();
+        term.power = OwnedToken(from_variant(simplified(power)).move());
 
         this->terms.push_back(std::make_unique<Term>(std::move(token) ^ -1));
 
@@ -337,23 +338,24 @@ mlp::Terms &mlp::Terms::operator/=(std::double_t const scalar) {
     return *this;
 }
 
-bool mlp::Terms::is_dependent_on(Variable const &variable) const {
+namespace mlp {
+bool is_dependent_on(Terms const &token, Variable const &variable) {
     return std::ranges::any_of(
-        this->terms,
+        token.terms,
         [variable](OwnedToken const &term) -> bool {
-            return term->is_dependent_on(variable);
+            return is_dependent_on(to_variant(*term), variable);
         }
     );
 }
 
-bool mlp::Terms::is_linear_of(Variable const &variable) const {
-    if (!this->is_dependent_on(variable))
+bool is_linear_of(Terms const &token, Variable const &variable) {
+    if (!is_dependent_on(token, variable))
         return false;
 
     bool is_linear = false;
 
-    for (OwnedToken const &token : this->terms) {
-        if (!token->is_linear_of(variable))
+    for (OwnedToken const &t : token.terms) {
+        if (!is_linear_of(to_variant(*t), variable))
             continue;
 
         if (is_linear)
@@ -365,144 +367,145 @@ bool mlp::Terms::is_linear_of(Variable const &variable) const {
     return is_linear;
 }
 
-mlp::OwnedToken
-mlp::Terms::evaluate(std::map<Variable, SharedToken> const &values) const {
-    Terms terms{*this};
+token evaluate(
+    Terms const &token, std::map<Variable, SharedToken> const &values
+) {
+    Terms terms{token};
 
     for (OwnedToken &term : terms.terms)
-        term = term->evaluate(values);
+        term =
+            OwnedToken(from_variant(evaluate(to_variant(*term), values)).move()
+            );
 
-    return terms.simplified();
+    return simplified(terms);
 }
 
-mlp::OwnedToken mlp::Terms::simplified() const {
-    if (this->coefficient == 0)
-        return std::make_unique<Constant>(0);
+token simplified(Terms const &token) {
+    if (token.coefficient == 0)
+        return Constant(0);
 
-    if (this->terms.empty())
-        return std::make_unique<Constant>(this->coefficient);
+    if (token.terms.empty())
+        return Constant(token.coefficient);
 
-    if (this->terms.size() == 1) {
-        auto term = OwnedToken(this->terms[0]->clone());
+    if (token.terms.size() == 1) {
+        auto term = OwnedToken(token.terms[0]->clone());
 
         if (typeid(*term) == typeid(Constant))
-            return std::make_unique<Constant>(
-                this->coefficient * dynamic_cast<Constant const &>(*term)
+            return Constant(
+                token.coefficient * dynamic_cast<Constant const &>(*term)
             );
 
         if (typeid(*term) == typeid(Term)) {
-            dynamic_cast<Term &>(*term) *= this->coefficient;
+            dynamic_cast<Term &>(*term) *= token.coefficient;
 
-            return term->simplified();
+            return simplified(*term);
         }
 
-        return (this->coefficient * std::move(*term)).simplified();
+        return simplified(token.coefficient * std::move(*term));
     }
 
-    auto terms = std::make_unique<Terms>();
-    terms->coefficient = this->coefficient;
+    Terms terms{};
+    terms.coefficient = token.coefficient;
 
-    for (OwnedToken const &token : this->terms)
-        *terms *= token->simplified();
+    for (OwnedToken const &token_ : token.terms)
+        terms *= from_variant(simplified(*token_));
 
-    if (terms->terms.empty())
-        return std::make_unique<Constant>(terms->coefficient);
+    if (terms.terms.empty())
+        return Constant(terms.coefficient);
 
-    if (terms->terms.size() == 1) {
-        auto &term = terms->terms[0];
+    if (terms.terms.size() == 1) {
+        auto &term = terms.terms[0];
 
         if (typeid(*term) == typeid(Constant))
-            return std::make_unique<Constant>(
-                terms->coefficient * dynamic_cast<Constant const &>(*term)
+            return Constant(
+                terms.coefficient * dynamic_cast<Constant const &>(*term)
             );
 
         if (typeid(*term) == typeid(Term)) {
-            dynamic_cast<Term &>(*term) *= terms->coefficient;
+            dynamic_cast<Term &>(*term) *= terms.coefficient;
 
-            return term->simplified();
+            return simplified(*term);
         }
 
-        return (terms->coefficient * std::move(*term)).simplified();
+        return simplified(terms.coefficient * std::move(*term));
     }
 
     return terms;
 }
 
-mlp::OwnedToken mlp::Terms::derivative(
-    Variable const &variable, std::uint32_t const order
-) const {
+token derivative(
+    Terms const &token, Variable const &variable, std::uint32_t const order
+) {
     if (!order)
-        return OwnedToken(this->clone());
+        return token;
 
-    if (this->coefficient == 0 || !this->is_dependent_on(variable))
-        return std::make_unique<Constant>(0);
+    if (token.coefficient == 0 || !is_dependent_on(token, variable))
+        return Constant(0);
 
-    auto const result = std::make_unique<Expression>();
+    Expression result{};
 
-    for (std::size_t i = 0; i < this->terms.size(); ++i) {
+    for (std::size_t i = 0; i < token.terms.size(); ++i) {
         auto term = std::make_unique<Terms>();
 
-        for (std::size_t j = 0; j < this->terms.size(); ++j) {
+        for (std::size_t j = 0; j < token.terms.size(); ++j) {
             if (i != j) {
-                *term *= OwnedToken(this->terms[j]->clone());
+                *term *= OwnedToken(token.terms[j]->clone());
 
                 continue;
             }
 
-            auto derivative = this->terms[i]->derivative(variable, 1);
+            Token const &derivative = from_variant(
+                mlp::derivative(to_variant(*token.terms[i]), variable, 1)
+            );
 
-            if (typeid(*derivative) == typeid(Constant)) {
-                *term *= dynamic_cast<Constant const &>(*derivative);
+            if (typeid(derivative) == typeid(Constant)) {
+                *term *= dynamic_cast<Constant const &>(derivative);
 
                 continue;
             }
 
-            *term *= std::move(derivative);
+            *term *= derivative;
         }
 
-        *result += std::move(term);
+        result += std::move(term);
     }
 
-    auto derivative = (this->coefficient * *result).simplified();
+    auto derivative = simplified(token.coefficient * result);
 
     if (order > 1)
-        return derivative->derivative(variable, order - 1)->simplified();
+        return simplified(mlp::derivative(derivative, variable, order - 1));
 
     return derivative;
 }
 
-mlp::OwnedToken mlp::Terms::integral(Variable const &variable) const {
-    auto simplified = this->simplified();
+token integral(Terms const &token, Variable const &variable) {
+    auto const simplified = mlp::simplified(token);
 
-    if (typeid(*simplified) != typeid(Terms))
-        return simplified->integral(variable);
+    if (!std::holds_alternative<Terms>(simplified))
+        return integral(simplified, variable);
 
-    auto &t = dynamic_cast<Terms &>(*simplified);
+    auto const &t = std::get<Terms>(simplified);
 
-    if (!t.is_dependent_on(variable)) {
-        auto terms = std::make_unique<Terms>();
-        *terms *= Variable(variable);
-        *terms *= Terms(t);
+    if (!is_dependent_on(t, variable))
+        return variable * t;
 
-        return terms;
-    }
-
-    if (t.is_linear_of(variable)) {
+    if (is_linear_of(t, variable)) {
         Terms terms{};
         terms.coefficient = t.coefficient;
 
-        for (OwnedToken const &token : t.terms)
-            terms *= token->is_linear_of(variable)
-                         ? token->integral(variable)
-                         : Owned<Token>(token->clone());
+        for (OwnedToken const &token_ : t.terms)
+            terms *= is_linear_of(to_variant(*token_), variable)
+                         ? OwnedToken(
+                               from_variant(integral(*token_, variable)).move()
+                           )
+                         : OwnedToken(token_->clone());
 
-        return terms.simplified();
+        return mlp::simplified(terms);
     }
 
     throw std::runtime_error("Expression is not integrable!");
 }
 
-namespace mlp {
 Terms operator*(std::double_t const lhs, Terms rhs) {
     return std::move(rhs *= lhs);
 }
