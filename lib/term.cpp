@@ -15,15 +15,17 @@ mlp::Term::Term(
     : coefficient(coefficient), base(std::move(base)), power(std::move(power)) {
 }
 
-mlp::Term::Term(std::double_t const coefficient, Token &&base, Token &&power)
-    : coefficient(coefficient), base(new Token(std::move(base))),
-      power(new Token(std::move(power))) {}
+mlp::Term::Term(
+    std::double_t const coefficient, Token const &base, Token const &power
+)
+    : coefficient(coefficient), base(new Token(base)), power(new Token(power)) {
+}
 
 mlp::Term::Term(OwnedToken &&base, OwnedToken &&power)
     : base(std::move(base)), power(std::move(power)) {}
 
-mlp::Term::Term(Token &&base, Token &&power)
-    : base(new Token(std::move(base))), power(new Token(std::move(power))) {}
+mlp::Term::Term(Token const &base, Token const &power)
+    : base(new Token(base)), power(new Token(power)) {}
 
 mlp::Term::Term(Term const &term)
     : coefficient(term.coefficient), base(new Token(*term.base)),
@@ -147,7 +149,7 @@ mlp::Token mlp::simplified(Term const &token) {
             } else {
                 Terms terms{};
                 terms.coefficient = power;
-                terms *= std::move(base.power);
+                terms *= *base.power;
 
                 *base.power = std::move(terms);
             }
@@ -266,12 +268,12 @@ mlp::Token mlp::integral(Term const &token, Variable const &variable) {
                 terms *= "ln"_f(*token.base);
             } else {
                 terms /= power.value() + 1.0;
-                terms *= std::move(Token(*token.base)) ^ power.value() + 1.0;
+                terms *= *token.base ^ power.value() + 1.0;
             }
         } else if (!is_dependent_on(*token.power, variable)) {
             auto expression = *token.power + Constant(1);
 
-            terms *= std::move(Token(*token.base)) ^ expression;
+            terms *= *token.base ^ expression;
             terms /= std::move(expression);
         } else {
             throw std::runtime_error("Expression is not integrable!");

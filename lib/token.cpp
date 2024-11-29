@@ -104,12 +104,12 @@ get_next_token(std::string const &expression, std::size_t &i) {
         }
 
         if (i >= expression.size())
-            return mlp::Constant(std::stoull(number));
+            return mlp::Constant(std::stod(number));
 
         if (character != '.') {
             --i;
 
-            return mlp::Constant(std::stoull(number));
+            return mlp::Constant(std::stod(number));
         }
 
         do {
@@ -121,7 +121,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
         if (i < expression.size())
             --i;
 
-        return mlp::Constant(std::stold(number));
+        return mlp::Constant(std::stod(number));
     }
 
     if (k_parenthesis_map.contains(character)) {
@@ -387,15 +387,14 @@ mlp::Token mlp::tokenise(std::string expression) {
         Token power = Constant(1);
 
         for (Token &p : powers | std::views::reverse)
-            power = std::move(p) ^ std::move(power);
+            power = p ^ power;
 
         power = std::move(simplified(power));
 
         if (!last)
-            numerator.back() = std::move(numerator.back()) ^ std::move(power);
+            numerator.back() = numerator.back() ^ power;
         else
-            denominator.back() =
-                std::move(denominator.back()) ^ std::move(power);
+            denominator.back() = denominator.back() ^ power;
     }
 
     Terms terms{};
@@ -423,14 +422,6 @@ Term operator*(std::double_t const lhs, Token const &rhs) {
 }
 
 Term operator*(Token const &lhs, std::double_t const rhs) { return rhs * lhs; }
-
-Term operator*(std::double_t const lhs, Token &&rhs) {
-    return lhs * (std::move(rhs) ^ 1);
-}
-
-Term operator*(Token &&lhs, std::double_t const rhs) {
-    return rhs * std::move(lhs);
-}
 
 Expression operator+(Token const &lhs, Token const &rhs) {
     Expression result;
@@ -486,32 +477,6 @@ Term operator^(Token const &lhs, std::double_t const rhs) {
 
 Term operator^(Token const &lhs, Token const &rhs) {
     return {1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
-}
-
-Term operator^(Token const &lhs, Token &&rhs) {
-    return {
-        1, std::make_unique<Token>(lhs), std::make_unique<Token>(std::move(rhs))
-    };
-}
-
-Term operator^(Token &&lhs, std::double_t const rhs) {
-    return {
-        1, std::make_unique<Token>(std::move(lhs)),
-        std::make_unique<Token>(Constant(rhs))
-    };
-}
-
-Term operator^(Token &&lhs, Token const &rhs) {
-    return {
-        1, std::make_unique<Token>(std::move(lhs)), std::make_unique<Token>(rhs)
-    };
-}
-
-Term operator^(Token &&lhs, Token &&rhs) {
-    return {
-        1, std::make_unique<Token>(std::move(lhs)),
-        std::make_unique<Token>(std::move(rhs))
-    };
 }
 } // namespace mlp
 

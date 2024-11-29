@@ -26,17 +26,9 @@ class Terms final {
 
     [[nodiscard]] Terms operator-() const;
 
-    Terms &operator*=(Token const &token);
+    Terms &operator*=(Token token);
 
-    Terms &operator/=(Token const &token);
-
-    Terms &operator*=(OwnedToken &&token);
-
-    Terms &operator/=(OwnedToken &&token);
-
-    Terms &operator*=(Token &&token);
-
-    Terms &operator/=(Token &&token);
+    Terms &operator/=(Token token);
 
     Terms &operator*=(std::double_t scalar);
 

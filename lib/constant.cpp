@@ -113,47 +113,25 @@ Constant operator--(Constant &lhs, int) {
     return temp;
 }
 
-Constant operator+(Constant lhs, std::double_t const rhs) {
-    return std::move(lhs += rhs);
-}
+Constant operator+(Constant lhs, std::double_t const rhs) { return lhs += rhs; }
 
-Constant operator+(std::double_t const lhs, Constant rhs) {
-    return std::move(rhs += lhs);
-}
+Constant operator+(std::double_t const lhs, Constant rhs) { return rhs += lhs; }
 
-Constant operator-(Constant lhs, std::double_t const rhs) {
-    return std::move(lhs -= rhs);
-}
+Constant operator-(Constant lhs, std::double_t const rhs) { return lhs -= rhs; }
 
-Constant operator-(std::double_t const lhs, Constant rhs) {
-    return std::move(rhs -= lhs);
-}
+Constant operator-(std::double_t const lhs, Constant rhs) { return rhs -= lhs; }
 
-Constant operator*(Constant lhs, std::double_t const rhs) {
-    return std::move(lhs *= rhs);
-}
+Constant operator*(Constant lhs, std::double_t const rhs) { return lhs *= rhs; }
 
-Constant operator*(std::double_t const lhs, Constant rhs) {
-    return std::move(rhs *= lhs);
-}
+Constant operator*(std::double_t const lhs, Constant rhs) { return rhs *= lhs; }
 
-Constant operator/(Constant lhs, std::double_t const rhs) {
-    return std::move(lhs /= rhs);
-}
+Constant operator/(Constant lhs, std::double_t const rhs) { return lhs /= rhs; }
 
-Constant operator/(std::double_t const lhs, Constant rhs) {
-    return std::move(rhs /= lhs);
-}
+Constant operator/(std::double_t const lhs, Constant rhs) { return rhs /= lhs; }
 
-Constant operator^(Constant lhs, Constant const &rhs) {
-    return std::move(lhs ^= rhs);
-}
+Constant operator^(Constant lhs, Constant const &rhs) { return lhs ^= rhs; }
 
-Constant operator^(Constant lhs, std::double_t const rhs) {
-    return std::move(lhs ^= rhs);
-}
+Constant operator^(Constant lhs, std::double_t const rhs) { return lhs ^= rhs; }
 
-Constant operator^(std::double_t const lhs, Constant rhs) {
-    return std::move(rhs ^= lhs);
-}
+Constant operator^(std::double_t const lhs, Constant rhs) { return rhs ^= lhs; }
 } // namespace mlp

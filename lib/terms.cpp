@@ -56,23 +56,7 @@ mlp::Terms mlp::Terms::operator-() const {
     return terms;
 }
 
-mlp::Terms &mlp::Terms::operator*=(Token const &token) {
-    return *this *= std::make_unique<Token>(token);
-}
-
-mlp::Terms &mlp::Terms::operator/=(Token const &token) {
-    return *this /= std::make_unique<Token>(token);
-}
-
-mlp::Terms &mlp::Terms::operator*=(OwnedToken &&token) {
-    return *this *= std::move(*token);
-}
-
-mlp::Terms &mlp::Terms::operator/=(OwnedToken &&token) {
-    return *this /= std::move(*token);
-}
-
-mlp::Terms &mlp::Terms::operator*=(Token &&token) {
+mlp::Terms &mlp::Terms::operator*=(Token token) {
     if (std::holds_alternative<Constant>(token)) {
         this->coefficient *= std::get<Constant>(token);
 
@@ -103,7 +87,7 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
 
                 if (!std::holds_alternative<Expression>(*t.power)) {
                     Expression power{};
-                    power += std::move(t.power);
+                    power += *t.power;
                     *t.power = std::move(power);
                 }
 
@@ -138,7 +122,7 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
 
         if (!std::holds_alternative<Expression>(*term.power)) {
             Expression power{};
-            power += std::move(term.power);
+            power += *term.power;
             *term.power = std::move(power);
         }
 
@@ -166,7 +150,7 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
                     variable != v)
                     continue;
 
-                power += std::move(term1.power);
+                power += *term1.power;
                 *term.power = simplified(power);
                 *t = std::move(token);
 
@@ -190,7 +174,7 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
         }
 
         for (OwnedToken &term : terms.terms)
-            *this *= std::move(term);
+            *this *= *term;
 
         return *this;
     }
@@ -200,7 +184,7 @@ mlp::Terms &mlp::Terms::operator*=(Token &&token) {
     return *this;
 }
 
-mlp::Terms &mlp::Terms::operator/=(Token &&token) {
+mlp::Terms &mlp::Terms::operator/=(Token token) {
     if (std::holds_alternative<Constant>(token)) {
         this->coefficient /= std::get<Constant>(token);
 
@@ -233,7 +217,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
 
                 if (!std::holds_alternative<Expression>(*t.power)) {
                     Expression power{};
-                    power += std::move(t.power);
+                    power += *t.power;
                     *t.power = std::move(power);
                 }
 
@@ -246,7 +230,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
             }
         }
 
-        this->terms.emplace_back(new Token(std::move(token) ^ -1));
+        this->terms.emplace_back(new Token(token ^ -1));
 
         return *this;
     }
@@ -260,7 +244,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
         }
 
         if (!std::holds_alternative<Variable>(*term.base)) {
-            this->terms.emplace_back(new Token(std::move(token) ^ -1));
+            this->terms.emplace_back(new Token(token ^ -1));
 
             return *this;
         }
@@ -269,7 +253,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
 
         if (!std::holds_alternative<Expression>(*term.power)) {
             Expression power{};
-            power -= std::move(term.power);
+            power -= *term.power;
             *term.power = std::move(power);
         }
 
@@ -297,7 +281,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
                     variable != v)
                     continue;
 
-                power += std::move(term1.power);
+                power += *term1.power;
                 *term.power = simplified(power);
                 *t = std::move(token);
 
@@ -307,7 +291,7 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
 
         *term.power = simplified(power);
 
-        this->terms.emplace_back(new Token(std::move(token) ^ -1));
+        this->terms.emplace_back(new Token(token ^ -1));
 
         return *this;
     }
@@ -321,12 +305,12 @@ mlp::Terms &mlp::Terms::operator/=(Token &&token) {
         }
 
         for (OwnedToken &term : terms.terms)
-            *this /= std::move(term);
+            *this /= *term;
 
         return *this;
     }
 
-    this->terms.emplace_back(new Token(std::move(token) ^ -1));
+    this->terms.emplace_back(new Token(token ^ -1));
 
     return *this;
 }
@@ -400,7 +384,7 @@ Token simplified(Terms const &token) {
             return simplified(term);
         }
 
-        return simplified(token.coefficient * std::move(term));
+        return simplified(token.coefficient * term);
     }
 
     Terms terms{};
@@ -424,7 +408,7 @@ Token simplified(Terms const &token) {
             return simplified(term);
         }
 
-        return simplified(terms.coefficient * std::move(term));
+        return simplified(terms.coefficient * term);
     }
 
     return terms;

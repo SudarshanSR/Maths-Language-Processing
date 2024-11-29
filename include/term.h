@@ -11,11 +11,11 @@ struct Term final {
 
     Term(std::double_t coefficient, OwnedToken &&base, OwnedToken &&power);
 
-    Term(std::double_t coefficient, Token &&base, Token &&power);
+    Term(std::double_t coefficient, Token const &base, Token const &power);
 
     Term(OwnedToken &&base, OwnedToken &&power);
 
-    Term(Token &&base, Token &&power);
+    Term(Token const &base, Token const &power);
 
     Term(Term const &term);
 

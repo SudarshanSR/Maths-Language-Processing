@@ -24,19 +24,11 @@ mlp::Expression &mlp::Expression::operator=(Expression const &expression) {
 }
 
 void mlp::Expression::add_token(Sign const sign, Token const &token) {
-    this->add_token(sign, std::make_unique<Token>(token));
-}
-
-void mlp::Expression::add_token(Sign const sign, Token &&token) {
     if (sign == Sign::pos)
-        *this += std::move(token);
+        *this += token;
 
     else
-        *this -= std::move(token);
-}
-
-void mlp::Expression::add_token(Sign const sign, OwnedToken &&token) {
-    this->add_token(sign, std::move(*token));
+        *this -= token;
 }
 
 bool mlp::Expression::empty() const { return this->tokens.empty(); }
@@ -70,13 +62,13 @@ mlp::Expression mlp::Expression::operator-() const {
     return expression;
 }
 
-mlp::Expression &mlp::Expression::operator+=(Token &&token) {
+mlp::Expression &mlp::Expression::operator+=(Token token) {
     if (std::holds_alternative<Expression>(token)) {
         for (auto &[sign, t] : std::get<Expression>(token).tokens)
             if (sign == Sign::pos)
-                *this += std::move(t);
+                *this += *t;
             else
-                *this -= std::move(t);
+                *this -= *t;
 
         return *this;
     }
@@ -159,7 +151,7 @@ mlp::Expression &mlp::Expression::operator+=(Token &&token) {
             }
         }
 
-        this->tokens.emplace_back(Sign::pos, new Token(std::move(token)));
+        this->tokens.emplace_back(Sign::pos, new Token(token));
 
         return *this;
     }
@@ -173,12 +165,12 @@ mlp::Expression &mlp::Expression::operator+=(Token &&token) {
         if (term.coefficient < 0) {
             term.coefficient = -term.coefficient;
 
-            return *this -= std::move(token);
+            return *this -= term;
         }
 
         if (!std::holds_alternative<Variable>(*term.base) ||
             !std::holds_alternative<Constant>(*term.power)) {
-            this->tokens.emplace_back(Sign::pos, new Token(std::move(token)));
+            this->tokens.emplace_back(Sign::pos, new Token(token));
 
             return *this;
         }
@@ -249,22 +241,22 @@ mlp::Expression &mlp::Expression::operator+=(Token &&token) {
         if (terms.coefficient < 0) {
             terms.coefficient = -terms.coefficient;
 
-            return *this -= std::move(token);
+            return *this -= terms;
         }
     }
 
-    this->tokens.emplace_back(Sign::pos, new Token(std::move(token)));
+    this->tokens.emplace_back(Sign::pos, new Token(token));
 
     return *this;
 }
 
-mlp::Expression &mlp::Expression::operator-=(Token &&token) {
+mlp::Expression &mlp::Expression::operator-=(Token token) {
     if (std::holds_alternative<Expression>(token)) {
         for (auto &[sign, t] : std::get<Expression>(token).tokens)
             if (sign == Sign::pos)
-                *this -= std::move(t);
+                *this -= *t;
             else
-                *this += std::move(t);
+                *this += *t;
 
         return *this;
     }
@@ -361,7 +353,7 @@ mlp::Expression &mlp::Expression::operator-=(Token &&token) {
         if (term.coefficient < 0) {
             term.coefficient = -term.coefficient;
 
-            return *this += std::move(token);
+            return *this += term;
         }
 
         if (!std::holds_alternative<Variable>(*term.base) ||
@@ -415,13 +407,13 @@ mlp::Expression &mlp::Expression::operator-=(Token &&token) {
                 if (term_.coefficient == 0)
                     this->tokens.erase(this->tokens.begin() + i);
 
-                if (term.coefficient < 0) {
+                if (term_.coefficient < 0) {
                     sign = sign == Sign::pos ? Sign::neg : Sign::pos;
-                    term.coefficient = -term.coefficient;
+                    term_.coefficient = -term_.coefficient;
                 }
 
-                if (term.coefficient == 1)
-                    *t = std::move(*term.base);
+                if (term_.coefficient == 1)
+                    *t = std::move(*term_.base);
 
                 return *this;
             }
@@ -437,29 +429,13 @@ mlp::Expression &mlp::Expression::operator-=(Token &&token) {
         if (terms.coefficient < 0) {
             terms.coefficient = -terms.coefficient;
 
-            return *this += std::move(token);
+            return *this += terms;
         }
     }
 
-    this->tokens.emplace_back(Sign::neg, new Token(std::move(token)));
+    this->tokens.emplace_back(Sign::neg, new Token(token));
 
     return *this;
-}
-
-mlp::Expression &mlp::Expression::operator+=(Token const &token) {
-    return *this += std::make_unique<Token>(token);
-}
-
-mlp::Expression &mlp::Expression::operator-=(Token const &token) {
-    return *this -= std::make_unique<Token>(token);
-}
-
-mlp::Expression &mlp::Expression::operator+=(OwnedToken &&token) {
-    return *this += std::move(*token);
-}
-
-mlp::Expression &mlp::Expression::operator-=(OwnedToken &&token) {
-    return *this -= std::move(*token);
 }
 
 mlp::Expression &mlp::Expression::operator*=(Token const &token) {

@@ -22,27 +22,15 @@ class Expression final {
 
     void add_token(Sign sign, Token const &token);
 
-    void add_token(Sign sign, Token &&token);
-
-    void add_token(Sign sign, OwnedToken &&token);
-
     [[nodiscard]] bool empty() const;
 
     explicit operator std::string() const;
 
     [[nodiscard]] Expression operator-() const;
 
-    Expression &operator+=(Token &&token);
+    Expression &operator+=(Token token);
 
-    Expression &operator-=(Token &&token);
-
-    Expression &operator+=(Token const &token);
-
-    Expression &operator-=(Token const &token);
-
-    Expression &operator+=(OwnedToken &&token);
-
-    Expression &operator-=(OwnedToken &&token);
+    Expression &operator-=(Token token);
 
     friend bool
     is_dependent_on(Expression const &token, Variable const &variable);

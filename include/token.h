@@ -54,10 +54,6 @@ Token tokenise(std::string expression);
 
 [[nodiscard]] Term operator*(Token const &lhs, std::double_t rhs);
 
-[[nodiscard]] Term operator*(std::double_t lhs, Token &&rhs);
-
-[[nodiscard]] Term operator*(Token &&lhs, std::double_t rhs);
-
 [[nodiscard]] Expression operator+(Token const &lhs, Token const &rhs);
 
 [[nodiscard]] Expression operator-(Token const &lhs, Token const &rhs);
@@ -73,14 +69,6 @@ Token tokenise(std::string expression);
 Term operator^(Token const &lhs, std::double_t rhs);
 
 Term operator^(Token const &lhs, Token const &rhs);
-
-Term operator^(Token const &lhs, Token &&rhs);
-
-Term operator^(Token &&lhs, std::double_t rhs);
-
-Term operator^(Token &&lhs, Token const &rhs);
-
-Term operator^(Token &&lhs, Token &&rhs);
 
 std::ostream &operator<<(std::ostream &os, Sign sign);
 } // namespace mlp
