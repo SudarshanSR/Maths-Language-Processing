@@ -68,10 +68,6 @@ mlp::Constant &mlp::Constant::operator^=(std::double_t const rhs) {
     return *this;
 }
 
-bool mlp::Constant::operator==(Constant const &rhs) const {
-    return this->value_ == rhs.value_;
-}
-
 bool mlp::Constant::operator>(Constant const &rhs) const {
     return this->value_ > rhs.value_;
 }

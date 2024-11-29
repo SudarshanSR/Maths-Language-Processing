@@ -12,10 +12,6 @@ mlp::Variable::Variable(char const var) : var(var) {}
 
 mlp::Variable::operator std::string() const { return {this->var}; }
 
-bool mlp::Variable::operator==(Variable const &variable) const {
-    return this->var == variable.var;
-}
-
 bool mlp::is_dependent_on(Variable const &token, Variable const &variable) {
     return token == variable;
 }

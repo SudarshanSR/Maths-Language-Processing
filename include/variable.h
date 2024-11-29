@@ -20,7 +20,7 @@ class Variable final {
 
     explicit operator std::string() const;
 
-    bool operator==(Variable const &) const;
+    bool operator==(Variable const &) const = default;
 
     friend bool operator<(Variable const &lhs, Variable const &rhs);
 };

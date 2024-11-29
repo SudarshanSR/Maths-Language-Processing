@@ -42,7 +42,7 @@ class Constant final {
 
     Constant &operator^=(std::double_t rhs);
 
-    bool operator==(Constant const &) const;
+    bool operator==(Constant const &) const = default;
 
     bool operator>(Constant const &) const;
 };
