@@ -31,8 +31,6 @@ void mlp::Expression::add_token(Sign const sign, Token const &token) {
         *this -= token;
 }
 
-bool mlp::Expression::empty() const { return this->tokens.empty(); }
-
 mlp::Expression::operator std::string() const {
     std::stringstream result;
 

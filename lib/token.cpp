@@ -77,12 +77,12 @@ std::map<char, char> const k_parenthesis_map{
     {'(', ')'}, {'[', ']'}, {'{', '}'}
 };
 
-std::set<std::string> k_functions{
-    "sin",   "cos",   "tan",   "sec",  "csc",   "cot",   "sinh",
-    "cosh",  "tanh",  "sech",  "csch", "coth",  "asin",  "acos",
-    "atan",  "asec",  "acsc",  "acot", "asinh", "acosh", "atanh",
-    "asech", "acsch", "acoth", "ln",
-};
+std::set<std::string> k_functions{"sin",   "cos",   "tan",   "sec",   "csc",
+                                  "cot",   "sinh",  "cosh",  "tanh",  "sech",
+                                  "csch",  "coth",  "asin",  "acos",  "atan",
+                                  "asec",  "acsc",  "acot",  "asinh", "acosh",
+                                  "atanh", "asech", "acsch", "acoth", "ln",
+                                  "abs"};
 
 std::variant<mlp::Operation, std::optional<mlp::Token>>
 get_next_token(std::string const &expression, std::size_t &i) {

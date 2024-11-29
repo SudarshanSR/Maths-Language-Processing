@@ -63,9 +63,10 @@ std::map<std::string, std::double_t (*)(std::double_t)> k_functions{
          return std::atanh(1 / val);
      }},
     {"ln", std::log},
+    {"abs", std::abs}
 };
 
-std::map<std::string, std::string> k_function_map{
+std::map<std::string, std::string> k_derivative_map{
     {"sin", "cos({0})"},
     {"cos", "-sin({0})"},
     {"tan", "sec({0})^2"},
@@ -81,16 +82,46 @@ std::map<std::string, std::string> k_function_map{
     {"asin", "1/((1 - ({0})^2)^0.5)"},
     {"acos", "-1/((1 - ({0})^2)^0.5)"},
     {"atan", "1/(1 + ({0})^2)"},
-    // {"asec", "1/(({0})*(({0})^2 - 1)^0.5"},
-    // {"acsc", "-1/(({0})*(({0})^2 - 1)^0.5"},
+    {"asec", "1/(abs({0})*(({0})^2 - 1)^0.5"},
+    {"acsc", "-1/(abs({0})*(({0})^2 - 1)^0.5"},
     {"acot", "-1/(1 + ({0})^2)"},
     {"asinh", "1/((1 + ({0})^2)^0.5)"},
     {"acosh", "-1/((1 + ({0})^2)^0.5)"},
     {"atanh", "1/(1 - ({0})^2)"},
     {"asech", "-1/(({0})*(1 - ({0})^2)^0.5"},
-    // {"acsch", "1/(({0})*(1 - ({0})^2)^0.5"},
+    {"acsch", "1/(abs({0})*(1 - ({0})^2)^0.5"},
     {"acoth", "1/(1 - ({0})^2)"},
-    {"ln", "1/({0})"}
+    {"ln", "1/({0})"},
+    {"abs", "abs({0})/({0})"}
+};
+
+std::map<std::string, std::string> k_integral_map{
+    {"sin", "-cos({0})"},
+    {"cos", "sin({0})"},
+    {"tan", "ln(abs(sec({0})))"},
+    {"sec", "ln(abs(sec({0}) + tan({0})))"},
+    {"csc", "ln(abs(sin({0})))"},
+    {"cot", "ln(abs(csc({0}) - cot({0})))"},
+    {"sinh", "cosh({0})"},
+    {"cosh", "sinh({0})"},
+    {"tanh", "ln(cosh({0}))"},
+    {"sech", "atan(sinh({0}))"},
+    {"csch", "ln(abs(coth({0}) - csch({0})))"},
+    {"coth", "ln(abs(sinh({0})))"},
+    {"asin", "({0})asin({0}) + ((1 - ({0})^2)^0.5"},
+    {"acos", "({0})acos({0}) - ((1 - ({0})^2)^0.5"},
+    {"atan", "({0})atan({0}) - ln(abs(1 + ({0})^2))/2"},
+    {"asec", "({0})asec({0}) - acosh(abs({0}))"},
+    {"acsc", "({0})acsc({0}) + acosh(abs({0}))"},
+    {"acot", "({0})acot({0}) + ln(abs(1 + ({0})^2))/2"},
+    {"asinh", "({0})asinh({0}) - ((1 + ({0})^2)^0.5"},
+    {"acosh", "({0})acosh({0}) - ((1 - ({0})^2)^0.5"},
+    {"atanh", "({0})atanh({0}) + ln(1 - ({0})^2)/2"},
+    {"asech", "({0})asech({0}) - 2atan(((1 - ({0})/(1 - ({0}))))^0.5)"},
+    {"acsch", "({0})acsch({0}) + acoth((1 + ({0})^2)^0.5)/({0})"},
+    {"acoth", "({0})acoth({0}) + ln(({0})^2 - 1)/2"},
+    {"ln", "({0})ln(abs({0})) - ({0})"},
+    {"abs", "({0})abs({0})/2"}
 };
 } // namespace
 
@@ -169,7 +200,7 @@ Token derivative(
     auto derivative = simplified(
         tokenise(
             std::vformat(
-                k_function_map.at(token.function),
+                k_derivative_map.at(token.function),
                 std::make_format_args(parameter)
             )
         ) *
@@ -192,7 +223,7 @@ Token integral(Function const &token, Variable const &variable) {
         return simplified(
             tokenise(
                 std::vformat(
-                    k_function_map.at(token.function),
+                    k_integral_map.at(token.function),
                     std::make_format_args(string)
                 )
             ) *

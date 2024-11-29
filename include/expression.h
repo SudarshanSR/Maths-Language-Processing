@@ -22,8 +22,6 @@ class Expression final {
 
     void add_token(Sign sign, Token const &token);
 
-    [[nodiscard]] bool empty() const;
-
     explicit operator std::string() const;
 
     [[nodiscard]] Expression operator-() const;
