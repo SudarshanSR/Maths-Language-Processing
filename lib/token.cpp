@@ -1,6 +1,5 @@
 #include "../include/token.h"
 
-#include "../include/constant.h"
 #include "../include/expression.h"
 #include "../include/function.h"
 #include "../include/term.h"
@@ -104,12 +103,12 @@ get_next_token(std::string const &expression, std::size_t &i) {
         }
 
         if (i >= expression.size())
-            return mlp::Constant(std::stod(number));
+            return std::stod(number);
 
         if (character != '.') {
             --i;
 
-            return mlp::Constant(std::stod(number));
+            return std::stod(number);
         }
 
         do {
@@ -121,7 +120,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
         if (i < expression.size())
             --i;
 
-        return mlp::Constant(std::stod(number));
+        return std::stod(number);
     }
 
     if (k_parenthesis_map.contains(character)) {
@@ -149,7 +148,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
 
         std::size_t const end = i - start;
 
-        return std::move(mlp::tokenise(expression.substr(start, end)));
+        return mlp::tokenise(expression.substr(start, end));
     }
 
     for (std::size_t const offset : {5, 4, 3, 2}) {
@@ -179,7 +178,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
     }
 
     if (character == 'e')
-        return mlp::Constant(std::numbers::e);
+        return std::numbers::e;
 
     if (('A' <= character && character <= 'Z') ||
         ('a' <= character && character <= 'z'))
@@ -208,13 +207,13 @@ bool mlp::is_linear_of(Token const &token, Variable const &variable) {
 mlp::Token
 mlp::evaluate(Token const &token, std::map<Variable, Token> const &values) {
     return std::visit(
-        [&values](auto &&val) -> Token { return evaluate(val, values); }, token
+        [&values](auto &&var) -> Token { return evaluate(var, values); }, token
     );
 }
 
 mlp::Token mlp::simplified(Token const &token) {
     return std::visit(
-        [](auto &&var) -> Token { return simplified(var); }, token
+        []<typename t>(t &&var) -> Token { return simplified(var); }, token
     );
 }
 
@@ -229,8 +228,8 @@ mlp::Token mlp::derivative(
     Token const &token, Variable const &variable, std::uint32_t const order
 ) {
     return std::visit(
-        [&variable, &order](auto &&val) -> Token {
-            return derivative(val, variable, order);
+        [&variable, &order](auto &&var) -> Token {
+            return derivative(var, variable, order);
         },
         token
     );
@@ -238,7 +237,7 @@ mlp::Token mlp::derivative(
 
 mlp::Token mlp::integral(Token const &token, Variable const &variable) {
     return std::visit(
-        [&variable](auto &&val) -> Token { return integral(val, variable); },
+        [&variable](auto &&var) -> Token { return integral(var, variable); },
         token
     );
 }
@@ -321,11 +320,11 @@ mlp::Token mlp::tokenise(std::string expression) {
             if (!numerator.empty()) {
                 Terms terms{};
 
-                for (Token &t : numerator)
-                    terms *= std::move(t);
+                for (Token const &t : numerator)
+                    terms *= t;
 
-                for (Token &t : denominator)
-                    terms /= std::move(t);
+                for (Token const &t : denominator)
+                    terms /= t;
 
                 result.add_token(s, simplified(terms));
 
@@ -334,10 +333,10 @@ mlp::Token mlp::tokenise(std::string expression) {
             }
 
             else if (sign == s)
-                result += Constant(1);
+                result += 1;
 
             else
-                result -= Constant(1);
+                result -= 1;
 
             s = sign;
             numerator.push_back(std::move(*next_term));
@@ -384,74 +383,87 @@ mlp::Token mlp::tokenise(std::string expression) {
                 break;
         }
 
-        Token power = Constant(1);
+        Token power = 1.0;
 
         for (Token &p : powers | std::views::reverse)
-            power = p ^ power;
+            power = pow(p, power);
 
         power = std::move(simplified(power));
 
         if (!last)
-            numerator.back() = numerator.back() ^ power;
+            numerator.back() = pow(numerator.back(), power);
         else
-            denominator.back() = denominator.back() ^ power;
+            denominator.back() = pow(denominator.back(), power);
     }
 
     Terms terms{};
 
-    for (Token &t : numerator)
-        terms *= std::move(t);
+    for (Token const &t : numerator)
+        terms *= t;
 
-    for (Token &t : denominator)
-        terms /= std::move(t);
+    for (Token const &t : denominator)
+        terms /= t;
 
     result.add_token(s, simplified(terms));
 
     return simplified(result);
 }
 
+mlp::Token mlp::pow(Token const &lhs, Constant const rhs) {
+    return std::visit(
+        [rhs](auto &&var) -> Token { return pow(var, rhs); }, lhs
+    );
+}
+
+mlp::Token mlp::pow(Constant lhs, Token rhs) {
+    return std::visit(
+        [lhs](auto &&var) -> Token { return pow(lhs, var); }, rhs
+    );
+}
+
+mlp::Token mlp::pow(Token const &lhs, Token const &rhs) {
+    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+}
+
 namespace mlp {
-Term operator-(Token const &token) {
-    return {
-        -1, std::make_unique<Token>(token), std::make_unique<Token>(Constant(1))
-    };
+Token operator-(Token const &token) {
+    return std::visit([](auto &&var) -> Token { return -var; }, token);
 }
 
-Term operator*(std::double_t const lhs, Token const &rhs) {
-    return lhs * (rhs ^ 1);
+Token operator+(Token const &lhs, Token const &rhs) {
+    return std::visit(
+        [&rhs](auto &&outer) -> Token {
+            return std::visit(
+                [&outer](auto &&inner) -> Token { return outer + inner; }, rhs
+            );
+        },
+        lhs
+    );
 }
 
-Term operator*(Token const &lhs, std::double_t const rhs) { return rhs * lhs; }
-
-Expression operator+(Token const &lhs, Token const &rhs) {
-    Expression result;
-    result += lhs;
-    result += rhs;
-
-    return result;
+Token operator-(Token const &lhs, Token const &rhs) {
+    return std::visit(
+        [&rhs](auto &&outer) -> Token {
+            return std::visit(
+                [&outer](auto &&inner) -> Token { return outer - inner; }, rhs
+            );
+        },
+        lhs
+    );
 }
 
-Expression operator-(Token const &lhs, Token const &rhs) {
-    Expression result;
-    result += lhs;
-    result -= rhs;
-
-    return result;
+Token operator*(Token const &lhs, Token const &rhs) {
+    return std::visit(
+        [&rhs](auto &&outer) -> Token {
+            return std::visit(
+                [&outer](auto &&inner) -> Token { return outer * inner; }, rhs
+            );
+        },
+        lhs
+    );
 }
 
-Expression operator*(std::double_t const lhs, Expression rhs) {
-    return std::move(rhs *= Constant(lhs));
-}
-
-Terms operator*(Token const &lhs, Token const &rhs) {
-    Terms result;
-    result *= lhs;
-    result *= rhs;
-
-    return result;
-}
-
-Expression operator*(Token const &lhs, Expression rhs) {
+Token operator*(Token const &lhs, Expression rhs) {
     return std::move(rhs *= lhs);
 }
 
@@ -468,21 +480,17 @@ std::ostream &operator<<(std::ostream &os, Sign const sign) {
 
     return os;
 }
-
-Term operator^(Token const &lhs, std::double_t const rhs) {
-    return {
-        1, std::make_unique<Token>(lhs), std::make_unique<Token>(Constant(rhs))
-    };
-}
-
-Term operator^(Token const &lhs, Token const &rhs) {
-    return {1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
-}
 } // namespace mlp
 
 std::string to_string(mlp::Token const &token) {
     return std::visit(
-        [](auto &&var) -> std::string { return static_cast<std::string>(var); },
+        []<typename T>(T &&var) -> std::string {
+            if constexpr (std::is_same<std::decay_t<T>, mlp::Constant>())
+                return std::to_string(var);
+
+            else
+                return static_cast<std::string>(var);
+        },
         token
     );
 }

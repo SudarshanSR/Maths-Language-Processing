@@ -5,13 +5,13 @@
 
 namespace mlp {
 struct Term final {
-    std::double_t coefficient{1};
+    Constant coefficient{1};
     OwnedToken base;
     OwnedToken power;
 
-    Term(std::double_t coefficient, OwnedToken &&base, OwnedToken &&power);
+    Term(Constant coefficient, OwnedToken &&base, OwnedToken &&power);
 
-    Term(std::double_t coefficient, Token const &base, Token const &power);
+    Term(Constant coefficient, Token const &base, Token const &power);
 
     Term(OwnedToken &&base, OwnedToken &&power);
 
@@ -29,19 +29,11 @@ struct Term final {
 
     [[nodiscard]] Term operator-() const;
 
-    friend Term operator-(Term const &rhs);
+    Term &operator*=(Constant rhs);
 
-    Term &operator*=(std::double_t rhs);
+    Term &operator/=(Constant rhs);
 
-    friend Term operator*(std::double_t lhs, Term rhs);
-
-    friend Term operator*(Term lhs, std::double_t rhs);
-
-    Term &operator/=(std::double_t rhs);
-
-    friend Term operator/(std::double_t lhs, Term rhs);
-
-    friend Term operator/(Term lhs, std::double_t rhs);
+    [[nodiscard]] bool operator==(Term const &) const;
 };
 
 [[nodiscard]] bool is_dependent_on(Term const &token, Variable const &variable);
@@ -57,6 +49,40 @@ evaluate(Term const &token, std::map<Variable, Token> const &values);
 derivative(Term const &token, Variable const &variable, std::uint32_t order);
 
 [[nodiscard]] Token integral(Term const &token, Variable const &variable);
+
+[[nodiscard]] Token operator+(Term lhs, Constant rhs);
+[[nodiscard]] Token operator+(Term lhs, Variable rhs);
+[[nodiscard]] Token operator+(Term const &lhs, Function rhs);
+[[nodiscard]] Token operator+(Term lhs, Term rhs);
+[[nodiscard]] Token operator+(Term lhs, Terms rhs);
+[[nodiscard]] Token operator+(Term const &lhs, Expression rhs);
+
+[[nodiscard]] Token operator-(Term lhs, Constant rhs);
+[[nodiscard]] Token operator-(Term lhs, Variable rhs);
+[[nodiscard]] Token operator-(Term const &lhs, Function rhs);
+[[nodiscard]] Token operator-(Term lhs, Term const &rhs);
+[[nodiscard]] Token operator-(Term lhs, Terms const &rhs);
+[[nodiscard]] Token operator-(Term const &lhs, Expression rhs);
+
+[[nodiscard]] Token operator*(Term lhs, Constant rhs);
+[[nodiscard]] Token operator*(Term lhs, Variable rhs);
+[[nodiscard]] Token operator*(Term lhs, Function const &rhs);
+[[nodiscard]] Token operator*(Term lhs, Term const &rhs);
+[[nodiscard]] Token operator*(Term const &lhs, Terms rhs);
+[[nodiscard]] Token operator*(Term lhs, Expression const &rhs);
+
+[[nodiscard]] Token operator/(Term lhs, Constant rhs);
+[[nodiscard]] Token operator/(Term lhs, Variable rhs);
+[[nodiscard]] Token operator/(Term lhs, Function const &rhs);
+[[nodiscard]] Token operator/(Term lhs, Term const &rhs);
+[[nodiscard]] Token operator/(Term const &lhs, Terms const &rhs);
+[[nodiscard]] Token operator/(Term lhs, Expression const &rhs);
+
+[[nodiscard]] Token pow(Term lhs, Constant rhs);
+[[nodiscard]] Token pow(Term const &lhs, Variable rhs);
+[[nodiscard]] Token pow(Term const &lhs, Function rhs);
+[[nodiscard]] Token pow(Term const &lhs, Term rhs);
+[[nodiscard]] Token pow(Term const &lhs, Terms rhs);
 } // namespace mlp
 
 #endif // TERM_H

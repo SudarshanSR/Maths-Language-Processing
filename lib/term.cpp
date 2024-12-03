@@ -1,6 +1,5 @@
 #include "../include/term.h"
 
-#include "../include/constant.h"
 #include "../include/expression.h"
 #include "../include/function.h"
 #include "../include/terms.h"
@@ -10,13 +9,13 @@
 #include <sstream>
 
 mlp::Term::Term(
-    std::double_t const coefficient, OwnedToken &&base, OwnedToken &&power
+    Constant const coefficient, OwnedToken &&base, OwnedToken &&power
 )
     : coefficient(coefficient), base(std::move(base)), power(std::move(power)) {
 }
 
 mlp::Term::Term(
-    std::double_t const coefficient, Token const &base, Token const &power
+    Constant const coefficient, Token const &base, Token const &power
 )
     : coefficient(coefficient), base(new Token(base)), power(new Token(power)) {
 }
@@ -52,12 +51,19 @@ mlp::Term::operator std::string() const {
 
     result << '(';
 
-    result << to_string(*this->base);
+    if (std::holds_alternative<Constant>(*this->power)) {
+        Constant const &power = std::get<Constant>(*this->power);
 
-    if (!std::holds_alternative<Constant>(*this->power) ||
-        std::get<Constant>(*this->power) != 1) {
-        result << '^';
-        result << to_string(*this->power);
+        if (power == 0.5)
+            result << "\u221A" << *this->base;
+        else if (power == 1.0 / 3.0)
+            result << "\u221B" << *this->base;
+        else if (power == 1.0 / 4.0)
+            result << "\u221C" << *this->base;
+        else if (power != 1)
+            result << *this->base << '^' << *this->power;
+    } else {
+        result << *this->base << '^' << *this->power;
     }
 
     result << ')';
@@ -72,10 +78,10 @@ mlp::Term mlp::Term::operator-() const {
     };
 }
 
-mlp::Term &mlp::Term::operator*=(std::double_t const rhs) {
+mlp::Term &mlp::Term::operator*=(Constant const rhs) {
     if (rhs == 0) {
-        *this->base = Constant(1);
-        *this->power = Constant(1);
+        *this->base = 1.0;
+        *this->power = 1.0;
     }
 
     this->coefficient *= rhs;
@@ -83,15 +89,20 @@ mlp::Term &mlp::Term::operator*=(std::double_t const rhs) {
     return *this;
 }
 
-mlp::Term &mlp::Term::operator/=(std::double_t const rhs) {
+mlp::Term &mlp::Term::operator/=(Constant const rhs) {
     if (rhs == 0) {
-        *this->base = Constant(1);
-        *this->power = Constant(1);
+        *this->base = 1.0;
+        *this->power = 1.0;
     }
 
     this->coefficient /= rhs;
 
     return *this;
+}
+
+bool mlp::Term::operator==(Term const &rhs) const {
+    return this->coefficient == rhs.coefficient && *this->base == *rhs.base &&
+           *this->power == *rhs.power;
 }
 
 bool mlp::is_dependent_on(Term const &token, Variable const &variable) {
@@ -129,30 +140,18 @@ mlp::Token mlp::simplified(Term const &token) {
             return *term.base;
 
         if (power == 0)
-            return Constant(term.coefficient);
+            return term.coefficient;
 
         if (std::holds_alternative<Term>(*term.base)) {
             auto &base = std::get<Term>(*term.base);
-            base.coefficient = base.coefficient ^ power;
+            base.coefficient = std::pow(base.coefficient, power);
 
             if (term.coefficient != 1) {
                 base.coefficient *= term.coefficient;
                 term.coefficient = 1;
             }
 
-            if (std::holds_alternative<Constant>(*base.power)) {
-                std::get<Constant>(*base.power) *= power;
-            } else if (std::holds_alternative<Term>(*base.power)) {
-                std::get<Term>(*base.power) *= power;
-            } else if (std::holds_alternative<Terms>(*base.power)) {
-                std::get<Terms>(*base.power) *= power.value();
-            } else {
-                Terms terms{};
-                terms.coefficient = power;
-                terms *= *base.power;
-
-                *base.power = std::move(terms);
-            }
+            *base.power = *base.power * power;
 
             power = 1;
 
@@ -176,17 +175,16 @@ mlp::Token mlp::simplified(Term const &token) {
         auto const &base = std::get<Constant>(*term.base);
 
         if (base == 1)
-            return Constant(token.coefficient);
+            return token.coefficient;
 
         if (std::holds_alternative<Constant>(*term.power))
-            return Constant(
-                term.coefficient * (base ^ std::get<Constant>(*term.power))
-            );
+            return term.coefficient *
+                   std::pow(base, std::get<Constant>(*term.power));
 
         if (term.coefficient == base) {
             if (std::holds_alternative<Expression>(*term.power)) {
                 auto &power = std::get<Expression>(*term.power);
-                power += Constant{1};
+                power += 1.0;
                 term.coefficient = 1;
             }
         }
@@ -205,17 +203,16 @@ mlp::Token mlp::derivative(
         return token;
 
     if (!is_dependent_on(token, variable))
-        return Constant(0);
+        return 0.0;
 
     if (std::holds_alternative<Constant>(*token.power)) {
         if (std::holds_alternative<Constant>(*token.base))
-            return Constant(0);
+            return 0.0;
 
         auto const &power = std::get<Constant>(*token.power);
 
         auto derivative = simplified(
-            token.coefficient * power.value() *
-            (*token.base ^ power.value() - 1.0) *
+            token.coefficient * power * pow(*token.base, power - 1.0) *
             mlp::derivative(*token.base, variable, 1)
         );
 
@@ -267,14 +264,14 @@ mlp::Token mlp::integral(Term const &token, Variable const &variable) {
                 power == -1) {
                 terms *= "ln"_f(*token.base);
             } else {
-                terms /= power.value() + 1.0;
-                terms *= *token.base ^ power.value() + 1.0;
+                terms /= power + 1.0;
+                terms *= pow(*token.base, power + 1.0);
             }
         } else if (!is_dependent_on(*token.power, variable)) {
-            auto expression = *token.power + Constant(1);
+            auto const expression = *token.power + 1.0;
 
-            terms *= *token.base ^ expression;
-            terms /= std::move(expression);
+            terms *= pow(*token.base, expression);
+            terms /= expression;
         } else {
             throw std::runtime_error("Expression is not integrable!");
         }
@@ -304,25 +301,393 @@ mlp::Token mlp::integral(Term const &token, Variable const &variable) {
     throw std::runtime_error("Expression is not integrable!");
 }
 
-namespace mlp {
-Term operator-(Term const &rhs) {
-    return {
-        -rhs.coefficient, std::make_unique<Token>(*rhs.base),
-        std::make_unique<Token>(*rhs.power)
-    };
+mlp::Token mlp::operator+(Term lhs, Constant const rhs) {
+    if (lhs.coefficient == 0)
+        return rhs;
+
+    if (rhs == 0)
+        return lhs;
+
+    Expression result;
+    result += lhs;
+    result += rhs;
+
+    return result;
 }
 
-Term operator*(std::double_t const lhs, Term rhs) { return rhs *= lhs; }
+mlp::Token mlp::operator+(Term lhs, Variable rhs) {
+    if (lhs.coefficient == 0 && rhs.coefficient == 0)
+        return 0.0;
 
-Term operator*(Term lhs, std::double_t const rhs) { return lhs *= rhs; }
+    if (lhs.coefficient == 0)
+        return rhs;
 
-Term operator/(std::double_t const lhs, Term rhs) {
-    rhs.coefficient = lhs / rhs.coefficient;
+    if (rhs.coefficient == 0)
+        return lhs;
 
-    *rhs.power = simplified(-*rhs.power);
+    Expression result;
+    result += lhs;
+    result += rhs;
 
-    return rhs;
+    return result;
 }
 
-Term operator/(Term lhs, std::double_t const rhs) { return lhs /= rhs; }
-} // namespace mlp
+mlp::Token mlp::operator+(Term const &lhs, Function rhs) {
+    if (lhs.coefficient == 0)
+        return rhs;
+
+    Expression result;
+    result += lhs;
+    result += rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator+(Term lhs, Term rhs) {
+    if (lhs.coefficient == 0 && rhs.coefficient == 0)
+        return 0.0;
+
+    if (lhs.coefficient == 0)
+        return rhs;
+
+    if (rhs.coefficient == 0)
+        return lhs;
+
+    if (*lhs.base == *rhs.base && *lhs.power == *rhs.power) {
+        lhs.coefficient += rhs.coefficient;
+
+        return lhs;
+    }
+
+    Expression result;
+    result += lhs;
+    result += rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator+(Term lhs, Terms rhs) {
+    if (lhs.coefficient == 0 && rhs.coefficient == 0)
+        return 0.0;
+
+    if (lhs.coefficient == 0)
+        return rhs;
+
+    if (rhs.coefficient == 0)
+        return lhs;
+
+    Expression result;
+    result += lhs;
+    result += rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator+(Term const &lhs, Expression rhs) {
+    return rhs += lhs;
+}
+
+mlp::Token mlp::operator-(Term lhs, Constant const rhs) {
+    if (lhs.coefficient == 0)
+        return -rhs;
+
+    if (rhs == 0)
+        return lhs;
+
+    Expression result;
+    result += lhs;
+    result -= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator-(Term lhs, Variable const rhs) {
+    if (lhs.coefficient == 0 && rhs.coefficient == 0)
+        return 0.0;
+
+    if (lhs.coefficient == 0)
+        return -rhs;
+
+    if (rhs.coefficient == 0)
+        return lhs;
+
+    Expression result;
+    result += lhs;
+    result -= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator-(Term const &lhs, Function rhs) {
+    if (lhs.coefficient == 0)
+        return rhs;
+
+    Expression result;
+    result += lhs;
+    result -= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator-(Term lhs, Term const &rhs) {
+    if (lhs.coefficient == 0 && rhs.coefficient == 0)
+        return 0.0;
+
+    if (lhs.coefficient == 0)
+        return -rhs;
+
+    if (rhs.coefficient == 0)
+        return lhs;
+
+    if (*lhs.base == *rhs.base && *lhs.power == *rhs.power) {
+        lhs.coefficient -= rhs.coefficient;
+
+        if (lhs.coefficient == 0)
+            return 0.0;
+
+        return lhs;
+    }
+
+    Expression result;
+    result += lhs;
+    result -= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator-(Term lhs, Terms const &rhs) {
+    if (lhs.coefficient == 0 && rhs.coefficient == 0)
+        return 0.0;
+
+    if (lhs.coefficient == 0)
+        return -rhs;
+
+    if (rhs.coefficient == 0)
+        return lhs;
+
+    Expression result;
+    result += lhs;
+    result -= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator-(Term const &lhs, Expression rhs) {
+    return -(rhs -= lhs);
+}
+
+mlp::Token mlp::operator*(Term lhs, Constant const rhs) {
+    if (rhs == 0)
+        return 0.0;
+
+    if (rhs == 1)
+        return lhs;
+
+    return lhs *= rhs;
+}
+
+mlp::Token mlp::operator*(Term lhs, Variable const rhs) {
+    if (lhs.coefficient == 0 || rhs.coefficient == 0)
+        return 0.0;
+
+    if (std::holds_alternative<Variable>(*lhs.base) &&
+        std::get<Variable>(*lhs.base) == rhs) {
+        *lhs.power = *lhs.power + 1.0;
+        lhs.coefficient *= rhs.coefficient;
+
+        return lhs;
+    }
+
+    Terms result;
+    result *= lhs;
+    result *= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator*(Term lhs, Function const &rhs) {
+    if (lhs.coefficient == 0)
+        return 0.0;
+
+    if (std::holds_alternative<Function>(*lhs.base) &&
+        std::get<Function>(*lhs.base) == rhs) {
+        *lhs.power = *lhs.power + 1.0;
+
+        return lhs;
+    }
+
+    Terms result;
+    result *= lhs;
+    result *= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator*(Term lhs, Term const &rhs) {
+    if (lhs.coefficient == 0 || rhs.coefficient == 0)
+        return 0.0;
+
+    if (std::holds_alternative<Term>(*lhs.base) &&
+        std::get<Term>(*lhs.base) == rhs) {
+        *lhs.power = *lhs.power + *rhs.power;
+        lhs.coefficient *= rhs.coefficient;
+
+        return lhs;
+    }
+
+    Terms result;
+    result *= lhs;
+    result *= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator*(Term const &lhs, Terms rhs) { return rhs *= lhs; }
+
+mlp::Token mlp::operator*(Term lhs, Expression const &rhs) { return rhs * lhs; }
+
+mlp::Token mlp::operator/(Term lhs, Constant const rhs) {
+    if (rhs == 0)
+        throw std::domain_error{"Division by 0!"};
+
+    if (rhs == 1)
+        return lhs;
+
+    return lhs /= rhs;
+}
+
+mlp::Token mlp::operator/(Term lhs, Variable const rhs) {
+    if (rhs.coefficient == 0)
+        throw std::domain_error{"Division by 0!"};
+
+    if (lhs.coefficient == 0)
+        return 0.0;
+
+    if (std::holds_alternative<Variable>(*lhs.base) &&
+        std::get<Variable>(*lhs.base) == rhs) {
+        *lhs.power = *lhs.power - 1.0;
+        lhs.coefficient /= rhs.coefficient;
+
+        return lhs;
+    }
+
+    Terms result;
+    result *= lhs;
+    result /= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator/(Term lhs, Function const &rhs) {
+    if (lhs.coefficient == 0)
+        return 0.0;
+
+    if (std::holds_alternative<Function>(*lhs.base) &&
+        std::get<Function>(*lhs.base) == rhs) {
+        *lhs.power = *lhs.power - 1.0;
+
+        return lhs;
+    }
+
+    Terms result;
+    result *= lhs;
+    result *= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator/(Term lhs, Term const &rhs) {
+    if (rhs.coefficient == 0)
+        throw std::domain_error{"Division by 0!"};
+
+    if (lhs.coefficient == 0)
+        return 0.0;
+
+    if (std::holds_alternative<Term>(*lhs.base) &&
+        std::get<Term>(*lhs.base) == rhs) {
+        *lhs.power = *lhs.power - *rhs.power;
+        lhs.coefficient /= rhs.coefficient;
+
+        return lhs;
+    }
+
+    Terms result;
+    result *= lhs;
+    result *= rhs;
+
+    return result;
+}
+
+mlp::Token mlp::operator/(Term const &lhs, Terms const &rhs) {
+    return pow(rhs / lhs, -1);
+}
+
+mlp::Token mlp::operator/(Term lhs, Expression const &rhs) {
+    return pow(rhs / lhs, -1);
+}
+
+mlp::Token mlp::pow(Term lhs, Constant const rhs) {
+    if (lhs.coefficient == 0) {
+        if (rhs == 0 || rhs == HUGE_VAL || rhs == -HUGE_VAL)
+            throw std::domain_error{"Indeterminate!"};
+
+        return 0.0;
+    }
+
+    if (rhs == 0)
+        return 1.0;
+
+    if (rhs == 1)
+        return lhs;
+
+    lhs.coefficient = std::pow(lhs.coefficient, rhs);
+    *lhs.power = *lhs.power * rhs;
+
+    return lhs;
+}
+
+mlp::Token mlp::pow(Term const &lhs, Variable rhs) {
+    if (rhs.coefficient == 0 && lhs.coefficient == 0)
+        throw std::domain_error{"Indeterminate!"};
+
+    if (rhs.coefficient == 0)
+        return 1.0;
+
+    if (lhs.coefficient == 0)
+        return 0.0;
+
+    return pow(lhs.coefficient, rhs) * pow(*lhs.base, *lhs.power * rhs);
+}
+
+mlp::Token mlp::pow(Term const &lhs, Function rhs) {
+    if (lhs.coefficient == 0)
+        return 0.0;
+
+    return pow(lhs.coefficient, rhs) * pow(*lhs.base, *lhs.power * rhs);
+}
+
+mlp::Token mlp::pow(Term const &lhs, Term rhs) {
+    if (rhs.coefficient == 0 && lhs.coefficient == 0)
+        throw std::domain_error{"Indeterminate!"};
+
+    if (rhs.coefficient == 0)
+        return 1.0;
+
+    if (lhs.coefficient == 0)
+        return 0.0;
+
+    return pow(lhs.coefficient, rhs) * pow(*lhs.base, *lhs.power * rhs);
+}
+
+mlp::Token mlp::pow(Term const &lhs, Terms rhs) {
+    if (rhs.coefficient == 0 && lhs.coefficient == 0)
+        throw std::domain_error{"Indeterminate!"};
+
+    if (rhs.coefficient == 0)
+        return 1.0;
+
+    if (lhs.coefficient == 0)
+        return 0.0;
+
+    return pow(lhs.coefficient, rhs) * pow(*lhs.base, *lhs.power * rhs);
+}

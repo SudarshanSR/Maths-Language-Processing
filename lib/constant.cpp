@@ -6,128 +6,136 @@
 #include "../include/terms.h"
 #include "../include/variable.h"
 
-#include <map>
+bool mlp::is_dependent_on(Constant, Variable const &) { return false; }
 
-mlp::Constant::Constant(std::double_t const value) : value_(value) {}
+bool mlp::is_linear_of(Constant, Variable const &) { return false; }
 
-mlp::Constant &mlp::Constant::operator=(std::double_t const value) {
-    this->value_ = value;
-
-    return *this;
-}
-
-mlp::Constant::operator std::string() const {
-    return std::to_string(this->value_);
-}
-
-mlp::Constant::operator double() const { return this->value_; }
-
-mlp::Constant mlp::Constant::operator-() const {
-    return Constant{-this->value_};
-}
-
-mlp::Constant &mlp::Constant::operator++() {
-    ++this->value_;
-
-    return *this;
-}
-
-mlp::Constant &mlp::Constant::operator--() {
-    --this->value_;
-
-    return *this;
-}
-
-mlp::Constant &mlp::Constant::operator+=(std::double_t const rhs) {
-    this->value_ += rhs;
-
-    return *this;
-}
-
-mlp::Constant &mlp::Constant::operator-=(std::double_t const rhs) {
-    this->value_ -= rhs;
-
-    return *this;
-}
-
-mlp::Constant &mlp::Constant::operator*=(std::double_t const rhs) {
-    this->value_ *= rhs;
-
-    return *this;
-}
-
-mlp::Constant &mlp::Constant::operator/=(std::double_t const rhs) {
-    this->value_ /= rhs;
-
-    return *this;
-}
-
-mlp::Constant &mlp::Constant::operator^=(std::double_t const rhs) {
-    this->value_ = std::pow(this->value_, rhs);
-
-    return *this;
-}
-
-bool mlp::Constant::operator>(Constant const &rhs) const {
-    return this->value_ > rhs.value_;
-}
-
-bool mlp::is_dependent_on(Constant const &, Variable const &) { return false; }
-
-bool mlp::is_linear_of(Constant const &, Variable const &) { return false; }
-
-mlp::Token
-mlp::evaluate(Constant const &token, std::map<Variable, Token> const &) {
+mlp::Token mlp::evaluate(Constant token, std::map<Variable, Token> const &) {
     return token;
 }
 
-mlp::Token mlp::simplified(Constant const &token) { return token; }
+mlp::Token mlp::simplified(Constant token) { return token; }
 
-mlp::Token mlp::derivative(
-    Constant const &token, Variable const &, std::uint32_t const order
-) {
-    if (!order)
-        return token;
-
-    return Constant(0);
+mlp::Token mlp::derivative(Constant, Variable const &, std::uint32_t) {
+    return 0.0;
 }
 
-mlp::Token mlp::integral(Constant const &token, Variable const &variable) {
-    return token.value() * variable;
+mlp::Token mlp::integral(Constant const token, Variable const &variable) {
+    if (token == 0)
+        return 0.0;
+
+    return variable / variable.coefficient;
 }
 
-namespace mlp {
-Constant operator++(Constant &lhs, int) {
-    Constant temp = lhs;
-    ++lhs;
-    return temp;
+mlp::Token mlp::operator+(Constant const lhs, Token const &rhs) {
+    return rhs + lhs;
 }
 
-Constant operator--(Constant &lhs, int) {
-    Constant temp = lhs;
-    --lhs;
-    return temp;
+mlp::Token mlp::operator-(Constant const lhs, Token const &rhs) {
+    return -(rhs - lhs);
 }
 
-Constant operator+(Constant lhs, std::double_t const rhs) { return lhs += rhs; }
+mlp::Token mlp::operator*(Token const &lhs, Constant const rhs) {
+    return std::visit([rhs](auto &&var) -> Token { return var * rhs; }, lhs);
+}
 
-Constant operator+(std::double_t const lhs, Constant rhs) { return rhs += lhs; }
+mlp::Token mlp::operator*(Constant const lhs, Token const &rhs) {
+    return rhs * lhs;
+}
 
-Constant operator-(Constant lhs, std::double_t const rhs) { return lhs -= rhs; }
+mlp::Token mlp::operator*(Constant lhs, Expression rhs) { return rhs *= lhs; }
 
-Constant operator-(std::double_t const lhs, Constant rhs) { return rhs -= lhs; }
+mlp::Token mlp::operator/(Token const &lhs, Constant const rhs) {
+    return std::visit([rhs](auto &&var) -> Token { return var / rhs; }, lhs);
+}
 
-Constant operator*(Constant lhs, std::double_t const rhs) { return lhs *= rhs; }
+mlp::Token mlp::operator/(Constant const lhs, Token const &rhs) {
+    return std::visit([lhs](auto &&var) -> Token { return lhs / var; }, rhs);
+}
 
-Constant operator*(std::double_t const lhs, Constant rhs) { return rhs *= lhs; }
+mlp::Token mlp::operator/(Constant const lhs, Variable const rhs) {
+    if (rhs.coefficient == 0)
+        throw std::domain_error{"Division by 0!"};
 
-Constant operator/(Constant lhs, std::double_t const rhs) { return lhs /= rhs; }
+    if (lhs == 0)
+        return 0.0;
 
-Constant operator/(std::double_t const lhs, Constant rhs) { return rhs /= lhs; }
+    return lhs * pow(rhs, -1);
+}
 
-Constant operator^(Constant lhs, Constant const &rhs) { return lhs ^= rhs; }
+mlp::Token mlp::operator/(Constant const lhs, Function const &rhs) {
+    if (lhs == 0)
+        return 0.0;
 
-Constant operator^(Constant lhs, std::double_t const rhs) { return lhs ^= rhs; }
+    return lhs * pow(rhs, -1);
+}
 
-Constant operator^(std::double_t const lhs, Constant rhs) { return rhs ^= lhs; }
-} // namespace mlp
+mlp::Token mlp::operator/(Constant const lhs, Term const &rhs) {
+    if (rhs.coefficient == 0)
+        throw std::domain_error{"Division by 0!"};
+
+    if (lhs == 0)
+        return 0.0;
+
+    return lhs * pow(rhs, -1);
+}
+
+mlp::Token mlp::operator/(Constant const lhs, Terms const &rhs) {
+    if (rhs.coefficient == 0)
+        throw std::domain_error{"Division by 0!"};
+
+    if (lhs == 0)
+        return 0.0;
+
+    return lhs * pow(rhs, -1);
+}
+
+mlp::Token mlp::operator/(Constant const lhs, Expression const &rhs) {
+    if (lhs == 0)
+        return 0.0;
+
+    return lhs * pow(rhs, -1);
+}
+
+mlp::Token mlp::pow(Constant const lhs, Variable rhs) {
+    if (lhs == 0 && rhs.coefficient == 0)
+        throw std::domain_error{"Indeterminate!"};
+
+    if (rhs.coefficient == 0)
+        return 0.0;
+
+    if (lhs == 1)
+        return 1.0;
+
+    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+}
+
+mlp::Token mlp::pow(Constant const lhs, Function rhs) {
+    if (lhs == 0)
+        return 0.0;
+
+    if (lhs == 1)
+        return 1.0;
+
+    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+}
+
+mlp::Token mlp::pow(Constant const lhs, Term rhs) {
+    if (lhs == 0) {
+        if (rhs.coefficient == 0 || rhs.coefficient == HUGE_VAL ||
+            rhs.coefficient == -HUGE_VAL)
+            throw std::domain_error{"Indeterminate!"};
+
+        return 0.0;
+    }
+
+    if (lhs == 1)
+        return 1.0;
+
+    Constant const coefficient = std::pow(lhs, rhs.coefficient);
+    rhs.coefficient = 1;
+
+    return Term{
+        coefficient, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)
+    };
+}

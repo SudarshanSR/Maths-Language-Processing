@@ -7,7 +7,7 @@
 
 namespace mlp {
 class Expression final {
-    std::vector<std::pair<Sign, OwnedToken>> tokens;
+    std::vector<std::pair<Sign, Token>> tokens;
 
   public:
     Expression() = default;
@@ -26,9 +26,33 @@ class Expression final {
 
     [[nodiscard]] Expression operator-() const;
 
-    Expression &operator+=(Token token);
+    Expression &operator+=(Expression const &rhs);
 
-    Expression &operator-=(Token token);
+    Expression &operator+=(Constant rhs);
+
+    Expression &operator+=(Variable const &rhs);
+
+    Expression &operator+=(Function const &rhs);
+
+    Expression &operator+=(Term const &rhs);
+
+    Expression &operator+=(Terms const &rhs);
+
+    Expression &operator+=(Token const &token);
+
+    Expression &operator-=(Expression const &rhs);
+
+    Expression &operator-=(Constant rhs);
+
+    Expression &operator-=(Variable const &rhs);
+
+    Expression &operator-=(Function const &rhs);
+
+    Expression &operator-=(Term const &rhs);
+
+    Expression &operator-=(Terms const &rhs);
+
+    Expression &operator-=(Token const &token);
 
     friend bool
     is_dependent_on(Expression const &token, Variable const &variable);
@@ -49,15 +73,28 @@ class Expression final {
     Expression &operator*=(Token const &token);
 
     Expression &operator*=(Expression const &rhs);
+
+    Expression &operator/=(Token const &rhs);
+
+    friend Token pow(Constant lhs, Expression const &rhs);
+    friend Token pow(Token const &lhs, Expression const &rhs);
+
+    [[nodiscard]] bool operator==(Expression const &) const;
 };
 
 [[nodiscard]] Expression operator+(Expression lhs, Token const &rhs);
 
 [[nodiscard]] Expression operator-(Expression lhs, Token const &rhs);
 
-[[nodiscard]] Expression operator*(Expression lhs, Expression const &rhs);
+[[nodiscard]] Token operator*(Expression lhs, Constant rhs);
 
+[[nodiscard]] Expression operator*(Expression lhs, Expression const &rhs);
 [[nodiscard]] Expression operator*(Expression lhs, Token const &rhs);
+
+[[nodiscard]] Token operator/(Expression lhs, Constant rhs);
+
+[[nodiscard]] Token pow(Expression const &lhs, Constant rhs);
+[[nodiscard]] Token pow(Expression const &lhs, Token const &rhs);
 } // namespace mlp
 
 #endif // EXPRESSION_H

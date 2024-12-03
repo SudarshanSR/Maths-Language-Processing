@@ -1,92 +1,56 @@
 #ifndef CONSTANT_H
 #define CONSTANT_H
 
-#include "token.h"
+#include <cmath>
+#include <map>
+#include <variant>
 
 namespace mlp {
-class Constant final {
-    std::double_t value_;
+using Constant = std::double_t;
+class Variable;
+class Function;
+struct Term;
+class Terms;
+class Expression;
 
-  public:
-    explicit Constant(std::double_t value);
+using Token =
+    std::variant<Constant, Variable, Function, Term, Terms, Expression>;
 
-    Constant(Constant const &) = default;
+[[nodiscard]] bool is_dependent_on(Constant token, Variable const &variable);
 
-    Constant(Constant &&) = default;
-
-    Constant &operator=(Constant const &) = default;
-
-    Constant &operator=(Constant &&) = default;
-
-    Constant &operator=(std::double_t value);
-
-    [[nodiscard]] std::double_t value() const { return this->value_; }
-
-    explicit operator std::string() const;
-
-    explicit(false) operator std::double_t() const;
-
-    [[nodiscard]] Constant operator-() const;
-
-    Constant &operator++();
-
-    Constant &operator--();
-
-    Constant &operator+=(std::double_t rhs);
-
-    Constant &operator-=(std::double_t rhs);
-
-    Constant &operator*=(std::double_t rhs);
-
-    Constant &operator/=(std::double_t rhs);
-
-    Constant &operator^=(std::double_t rhs);
-
-    bool operator==(Constant const &) const = default;
-
-    bool operator>(Constant const &) const;
-};
-
-[[nodiscard]] bool is_dependent_on(Constant const &, Variable const &);
-
-[[nodiscard]] bool is_linear_of(Constant const &, Variable const &);
+[[nodiscard]] bool is_linear_of(Constant token, Variable const &variable);
 
 [[nodiscard]] Token
-evaluate(Constant const &token, std::map<Variable, Token> const &values);
+evaluate(Constant token, std::map<Variable, Token> const &values);
 
-[[nodiscard]] Token simplified(Constant const &token);
+[[nodiscard]] Token simplified(Constant token);
 
-[[nodiscard]] Token derivative(
-    Constant const &token, Variable const &variable, std::uint32_t order
-);
+[[nodiscard]] Token
+derivative(Constant token, Variable const &variable, std::uint32_t order);
 
-[[nodiscard]] Token integral(Constant const &token, Variable const &variable);
+[[nodiscard]] Token integral(Constant token, Variable const &variable);
 
-Constant operator++(Constant &lhs, int);
+[[nodiscard]] Token operator+(Constant lhs, Token const &rhs);
 
-Constant operator--(Constant &lhs, int);
+[[nodiscard]] Token operator-(Constant lhs, Token const &rhs);
 
-Constant operator+(Constant lhs, std::double_t rhs);
+[[nodiscard]] Token operator*(Token const &lhs, Constant rhs);
+[[nodiscard]] Token operator*(Constant lhs, Token const &rhs);
+[[nodiscard]] Token operator*(Constant lhs, Expression rhs);
 
-Constant operator+(std::double_t lhs, Constant rhs);
+[[nodiscard]] Token operator/(Token const &lhs, Constant rhs);
+[[nodiscard]] Token operator/(Constant lhs, Token const &rhs);
+[[nodiscard]] Token operator/(Constant lhs, Variable rhs);
+[[nodiscard]] Token operator/(Constant lhs, Function const &rhs);
+[[nodiscard]] Token operator/(Constant lhs, Term const &rhs);
+[[nodiscard]] Token operator/(Constant lhs, Terms const &rhs);
+[[nodiscard]] Token operator/(Constant lhs, Expression const &rhs);
 
-Constant operator-(Constant lhs, std::double_t rhs);
-
-Constant operator-(std::double_t lhs, Constant rhs);
-
-Constant operator*(Constant lhs, std::double_t rhs);
-
-Constant operator*(std::double_t lhs, Constant rhs);
-
-Constant operator/(Constant lhs, std::double_t rhs);
-
-Constant operator/(std::double_t lhs, Constant rhs);
-
-Constant operator^(Constant lhs, Constant const &rhs);
-
-Constant operator^(Constant lhs, std::double_t rhs);
-
-Constant operator^(std::double_t lhs, Constant rhs);
+using std::pow;
+[[nodiscard]] Token pow(Constant lhs, Variable rhs);
+[[nodiscard]] Token pow(Constant lhs, Function rhs);
+[[nodiscard]] Token pow(Constant lhs, Term rhs);
+[[nodiscard]] Token pow(Constant lhs, Terms rhs);
 } // namespace mlp
 
 #endif // CONSTANT_H

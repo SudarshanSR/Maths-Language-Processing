@@ -7,10 +7,10 @@
 
 namespace mlp {
 class Terms final {
-    std::vector<OwnedToken> terms;
+    std::vector<Token> terms;
 
   public:
-    std::double_t coefficient{1};
+    Constant coefficient{1};
 
     Terms() = default;
 
@@ -26,21 +26,37 @@ class Terms final {
 
     [[nodiscard]] Terms operator-() const;
 
+    Terms &operator*=(Variable variable);
+
+    Terms &operator*=(Function function);
+
+    Terms &operator*=(Term term);
+
+    Terms &operator*=(Terms terms);
+
+    Terms &operator*=(Expression expression);
+
     Terms &operator*=(Token token);
+
+    Terms &operator/=(Variable variable);
+
+    Terms &operator/=(Function const &function);
+
+    Terms &operator/=(Term term);
+
+    Terms &operator/=(Terms terms);
+
+    Terms &operator/=(Expression const &expression);
 
     Terms &operator/=(Token token);
 
-    Terms &operator*=(std::double_t scalar);
+    Terms &operator*=(Constant scalar);
 
-    friend Terms operator*(std::double_t lhs, Terms rhs);
+    Terms &operator/=(Constant scalar);
 
-    friend Terms operator*(Terms lhs, std::double_t rhs);
+    [[nodiscard]] bool operator==(Terms const &) const;
 
-    Terms &operator/=(std::double_t scalar);
-
-    friend Terms operator/(std::double_t lhs, Terms rhs);
-
-    friend Terms operator/(Terms lhs, std::double_t rhs);
+    friend Token pow(Terms lhs, Constant rhs);
 
     friend bool is_dependent_on(Terms const &token, Variable const &variable);
 
@@ -56,7 +72,24 @@ class Terms final {
     );
 
     friend Token integral(Terms const &token, Variable const &variable);
+
+    friend Token pow(Terms lhs, Constant rhs);
+
+    friend Token pow(Terms const &lhs, Token const &rhs);
 };
+
+[[nodiscard]] Token operator+(Terms lhs, Constant rhs);
+[[nodiscard]] Token operator+(Terms const &lhs, Token const &rhs);
+
+[[nodiscard]] Token operator-(Terms lhs, Constant rhs);
+[[nodiscard]] Token operator-(Terms const &lhs, Token const &rhs);
+
+[[nodiscard]] Token operator*(Terms lhs, Constant rhs);
+[[nodiscard]] Token operator*(Terms lhs, Token const &rhs);
+[[nodiscard]] Token operator*(Terms lhs, Expression rhs);
+
+[[nodiscard]] Token operator/(Terms lhs, Constant rhs);
+[[nodiscard]] Token operator/(Terms lhs, Token const &rhs);
 } // namespace mlp
 
 #endif // TERMS_H

@@ -8,6 +8,10 @@ class Variable final {
     char var;
 
   public:
+    Constant coefficient{1};
+
+    Variable(Constant coefficient, char var);
+
     explicit Variable(char var);
 
     Variable(Variable const &) = default;
@@ -20,9 +24,15 @@ class Variable final {
 
     explicit operator std::string() const;
 
-    bool operator==(Variable const &) const = default;
+    [[nodiscard]] Variable operator-() const;
 
-    friend bool operator<(Variable const &lhs, Variable const &rhs);
+    [[nodiscard]] bool operator<(Variable const &) const;
+
+    [[nodiscard]] bool operator==(Variable const &) const;
+
+    Variable &operator*=(Constant rhs);
+
+    Variable &operator/=(Constant rhs);
 };
 
 [[nodiscard]] bool
@@ -41,6 +51,39 @@ evaluate(Variable const &token, std::map<Variable, Token> const &values);
 );
 
 [[nodiscard]] Token integral(Variable const &token, Variable const &variable);
+
+[[nodiscard]] Token operator+(Variable lhs, Constant rhs);
+[[nodiscard]] Token operator+(Variable lhs, Variable const &rhs);
+[[nodiscard]] Token operator+(Variable lhs, Function const &rhs);
+[[nodiscard]] Token operator+(Variable lhs, Term const &rhs);
+[[nodiscard]] Token operator+(Variable lhs, Terms const &rhs);
+[[nodiscard]] Token operator+(Variable lhs, Expression rhs);
+
+[[nodiscard]] Token operator-(Variable lhs, Constant rhs);
+[[nodiscard]] Token operator-(Variable lhs, Variable const &rhs);
+[[nodiscard]] Token operator-(Variable lhs, Function const &rhs);
+[[nodiscard]] Token operator-(Variable lhs, Term const &rhs);
+[[nodiscard]] Token operator-(Variable lhs, Terms const &rhs);
+[[nodiscard]] Token operator-(Variable lhs, Expression rhs);
+
+[[nodiscard]] Token operator*(Variable lhs, Constant rhs);
+[[nodiscard]] Token operator*(Variable lhs, Variable const &rhs);
+[[nodiscard]] Token operator*(Variable lhs, Function const &rhs);
+[[nodiscard]] Token operator*(Variable lhs, Term const &rhs);
+[[nodiscard]] Token operator*(Variable lhs, Terms rhs);
+[[nodiscard]] Token operator*(Variable lhs, Expression const &rhs);
+
+[[nodiscard]] Token operator/(Variable lhs, Constant rhs);
+[[nodiscard]] Token operator/(Variable lhs, Variable const &rhs);
+[[nodiscard]] Token operator/(Variable lhs, Function const &rhs);
+[[nodiscard]] Token operator/(Variable lhs, Term const &rhs);
+[[nodiscard]] Token operator/(Variable lhs, Terms const &rhs);
+[[nodiscard]] Token operator/(Variable lhs, Expression const &rhs);
+
+[[nodiscard]] Token pow(Variable lhs, Constant rhs);
+[[nodiscard]] Token pow(Variable lhs, Function rhs);
+[[nodiscard]] Token pow(Variable lhs, Term rhs);
+[[nodiscard]] Token pow(Variable lhs, Terms rhs);
 } // namespace mlp
 
 #endif // VARIABLE_H

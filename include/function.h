@@ -37,6 +37,8 @@ class Function final {
     );
 
     friend Token integral(Function const &token, Variable const &variable);
+
+    [[nodiscard]] bool operator==(Function const &) const;
 };
 
 class FunctionFactory final {
@@ -47,6 +49,42 @@ class FunctionFactory final {
 
     Function operator()(Token const &token) const;
 };
+
+[[nodiscard]] Term operator-(Function token);
+
+[[nodiscard]] Token operator+(Function lhs, Constant rhs);
+[[nodiscard]] Token operator+(Function lhs, Variable rhs);
+[[nodiscard]] Token operator+(Function const &lhs, Function const &rhs);
+[[nodiscard]] Token operator+(Function lhs, Term const &rhs);
+[[nodiscard]] Token operator+(Function lhs, Terms const &rhs);
+[[nodiscard]] Token operator+(Function const &lhs, Expression rhs);
+
+[[nodiscard]] Token operator-(Function lhs, Constant rhs);
+[[nodiscard]] Token operator-(Function lhs, Variable rhs);
+[[nodiscard]] Token operator-(Function const &lhs, Function const &rhs);
+[[nodiscard]] Token operator-(Function lhs, Term const &rhs);
+[[nodiscard]] Token operator-(Function lhs, Terms const &rhs);
+[[nodiscard]] Token operator-(Function const &lhs, Expression rhs);
+
+[[nodiscard]] Token operator*(Function lhs, Constant rhs);
+[[nodiscard]] Token operator*(Function const &lhs, Variable rhs);
+[[nodiscard]] Token operator*(Function const &lhs, Function const &rhs);
+[[nodiscard]] Token operator*(Function const &lhs, Term const &rhs);
+[[nodiscard]] Token operator*(Function const &lhs, Terms rhs);
+[[nodiscard]] Token operator*(Function const &lhs, Expression rhs);
+
+[[nodiscard]] Token operator/(Function lhs, Constant rhs);
+[[nodiscard]] Token operator/(Function const &lhs, Function const &rhs);
+[[nodiscard]] Token operator/(Function const &lhs, Variable rhs);
+[[nodiscard]] Token operator/(Function const &lhs, Term const &rhs);
+[[nodiscard]] Token operator/(Function const &lhs, Terms const &rhs);
+[[nodiscard]] Token operator/(Function const &lhs, Expression const &rhs);
+
+[[nodiscard]] Token pow(Function const &lhs, Constant rhs);
+[[nodiscard]] Token pow(Function const &lhs, Variable rhs);
+[[nodiscard]] Token pow(Function const &lhs, Function const &rhs);
+[[nodiscard]] Token pow(Function const &lhs, Term const &rhs);
+[[nodiscard]] Token pow(Function const &lhs, Terms const &rhs);
 } // namespace mlp
 
 mlp::FunctionFactory operator""_f(char const *string, size_t);

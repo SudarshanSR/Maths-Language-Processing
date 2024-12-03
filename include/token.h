@@ -1,14 +1,12 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
-#include <cmath>
+#include "constant.h"
+
 #include <map>
 #include <string>
 
-#include <gsl/gsl>
-
 namespace mlp {
-class Constant;
 class Variable;
 class Function;
 struct Term;
@@ -48,27 +46,21 @@ enum class Sign { pos, neg };
 
 Token tokenise(std::string expression);
 
-[[nodiscard]] Term operator-(Token const &token);
+[[nodiscard]] Token operator-(Token const &token);
 
-[[nodiscard]] Term operator*(std::double_t lhs, Token const &rhs);
+[[nodiscard]] Token operator+(Token const &lhs, Token const &rhs);
 
-[[nodiscard]] Term operator*(Token const &lhs, std::double_t rhs);
+[[nodiscard]] Token operator-(Token const &lhs, Token const &rhs);
 
-[[nodiscard]] Expression operator+(Token const &lhs, Token const &rhs);
+[[nodiscard]] Token operator*(Token const &lhs, Token const &rhs);
 
-[[nodiscard]] Expression operator-(Token const &lhs, Token const &rhs);
-
-[[nodiscard]] Expression operator*(std::double_t lhs, Expression rhs);
-
-[[nodiscard]] Terms operator*(Token const &lhs, Token const &rhs);
-
-[[nodiscard]] Expression operator*(Token const &lhs, Expression rhs);
+[[nodiscard]] Token operator*(Token const &lhs, Expression rhs);
 
 [[nodiscard]] Terms operator/(Token const &lhs, Token const &rhs);
 
-Term operator^(Token const &lhs, std::double_t rhs);
-
-Term operator^(Token const &lhs, Token const &rhs);
+[[nodiscard]] Token pow(Token const &lhs, Constant rhs);
+[[nodiscard]] Token pow(Constant lhs, Token rhs);
+[[nodiscard]] Token pow(Token const &lhs, Token const &rhs);
 
 std::ostream &operator<<(std::ostream &os, Sign sign);
 } // namespace mlp
