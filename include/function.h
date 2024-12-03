@@ -10,7 +10,7 @@ class Function final {
     OwnedToken parameter;
 
   public:
-    explicit Function(std::string function, OwnedToken &&parameter);
+    Function(std::string function, Token parameter);
 
     Function(Function const &function);
 
@@ -22,21 +22,19 @@ class Function final {
 
     explicit operator std::string() const;
 
-    friend bool
-    is_dependent_on(Function const &token, Variable const &variable);
+    friend bool is_dependent_on(Function const &token, Variable variable);
 
-    friend bool is_linear_of(Function const &token, Variable const &variable);
+    friend bool is_linear_of(Function const &token, Variable variable);
 
     friend Token
     evaluate(Function const &token, std::map<Variable, Token> const &values);
 
     friend Token simplified(Function const &token);
 
-    friend Token derivative(
-        Function const &token, Variable const &variable, std::uint32_t order
-    );
+    friend Token
+    derivative(Function const &token, Variable variable, std::uint32_t order);
 
-    friend Token integral(Function const &token, Variable const &variable);
+    friend Token integral(Function const &token, Variable variable);
 
     [[nodiscard]] bool operator==(Function const &) const;
 };

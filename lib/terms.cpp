@@ -488,9 +488,7 @@ mlp::Token mlp::pow(Constant const lhs, Terms rhs) {
     Constant const coefficient = std::pow(lhs, rhs.coefficient);
     rhs.coefficient = 1;
 
-    return Term{
-        coefficient, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)
-    };
+    return Term{coefficient, lhs, rhs};
 }
 
 namespace mlp {
@@ -524,7 +522,7 @@ Token pow(Terms const &lhs, Token const &rhs) {
     return terms;
 }
 
-bool is_dependent_on(Terms const &token, Variable const &variable) {
+bool is_dependent_on(Terms const &token, Variable variable) {
     return std::ranges::any_of(
         token.terms,
         [variable](Token const &term) -> bool {
@@ -533,7 +531,7 @@ bool is_dependent_on(Terms const &token, Variable const &variable) {
     );
 }
 
-bool is_linear_of(Terms const &token, Variable const &variable) {
+bool is_linear_of(Terms const &token, Variable const variable) {
     if (!is_dependent_on(token, variable))
         return false;
 
@@ -611,7 +609,7 @@ Token simplified(Terms const &token) {
 }
 
 Token derivative(
-    Terms const &token, Variable const &variable, std::uint32_t const order
+    Terms const &token, Variable const variable, std::uint32_t const order
 ) {
     if (!order)
         return token;
@@ -645,7 +643,7 @@ Token derivative(
     return derivative;
 }
 
-Token integral(Terms const &token, Variable const &variable) {
+Token integral(Terms const &token, Variable const variable) {
     auto const simplified = mlp::simplified(token);
 
     if (!std::holds_alternative<Terms>(simplified))

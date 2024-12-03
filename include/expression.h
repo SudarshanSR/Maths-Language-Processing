@@ -30,7 +30,7 @@ class Expression final {
 
     Expression &operator+=(Constant rhs);
 
-    Expression &operator+=(Variable const &rhs);
+    Expression &operator+=(Variable rhs);
 
     Expression &operator+=(Function const &rhs);
 
@@ -44,7 +44,7 @@ class Expression final {
 
     Expression &operator-=(Constant rhs);
 
-    Expression &operator-=(Variable const &rhs);
+    Expression &operator-=(Variable rhs);
 
     Expression &operator-=(Function const &rhs);
 
@@ -55,9 +55,9 @@ class Expression final {
     Expression &operator-=(Token const &token);
 
     friend bool
-    is_dependent_on(Expression const &token, Variable const &variable);
+    is_dependent_on(Expression const &token, Variable variable);
 
-    friend bool is_linear_of(Expression const &token, Variable const &variable);
+    friend bool is_linear_of(Expression const &token, Variable variable);
 
     friend Token
     evaluate(Expression const &token, std::map<Variable, Token> const &values);
@@ -65,10 +65,10 @@ class Expression final {
     friend Token simplified(Expression const &token);
 
     friend Token derivative(
-        Expression const &token, Variable const &variable, std::uint32_t order
+        Expression const &token, Variable variable, std::uint32_t order
     );
 
-    friend Token integral(Expression const &token, Variable const &variable);
+    friend Token integral(Expression const &token, Variable variable);
 
     Expression &operator*=(Token const &token);
 

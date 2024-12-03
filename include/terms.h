@@ -58,9 +58,9 @@ class Terms final {
 
     friend Token pow(Terms lhs, Constant rhs);
 
-    friend bool is_dependent_on(Terms const &token, Variable const &variable);
+    friend bool is_dependent_on(Terms const &token, Variable variable);
 
-    friend bool is_linear_of(Terms const &token, Variable const &variable);
+    friend bool is_linear_of(Terms const &token, Variable variable);
 
     friend Token
     evaluate(Terms const &token, std::map<Variable, Token> const &values);
@@ -68,10 +68,10 @@ class Terms final {
     friend Token simplified(Terms const &token);
 
     friend Token derivative(
-        Terms const &token, Variable const &variable, std::uint32_t order
+        Terms const &token, Variable variable, std::uint32_t order
     );
 
-    friend Token integral(Terms const &token, Variable const &variable);
+    friend Token integral(Terms const &token, Variable variable);
 
     friend Token pow(Terms lhs, Constant rhs);
 

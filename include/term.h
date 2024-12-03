@@ -9,13 +9,9 @@ struct Term final {
     OwnedToken base;
     OwnedToken power;
 
-    Term(Constant coefficient, OwnedToken &&base, OwnedToken &&power);
+    Term(Constant coefficient, Token base, Token power);
 
-    Term(Constant coefficient, Token const &base, Token const &power);
-
-    Term(OwnedToken &&base, OwnedToken &&power);
-
-    Term(Token const &base, Token const &power);
+    Term(Token base, Token power);
 
     Term(Term const &term);
 
@@ -36,9 +32,9 @@ struct Term final {
     [[nodiscard]] bool operator==(Term const &) const;
 };
 
-[[nodiscard]] bool is_dependent_on(Term const &token, Variable const &variable);
+[[nodiscard]] bool is_dependent_on(Term const &token, Variable variable);
 
-[[nodiscard]] bool is_linear_of(Term const &token, Variable const &variable);
+[[nodiscard]] bool is_linear_of(Term const &token, Variable variable);
 
 [[nodiscard]] Token
 evaluate(Term const &token, std::map<Variable, Token> const &values);
@@ -46,9 +42,9 @@ evaluate(Term const &token, std::map<Variable, Token> const &values);
 [[nodiscard]] Token simplified(Term const &token);
 
 [[nodiscard]] Token
-derivative(Term const &token, Variable const &variable, std::uint32_t order);
+derivative(Term const &token, Variable variable, std::uint32_t order);
 
-[[nodiscard]] Token integral(Term const &token, Variable const &variable);
+[[nodiscard]] Token integral(Term const &token, Variable variable);
 
 [[nodiscard]] Token operator+(Term lhs, Constant rhs);
 [[nodiscard]] Token operator+(Term lhs, Variable rhs);

@@ -172,9 +172,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
         if (!parameter)
             throw std::runtime_error("Expression is not valid!");
 
-        return mlp::Function(
-            fn, std::make_unique<mlp::Token>(std::move(*parameter))
-        );
+        return mlp::Function(fn, std::move(*parameter));
     }
 
     if (character == 'e')
@@ -188,7 +186,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
 }
 } // namespace
 
-bool mlp::is_dependent_on(Token const &token, Variable const &variable) {
+bool mlp::is_dependent_on(Token const &token, Variable variable) {
     return std::visit(
         [&variable](auto &&var) -> bool {
             return is_dependent_on(var, variable);
@@ -197,7 +195,7 @@ bool mlp::is_dependent_on(Token const &token, Variable const &variable) {
     );
 }
 
-bool mlp::is_linear_of(Token const &token, Variable const &variable) {
+bool mlp::is_linear_of(Token const &token, Variable variable) {
     return std::visit(
         [&variable](auto &&var) -> bool { return is_linear_of(var, variable); },
         token
@@ -218,14 +216,14 @@ mlp::Token mlp::simplified(Token const &token) {
 }
 
 mlp::Token mlp::derivative(
-    Token const &token, Variable const &variable, std::uint32_t const order,
+    Token const &token, Variable const variable, std::uint32_t const order,
     std::map<Variable, Token> const &values
 ) {
     return evaluate(derivative(token, variable, order), values);
 }
 
 mlp::Token mlp::derivative(
-    Token const &token, Variable const &variable, std::uint32_t const order
+    Token const &token, Variable variable, std::uint32_t const order
 ) {
     return std::visit(
         [&variable, &order](auto &&var) -> Token {
@@ -235,7 +233,7 @@ mlp::Token mlp::derivative(
     );
 }
 
-mlp::Token mlp::integral(Token const &token, Variable const &variable) {
+mlp::Token mlp::integral(Token const &token, Variable variable) {
     return std::visit(
         [&variable](auto &&var) -> Token { return integral(var, variable); },
         token
@@ -243,8 +241,7 @@ mlp::Token mlp::integral(Token const &token, Variable const &variable) {
 }
 
 mlp::Token mlp::integral(
-    Token const &token, Variable const &variable, Token const &from,
-    Token const &to
+    Token const &token, Variable variable, Token const &from, Token const &to
 ) {
     auto const &integral = mlp::integral(token, variable);
 
@@ -422,7 +419,7 @@ mlp::Token mlp::pow(Constant lhs, Token rhs) {
 }
 
 mlp::Token mlp::pow(Token const &lhs, Token const &rhs) {
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 namespace mlp {

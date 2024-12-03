@@ -38,11 +38,11 @@ mlp::Variable mlp::Variable::operator-() const {
     return {-this->coefficient, this->var};
 }
 
-bool mlp::Variable::operator<(Variable const &rhs) const {
+bool mlp::Variable::operator<(Variable const rhs) const {
     return this->var < rhs.var;
 }
 
-bool mlp::Variable::operator==(Variable const &rhs) const {
+bool mlp::Variable::operator==(Variable const rhs) const {
     return this->var == rhs.var;
 }
 
@@ -58,26 +58,26 @@ mlp::Variable &mlp::Variable::operator/=(Constant const rhs) {
     return *this;
 }
 
-bool mlp::is_dependent_on(Variable const &token, Variable const &variable) {
+bool mlp::is_dependent_on(Variable const token, Variable const variable) {
     return token == variable;
 }
 
-bool mlp::is_linear_of(Variable const &token, Variable const &variable) {
+bool mlp::is_linear_of(Variable const token, Variable const variable) {
     return is_dependent_on(token, variable);
 }
 
 mlp::Token
-mlp::evaluate(Variable const &token, std::map<Variable, Token> const &values) {
+mlp::evaluate(Variable token, std::map<Variable, Token> const &values) {
     if (!values.contains(token))
         return token;
 
     return token.coefficient * values.at(token);
 }
 
-mlp::Token mlp::simplified(Variable const &token) { return token; }
+mlp::Token mlp::simplified(Variable token) { return token; }
 
 mlp::Token mlp::derivative(
-    Variable const &token, Variable const &variable, std::uint32_t const order
+    Variable token, Variable const variable, std::uint32_t const order
 ) {
     if (!order)
         return token;
@@ -85,7 +85,7 @@ mlp::Token mlp::derivative(
     return token == variable && order == 1 ? token.coefficient : 0;
 }
 
-mlp::Token mlp::integral(Variable const &token, Variable const &variable) {
+mlp::Token mlp::integral(Variable const token, Variable const variable) {
     if (token == variable)
         return pow(token, 2) / (2 * token.coefficient);
 
@@ -106,7 +106,7 @@ mlp::Token mlp::operator+(Variable lhs, Constant const rhs) {
     return result;
 }
 
-mlp::Token mlp::operator+(Variable lhs, Variable const &rhs) {
+mlp::Token mlp::operator+(Variable lhs, Variable const rhs) {
     if (rhs.coefficient < 0)
         return lhs - -rhs;
 
@@ -189,7 +189,7 @@ mlp::Token mlp::operator-(Variable lhs, Constant const rhs) {
     return result;
 }
 
-mlp::Token mlp::operator-(Variable lhs, Variable const &rhs) {
+mlp::Token mlp::operator-(Variable lhs, Variable const rhs) {
     if (rhs.coefficient < 0)
         return lhs + -rhs;
 
@@ -268,12 +268,9 @@ mlp::Token mlp::operator*(Variable lhs, Constant const rhs) {
     return lhs *= rhs;
 }
 
-mlp::Token mlp::operator*(Variable lhs, Variable const &rhs) {
+mlp::Token mlp::operator*(Variable const lhs, Variable const rhs) {
     if (lhs == rhs)
-        return Term(
-            lhs.coefficient * rhs.coefficient, std::make_unique<Token>(lhs),
-            std::make_unique<Token>(2.0)
-        );
+        return lhs.coefficient * rhs.coefficient * pow(lhs, 2);
 
     Terms result;
     result *= lhs;
@@ -332,7 +329,7 @@ mlp::Token mlp::operator/(Variable lhs, Constant const rhs) {
     return lhs /= rhs;
 }
 
-mlp::Token mlp::operator/(Variable const lhs, Variable const &rhs) {
+mlp::Token mlp::operator/(Variable const lhs, Variable const rhs) {
     if (lhs == rhs)
         return lhs.coefficient / rhs.coefficient;
 
@@ -409,14 +406,14 @@ mlp::Token mlp::pow(Variable lhs, Constant const rhs) {
     Constant const c = std::pow(lhs.coefficient, rhs);
     lhs.coefficient = 1;
 
-    return Term{c, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{c, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Variable lhs, Function rhs) {
     if (lhs.coefficient == 0)
         return 0.0;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Variable lhs, Term rhs) {
@@ -429,7 +426,7 @@ mlp::Token mlp::pow(Variable lhs, Term rhs) {
     if (rhs.coefficient == 0)
         return 1.0;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Variable lhs, Terms rhs) {
@@ -442,5 +439,5 @@ mlp::Token mlp::pow(Variable lhs, Terms rhs) {
     if (rhs.coefficient == 0)
         return 1.0;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }

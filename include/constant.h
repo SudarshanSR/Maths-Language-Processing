@@ -16,9 +16,9 @@ class Expression;
 using Token =
     std::variant<Constant, Variable, Function, Term, Terms, Expression>;
 
-[[nodiscard]] bool is_dependent_on(Constant token, Variable const &variable);
+[[nodiscard]] bool is_dependent_on(Constant token, Variable variable);
 
-[[nodiscard]] bool is_linear_of(Constant token, Variable const &variable);
+[[nodiscard]] bool is_linear_of(Constant token, Variable variable);
 
 [[nodiscard]] Token
 evaluate(Constant token, std::map<Variable, Token> const &values);
@@ -26,9 +26,9 @@ evaluate(Constant token, std::map<Variable, Token> const &values);
 [[nodiscard]] Token simplified(Constant token);
 
 [[nodiscard]] Token
-derivative(Constant token, Variable const &variable, std::uint32_t order);
+derivative(Constant token, Variable variable, std::uint32_t order);
 
-[[nodiscard]] Token integral(Constant token, Variable const &variable);
+[[nodiscard]] Token integral(Constant token, Variable variable);
 
 [[nodiscard]] Token operator+(Constant lhs, Token const &rhs);
 

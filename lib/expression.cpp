@@ -108,7 +108,7 @@ mlp::Expression &mlp::Expression::operator+=(Constant const rhs) {
     return *this;
 }
 
-mlp::Expression &mlp::Expression::operator+=(Variable const &rhs) {
+mlp::Expression &mlp::Expression::operator+=(Variable rhs) {
     if (rhs.coefficient == 0)
         return *this;
 
@@ -326,7 +326,7 @@ mlp::Expression &mlp::Expression::operator-=(Constant const rhs) {
     return *this;
 }
 
-mlp::Expression &mlp::Expression::operator-=(Variable const &rhs) {
+mlp::Expression &mlp::Expression::operator-=(Variable rhs) {
     if (rhs.coefficient == 0)
         return *this;
 
@@ -596,15 +596,15 @@ mlp::Token mlp::pow(Expression const &lhs, Constant const rhs) {
     if (rhs == 1)
         return lhs;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Expression const &lhs, Token const &rhs) {
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 namespace mlp {
-bool is_dependent_on(Expression const &token, Variable const &variable) {
+bool is_dependent_on(Expression const &token, Variable variable) {
     return std::ranges::any_of(
         token.tokens,
         [variable](std::pair<Sign, Token> const &term) -> bool {
@@ -613,7 +613,7 @@ bool is_dependent_on(Expression const &token, Variable const &variable) {
     );
 }
 
-bool is_linear_of(Expression const &token, Variable const &variable) {
+bool is_linear_of(Expression const &token, Variable const variable) {
     if (!is_dependent_on(token, variable))
         return false;
 
@@ -691,7 +691,7 @@ Token simplified(Expression const &token) {
 }
 
 Token derivative(
-    Expression const &token, Variable const &variable, std::uint32_t const order
+    Expression const &token, Variable const variable, std::uint32_t const order
 ) {
     if (!order)
         return token;
@@ -712,7 +712,7 @@ Token derivative(
     return derivative;
 }
 
-Token integral(Expression const &token, Variable const &variable) {
+Token integral(Expression const &token, Variable const variable) {
     if (!is_dependent_on(token, variable))
         return variable * token;
 

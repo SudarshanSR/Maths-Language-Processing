@@ -6,9 +6,9 @@
 #include "../include/terms.h"
 #include "../include/variable.h"
 
-bool mlp::is_dependent_on(Constant, Variable const &) { return false; }
+bool mlp::is_dependent_on(Constant, Variable) { return false; }
 
-bool mlp::is_linear_of(Constant, Variable const &) { return false; }
+bool mlp::is_linear_of(Constant, Variable) { return false; }
 
 mlp::Token mlp::evaluate(Constant token, std::map<Variable, Token> const &) {
     return token;
@@ -16,11 +16,9 @@ mlp::Token mlp::evaluate(Constant token, std::map<Variable, Token> const &) {
 
 mlp::Token mlp::simplified(Constant token) { return token; }
 
-mlp::Token mlp::derivative(Constant, Variable const &, std::uint32_t) {
-    return 0.0;
-}
+mlp::Token mlp::derivative(Constant, Variable, std::uint32_t) { return 0.0; }
 
-mlp::Token mlp::integral(Constant const token, Variable const &variable) {
+mlp::Token mlp::integral(Constant const token, Variable const variable) {
     if (token == 0)
         return 0.0;
 
@@ -107,7 +105,7 @@ mlp::Token mlp::pow(Constant const lhs, Variable rhs) {
     if (lhs == 1)
         return 1.0;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Constant const lhs, Function rhs) {
@@ -117,7 +115,7 @@ mlp::Token mlp::pow(Constant const lhs, Function rhs) {
     if (lhs == 1)
         return 1.0;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Constant const lhs, Term rhs) {
@@ -135,7 +133,5 @@ mlp::Token mlp::pow(Constant const lhs, Term rhs) {
     Constant const coefficient = std::pow(lhs, rhs.coefficient);
     rhs.coefficient = 1;
 
-    return Term{
-        coefficient, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)
-    };
+    return Term{coefficient, lhs, rhs};
 }

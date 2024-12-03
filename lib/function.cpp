@@ -124,8 +124,9 @@ std::map<std::string, std::string> k_integral_map{
 };
 } // namespace
 
-mlp::Function::Function(std::string function, OwnedToken &&parameter)
-    : function(std::move(function)), parameter(std::move(parameter)) {}
+mlp::Function::Function(std::string function, Token parameter)
+    : function(std::move(function)),
+      parameter(new Token(std::move(parameter))) {}
 
 mlp::Function::Function(Function const &function)
     : function(function.function), parameter(new Token(*function.parameter)) {}
@@ -153,12 +154,10 @@ mlp::FunctionFactory::FunctionFactory(std::string function)
     : function(std::move(function)) {}
 
 mlp::Function mlp::FunctionFactory::operator()(Token const &token) const {
-    return Function(this->function, std::make_unique<Token>(token));
+    return Function(this->function, token);
 }
 
-mlp::Term mlp::operator-(Function token) {
-    return {-1, std::make_unique<Token>(token), std::make_unique<Token>(1.0)};
-}
+mlp::Term mlp::operator-(Function token) { return {-1, token, 1.0}; }
 
 mlp::Token mlp::operator+(Function lhs, Constant const rhs) {
     if (rhs == 0)
@@ -279,9 +278,7 @@ mlp::Token mlp::operator*(Function lhs, Constant const rhs) {
     if (rhs == 1)
         return lhs;
 
-    return Term{
-        rhs, std::make_unique<Token>(lhs), std::make_unique<Token>(1.0)
-    };
+    return Term{rhs, lhs, 1.0};
 }
 
 mlp::Token mlp::operator*(Function const &lhs, Variable const rhs) {
@@ -332,9 +329,7 @@ mlp::Token mlp::operator/(Function lhs, Constant const rhs) {
     if (rhs == 1)
         return lhs;
 
-    return Term{
-        1.0 / rhs, std::make_unique<Token>(lhs), std::make_unique<Token>(1.0)
-    };
+    return Term{1.0 / rhs, lhs, 1.0};
 }
 
 mlp::Token mlp::operator/(Function const &lhs, Variable const rhs) {
@@ -385,40 +380,40 @@ mlp::Token mlp::pow(Function const &lhs, Constant const rhs) {
     if (rhs == 1)
         return lhs;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Function const &lhs, Variable rhs) {
     if (rhs.coefficient == 0)
         return 1.0;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Function const &lhs, Function const &rhs) {
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Function const &lhs, Term const &rhs) {
     if (rhs.coefficient == 0)
         return 1.0;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 mlp::Token mlp::pow(Function const &lhs, Terms const &rhs) {
     if (rhs.coefficient == 0)
         return 1.0;
 
-    return Term{1, std::make_unique<Token>(lhs), std::make_unique<Token>(rhs)};
+    return Term{1, lhs, rhs};
 }
 
 namespace mlp {
-bool is_dependent_on(Function const &token, Variable const &variable) {
+bool is_dependent_on(Function const &token, Variable const variable) {
     return is_dependent_on(*token.parameter, variable);
 }
 
-bool is_linear_of(Function const &, Variable const &) { return false; }
+bool is_linear_of(Function const &, Variable) { return false; }
 
 Token evaluate(Function const &token, std::map<Variable, Token> const &values) {
     auto param = evaluate(*token.parameter, values);
@@ -426,27 +421,20 @@ Token evaluate(Function const &token, std::map<Variable, Token> const &values) {
     if (std::holds_alternative<Constant>(param))
         return k_functions.at(token.function)(std::get<Constant>(param));
 
-    return Function(token.function, std::make_unique<Token>(std::move(param)));
+    return Function(token.function, std::move(param));
 }
 
 Token simplified(Function const &token) {
     Token simplified = mlp::simplified(*token.parameter);
 
     if (std::holds_alternative<Constant>(simplified))
-        return evaluate(
-            Function(
-                token.function, std::make_unique<Token>(std::move(simplified))
-            ),
-            {}
-        );
+        return evaluate(Function(token.function, std::move(simplified)), {});
 
-    return Function(
-        token.function, std::make_unique<Token>(std::move(simplified))
-    );
+    return Function(token.function, std::move(simplified));
 }
 
 Token derivative(
-    Function const &token, Variable const &variable, std::uint32_t const order
+    Function const &token, Variable const variable, std::uint32_t const order
 ) {
     if (!order)
         return token;
@@ -472,7 +460,7 @@ Token derivative(
     return derivative;
 }
 
-Token integral(Function const &token, Variable const &variable) {
+Token integral(Function const &token, Variable const variable) {
     if (!is_dependent_on(token, variable))
         return variable * token;
 

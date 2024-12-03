@@ -7,24 +7,14 @@
 
 #include <map>
 #include <sstream>
+#include <utility>
 
-mlp::Term::Term(
-    Constant const coefficient, OwnedToken &&base, OwnedToken &&power
-)
-    : coefficient(coefficient), base(std::move(base)), power(std::move(power)) {
-}
+mlp::Term::Term(Constant const coefficient, Token base, Token power)
+    : coefficient(coefficient), base(new Token(std::move(base))),
+      power(new Token(std::move(power))) {}
 
-mlp::Term::Term(
-    Constant const coefficient, Token const &base, Token const &power
-)
-    : coefficient(coefficient), base(new Token(base)), power(new Token(power)) {
-}
-
-mlp::Term::Term(OwnedToken &&base, OwnedToken &&power)
-    : base(std::move(base)), power(std::move(power)) {}
-
-mlp::Term::Term(Token const &base, Token const &power)
-    : base(new Token(base)), power(new Token(power)) {}
+mlp::Term::Term(Token base, Token power)
+    : base(new Token(std::move(base))), power(new Token(std::move(power))) {}
 
 mlp::Term::Term(Term const &term)
     : coefficient(term.coefficient), base(new Token(*term.base)),
@@ -72,10 +62,7 @@ mlp::Term::operator std::string() const {
 }
 
 mlp::Term mlp::Term::operator-() const {
-    return {
-        -this->coefficient, std::make_unique<Token>(*this->base),
-        std::make_unique<Token>(*this->power)
-    };
+    return {-this->coefficient, *this->base, *this->power};
 }
 
 mlp::Term &mlp::Term::operator*=(Constant const rhs) {
@@ -105,12 +92,12 @@ bool mlp::Term::operator==(Term const &rhs) const {
            *this->power == *rhs.power;
 }
 
-bool mlp::is_dependent_on(Term const &token, Variable const &variable) {
+bool mlp::is_dependent_on(Term const &token, Variable const variable) {
     return is_dependent_on(*token.base, variable) ||
            is_dependent_on(*token.power, variable);
 }
 
-bool mlp::is_linear_of(Term const &token, Variable const &variable) {
+bool mlp::is_linear_of(Term const &token, Variable const variable) {
     return is_dependent_on(token, variable) &&
            std::holds_alternative<Constant>(*token.power) &&
            std::get<Constant>(*token.power) == 1 &&
@@ -197,7 +184,7 @@ mlp::Token mlp::simplified(Term const &token) {
 }
 
 mlp::Token mlp::derivative(
-    Term const &token, Variable const &variable, std::uint32_t const order
+    Term const &token, Variable variable, std::uint32_t const order
 ) {
     if (!order)
         return token;
@@ -246,7 +233,7 @@ mlp::Token mlp::derivative(
     return derivative;
 }
 
-mlp::Token mlp::integral(Term const &token, Variable const &variable) {
+mlp::Token mlp::integral(Term const &token, Variable variable) {
     if (!is_dependent_on(token, variable))
         return variable * token;
 
