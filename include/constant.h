@@ -2,6 +2,7 @@
 #define CONSTANT_H
 
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <variant>
 

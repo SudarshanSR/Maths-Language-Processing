@@ -107,9 +107,6 @@ mlp::Token mlp::operator+(Variable lhs, Constant const rhs) {
 }
 
 mlp::Token mlp::operator+(Variable lhs, Variable const rhs) {
-    if (rhs.coefficient < 0)
-        return lhs - -rhs;
-
     if (lhs == rhs) {
         lhs.coefficient += rhs.coefficient;
 
@@ -190,9 +187,6 @@ mlp::Token mlp::operator-(Variable lhs, Constant const rhs) {
 }
 
 mlp::Token mlp::operator-(Variable lhs, Variable const rhs) {
-    if (rhs.coefficient < 0)
-        return lhs + -rhs;
-
     if (lhs == rhs) {
         lhs.coefficient -= rhs.coefficient;
 

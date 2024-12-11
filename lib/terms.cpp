@@ -218,7 +218,7 @@ mlp::Terms &mlp::Terms::operator/=(Variable variable) {
         variable.coefficient = 1;
     }
 
-    for (std::size_t i = 0; i < this->terms.size(); ++i) {
+    for (std::int64_t i = 0; i < this->terms.size(); ++i) {
         Token &term = this->terms[i];
 
         if (std::holds_alternative<Variable>(term)) {

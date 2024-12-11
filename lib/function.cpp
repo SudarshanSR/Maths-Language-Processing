@@ -154,7 +154,7 @@ mlp::FunctionFactory::FunctionFactory(std::string function)
     : function(std::move(function)) {}
 
 mlp::Function mlp::FunctionFactory::operator()(Token const &token) const {
-    return Function(this->function, token);
+    return {this->function, token};
 }
 
 mlp::Term mlp::operator-(Function token) { return {-1, token, 1.0}; }

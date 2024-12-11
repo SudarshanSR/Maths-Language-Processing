@@ -74,10 +74,7 @@ mlp::Expression &mlp::Expression::operator+=(Constant const rhs) {
     if (rhs == 0)
         return *this;
 
-    if (rhs < 0)
-        return *this -= -rhs;
-
-    for (std::size_t i = 0; i < this->tokens.size(); ++i) {
+    for (std::int64_t i = 0; i < this->tokens.size(); ++i) {
         auto &[sign, token] = this->tokens[i];
 
         if (!std::holds_alternative<Constant>(token))
@@ -103,7 +100,10 @@ mlp::Expression &mlp::Expression::operator+=(Constant const rhs) {
         return *this;
     }
 
-    this->tokens.emplace_back(Sign::pos, rhs);
+    if (rhs < 0)
+        this->tokens.emplace_back(Sign::neg, -rhs);
+    else
+        this->tokens.emplace_back(Sign::pos, rhs);
 
     return *this;
 }
@@ -112,10 +112,7 @@ mlp::Expression &mlp::Expression::operator+=(Variable rhs) {
     if (rhs.coefficient == 0)
         return *this;
 
-    if (rhs.coefficient < 0)
-        return *this -= -rhs;
-
-    for (std::size_t i = 0; i < this->tokens.size(); ++i) {
+    for (std::int64_t i = 0; i < this->tokens.size(); ++i) {
         auto &[sign, token] = this->tokens[i];
 
         if (std::holds_alternative<Variable>(token)) {
@@ -175,7 +172,10 @@ mlp::Expression &mlp::Expression::operator+=(Variable rhs) {
         }
     }
 
-    this->tokens.emplace_back(Sign::pos, rhs);
+    if (rhs.coefficient < 0)
+        this->tokens.emplace_back(Sign::neg, -rhs);
+    else
+        this->tokens.emplace_back(Sign::pos, rhs);
 
     return *this;
 }
@@ -190,9 +190,6 @@ mlp::Expression &mlp::Expression::operator+=(Term const &rhs) {
     if (rhs.coefficient == 0)
         return *this;
 
-    if (rhs.coefficient < 0)
-        return *this -= -rhs;
-
     if (!std::holds_alternative<Variable>(*rhs.base) ||
         !std::holds_alternative<Constant>(*rhs.power)) {
         this->tokens.emplace_back(Sign::pos, rhs);
@@ -202,7 +199,7 @@ mlp::Expression &mlp::Expression::operator+=(Term const &rhs) {
 
     auto const &variable = std::get<Variable>(*rhs.base);
 
-    for (std::size_t i = 0; i < this->tokens.size(); ++i) {
+    for (std::int64_t i = 0; i < this->tokens.size(); ++i) {
         auto &[sign, token] = this->tokens[i];
 
         if (std::holds_alternative<Variable>(token)) {
@@ -255,7 +252,10 @@ mlp::Expression &mlp::Expression::operator+=(Term const &rhs) {
         }
     }
 
-    this->tokens.emplace_back(Sign::pos, rhs);
+    if (rhs.coefficient < 0)
+        this->tokens.emplace_back(Sign::neg, -rhs);
+    else
+        this->tokens.emplace_back(Sign::pos, rhs);
 
     return *this;
 }
@@ -265,9 +265,9 @@ mlp::Expression &mlp::Expression::operator+=(Terms const &rhs) {
         return *this;
 
     if (rhs.coefficient < 0)
-        return *this -= -rhs;
-
-    this->tokens.emplace_back(Sign::pos, rhs);
+        this->tokens.emplace_back(Sign::neg, -rhs);
+    else
+        this->tokens.emplace_back(Sign::pos, rhs);
 
     return *this;
 }
@@ -292,10 +292,7 @@ mlp::Expression &mlp::Expression::operator-=(Constant const rhs) {
     if (rhs == 0)
         return *this;
 
-    if (rhs < 0)
-        return *this += -rhs;
-
-    for (std::size_t i = 0; i < this->tokens.size(); ++i) {
+    for (std::int64_t i = 0; i < this->tokens.size(); ++i) {
         auto &[sign, t] = this->tokens[i];
 
         if (!std::holds_alternative<Constant>(t))
@@ -321,7 +318,10 @@ mlp::Expression &mlp::Expression::operator-=(Constant const rhs) {
         return *this;
     }
 
-    this->tokens.emplace_back(Sign::neg, rhs);
+    if (rhs < 0)
+        this->tokens.emplace_back(Sign::pos, -rhs);
+    else
+        this->tokens.emplace_back(Sign::neg, rhs);
 
     return *this;
 }
@@ -330,10 +330,7 @@ mlp::Expression &mlp::Expression::operator-=(Variable rhs) {
     if (rhs.coefficient == 0)
         return *this;
 
-    if (rhs.coefficient < 0)
-        return *this += -rhs;
-
-    for (std::size_t i = 0; i < this->tokens.size(); ++i) {
+    for (std::int64_t i = 0; i < this->tokens.size(); ++i) {
         auto &[sign, token] = this->tokens[i];
 
         if (std::holds_alternative<Variable>(token)) {
@@ -393,7 +390,10 @@ mlp::Expression &mlp::Expression::operator-=(Variable rhs) {
         }
     }
 
-    this->tokens.emplace_back(Sign::neg, rhs);
+    if (rhs.coefficient < 0)
+        this->tokens.emplace_back(Sign::pos, -rhs);
+    else
+        this->tokens.emplace_back(Sign::neg, rhs);
 
     return *this;
 }
@@ -408,9 +408,6 @@ mlp::Expression &mlp::Expression::operator-=(Term const &rhs) {
     if (rhs.coefficient == 0)
         return *this;
 
-    if (rhs.coefficient < 0)
-        return *this += -rhs;
-
     if (!std::holds_alternative<Variable>(*rhs.base) ||
         !std::holds_alternative<Constant>(*rhs.power)) {
         this->tokens.emplace_back(Sign::neg, rhs);
@@ -420,7 +417,7 @@ mlp::Expression &mlp::Expression::operator-=(Term const &rhs) {
 
     auto const &variable = std::get<Variable>(*rhs.base);
 
-    for (std::size_t i = 0; i < this->tokens.size(); ++i) {
+    for (std::int64_t i = 0; i < this->tokens.size(); ++i) {
         auto &[sign, token] = this->tokens[i];
 
         if (std::holds_alternative<Variable>(token)) {
@@ -473,7 +470,10 @@ mlp::Expression &mlp::Expression::operator-=(Term const &rhs) {
         }
     }
 
-    this->tokens.emplace_back(Sign::neg, rhs);
+    if (rhs.coefficient < 0)
+        this->tokens.emplace_back(Sign::pos, -rhs);
+    else
+        this->tokens.emplace_back(Sign::neg, rhs);
 
     return *this;
 }
@@ -483,9 +483,9 @@ mlp::Expression &mlp::Expression::operator-=(Terms const &rhs) {
         return *this;
 
     if (rhs.coefficient < 0)
-        return *this += -rhs;
-
-    this->tokens.emplace_back(Sign::neg, rhs);
+        this->tokens.emplace_back(Sign::pos, -rhs);
+    else
+        this->tokens.emplace_back(Sign::neg, rhs);
 
     return *this;
 }

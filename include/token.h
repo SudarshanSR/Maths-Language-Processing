@@ -3,7 +3,9 @@
 
 #include "constant.h"
 
+#include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 
 namespace mlp {
@@ -17,8 +19,7 @@ using Token =
     std::variant<Constant, Variable, Function, Term, Terms, Expression>;
 using OwnedToken = std::unique_ptr<Token>;
 
-[[nodiscard]] bool
-is_dependent_on(Token const &token, Variable variable);
+[[nodiscard]] bool is_dependent_on(Token const &token, Variable variable);
 
 [[nodiscard]] bool is_linear_of(Token const &token, Variable variable);
 
@@ -38,8 +39,7 @@ derivative(Token const &token, Variable variable, std::uint32_t order);
 [[nodiscard]] Token integral(Token const &token, Variable variable);
 
 [[nodiscard]] Token integral(
-    Token const &token, Variable variable, Token const &from,
-    Token const &to
+    Token const &token, Variable variable, Token const &from, Token const &to
 );
 
 enum class Sign { pos, neg };

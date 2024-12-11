@@ -287,13 +287,16 @@ mlp::Token mlp::tokenise(std::string expression) {
         auto &operation = std::get<Operation>(token);
 
         if (copy == 0) {
-            if (operation.operation == Operation::mul ||
-                operation.operation == Operation::div ||
-                operation.operation == Operation::pow)
+            switch (operation.operation) {
+            case Operation::mul:
+            case Operation::div:
+            case Operation::pow:
                 throw std::runtime_error("Expression is not valid!");
-
-            if (operation.operation == Operation::sub)
+            case Operation::sub:
                 s = Sign::neg;
+            case Operation::add:
+                break;
+            }
 
             continue;
         }

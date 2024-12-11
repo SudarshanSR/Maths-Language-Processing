@@ -3,6 +3,7 @@
 
 #include "token.h"
 
+#include <cstdint>
 #include <vector>
 
 namespace mlp {
@@ -54,8 +55,7 @@ class Expression final {
 
     Expression &operator-=(Token const &token);
 
-    friend bool
-    is_dependent_on(Expression const &token, Variable variable);
+    friend bool is_dependent_on(Expression const &token, Variable variable);
 
     friend bool is_linear_of(Expression const &token, Variable variable);
 
@@ -64,9 +64,8 @@ class Expression final {
 
     friend Token simplified(Expression const &token);
 
-    friend Token derivative(
-        Expression const &token, Variable variable, std::uint32_t order
-    );
+    friend Token
+    derivative(Expression const &token, Variable variable, std::uint32_t order);
 
     friend Token integral(Expression const &token, Variable variable);
 
