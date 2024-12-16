@@ -480,6 +480,14 @@ std::ostream &operator<<(std::ostream &os, Sign const sign) {
 
     return os;
 }
+
+std::istream &operator>>(std::istream &input, Token &output) {
+    std::string expression;
+    input >> expression;
+    output = tokenise(expression);
+
+    return input;
+}
 } // namespace mlp
 
 std::string to_string(mlp::Token const &token) {

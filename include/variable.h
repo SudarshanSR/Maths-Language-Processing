@@ -5,10 +5,12 @@
 
 namespace mlp {
 class Variable final {
-    char var;
+    char var{'\0'};
 
   public:
     Constant coefficient{1};
+
+    Variable() = default;
 
     Variable(Constant coefficient, char var);
 
@@ -33,6 +35,8 @@ class Variable final {
     Variable &operator*=(Constant rhs);
 
     Variable &operator/=(Constant rhs);
+
+    friend std::istream &operator>>(std::istream &input, Variable &output);
 };
 
 [[nodiscard]] bool is_dependent_on(Variable token, Variable variable);

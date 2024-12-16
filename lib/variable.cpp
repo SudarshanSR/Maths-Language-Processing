@@ -435,3 +435,12 @@ mlp::Token mlp::pow(Variable lhs, Terms rhs) {
 
     return Term{1, lhs, rhs};
 }
+
+namespace mlp {
+std::istream &operator>>(std::istream &input, Variable &output) {
+    input >> output.var;
+    output.coefficient = 1;
+
+    return input;
+}
+} // namespace mlp

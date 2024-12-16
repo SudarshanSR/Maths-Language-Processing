@@ -63,6 +63,8 @@ Token tokenise(std::string expression);
 [[nodiscard]] Token pow(Token const &lhs, Token const &rhs);
 
 std::ostream &operator<<(std::ostream &os, Sign sign);
+
+std::istream &operator>>(std::istream &input, Token &output);
 } // namespace mlp
 
 [[nodiscard]] std::string to_string(mlp::Token const &token);
