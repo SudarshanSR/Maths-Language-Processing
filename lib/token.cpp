@@ -7,6 +7,7 @@
 #include "../include/variable.h"
 
 #include <algorithm>
+#include <istream>
 #include <map>
 #include <numbers>
 #include <ranges>

@@ -52,6 +52,8 @@ mlp::Term::operator std::string() const {
             result << "\u221C" << *this->base;
         else if (power != 1)
             result << *this->base << '^' << *this->power;
+        else
+            result << *this->base;
     } else {
         result << *this->base << '^' << *this->power;
     }
@@ -184,7 +186,7 @@ mlp::Token mlp::simplified(Term const &token) {
 }
 
 mlp::Token mlp::derivative(
-    Term const &token, Variable variable, std::uint32_t const order
+    Term const &token, Variable const variable, std::uint32_t const order
 ) {
     if (!order)
         return token;

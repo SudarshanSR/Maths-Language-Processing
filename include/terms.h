@@ -6,11 +6,9 @@
 #include <vector>
 
 namespace mlp {
-class Terms final {
-    std::vector<Token> terms;
-
-  public:
+struct Terms final {
     Constant coefficient{1};
+    std::vector<Token> terms;
 
     Terms() = default;
 
@@ -67,9 +65,8 @@ class Terms final {
 
     friend Token simplified(Terms const &token);
 
-    friend Token derivative(
-        Terms const &token, Variable variable, std::uint32_t order
-    );
+    friend Token
+    derivative(Terms const &token, Variable variable, std::uint32_t order);
 
     friend Token integral(Terms const &token, Variable variable);
 

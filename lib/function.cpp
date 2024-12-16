@@ -65,6 +65,15 @@ std::map<std::string, mlp::Constant (*)(mlp::Constant)> k_functions{
     {"abs", std::abs}
 };
 
+std::map<std::string, std::string> k_inverses{
+    {"sin", "asin"},   {"cos", "acos"},   {"tan", "atan"},   {"sec", "asec"},
+    {"csc", "acsc"},   {"cot", "acot"},   {"sinh", "asinh"}, {"cosh", "acosh"},
+    {"tanh", "atanh"}, {"sech", "asech"}, {"csch", "acsch"}, {"coth", "acoth"},
+    {"asin", "sin"},   {"acos", "cos"},   {"atan", "tan"},   {"asec", "sec"},
+    {"acsc", "csc"},   {"acot", "cot"},   {"asinh", "sinh"}, {"acosh", "cosh"},
+    {"atanh", "tanh"}, {"asech", "sech"}, {"acsch", "csch"}, {"acoth", "coth"}
+};
+
 std::map<std::string, std::string> k_derivative_map{
     {"sin", "cos({0})"},
     {"cos", "-sin({0})"},
@@ -427,8 +436,47 @@ Token evaluate(Function const &token, std::map<Variable, Token> const &values) {
 Token simplified(Function const &token) {
     Token simplified = mlp::simplified(*token.parameter);
 
+    if (std::holds_alternative<Function>(simplified))
+        if (auto const &parameter = std::get<Function>(simplified);
+            k_inverses.contains(token.function) &&
+            parameter.function == k_inverses[token.function])
+            return mlp::simplified(*parameter.parameter);
+
     if (std::holds_alternative<Constant>(simplified))
         return evaluate(Function(token.function, std::move(simplified)), {});
+
+    if (token.function == "ln") {
+        if (std::holds_alternative<Variable>(simplified)) {
+            auto &variable = std::get<Variable>(simplified);
+
+            Constant const coefficient = variable.coefficient;
+
+            variable.coefficient = 1;
+
+            return k_functions["ln"](coefficient) + "ln"_f(variable);
+        }
+
+        if (std::holds_alternative<Term>(simplified))
+            if (auto const &term = std::get<Term>(simplified);
+                !std::holds_alternative<Constant>(*term.power) ||
+                std::get<Constant>(*term.power) != 1)
+                return mlp::simplified(
+                    *term.power * Function("ln", *term.base)
+                );
+
+        if (std::holds_alternative<Terms>(simplified)) {
+            auto &terms = std::get<Terms>(simplified);
+
+            Expression result;
+
+            result += k_functions["ln"](terms.coefficient);
+
+            for (Token const &t : terms.terms)
+                result += mlp::simplified("ln"_f(t));
+
+            return mlp::simplified(result);
+        }
+    }
 
     return Function(token.function, std::move(simplified));
 }

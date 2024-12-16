@@ -11,7 +11,7 @@ using Constant = std::double_t;
 class Variable;
 class Function;
 struct Term;
-class Terms;
+struct Terms;
 class Expression;
 
 using Token =
