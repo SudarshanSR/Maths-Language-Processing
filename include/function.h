@@ -3,22 +3,34 @@
 
 #include "token.h"
 
+#include <functional>
+#include <vector>
+
 namespace mlp {
 class Function final {
     std::string function;
 
-    OwnedToken parameter;
+    std::vector<Token> parameters;
 
   public:
-    Function(std::string function, Token parameter);
+    Function(std::string function, std::vector<Token> parameters);
 
-    Function(Function const &function);
+    Function(Function const &function) = default;
 
     Function(Function &&function) = default;
 
-    Function &operator=(Function const &function);
+    Function &operator=(Function const &function) = default;
 
     Function &operator=(Function &&function) = default;
+
+    static void define(
+        std::string const &name,
+        std::function<Token(std::vector<Token> const &)> definition
+    );
+
+    static void undef(std::string const &name);
+
+    static bool is_defined(std::string const &name);
 
     explicit operator std::string() const;
 
@@ -45,7 +57,7 @@ class FunctionFactory final {
   public:
     explicit FunctionFactory(std::string function);
 
-    Function operator()(Token const &token) const;
+    Function operator()(std::vector<Token> const &parameters);
 };
 
 [[nodiscard]] Term operator-(Function token);

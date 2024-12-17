@@ -13,6 +13,7 @@
 #include <ranges>
 #include <regex>
 #include <set>
+#include <sstream>
 #include <utility>
 
 namespace mlp {
@@ -77,13 +78,6 @@ std::map<char, char> const k_parenthesis_map{
     {'(', ')'}, {'[', ']'}, {'{', '}'}
 };
 
-std::set<std::string> k_functions{"sin",   "cos",   "tan",   "sec",   "csc",
-                                  "cot",   "sinh",  "cosh",  "tanh",  "sech",
-                                  "csch",  "coth",  "asin",  "acos",  "atan",
-                                  "asec",  "acsc",  "acot",  "asinh", "acosh",
-                                  "atanh", "asech", "acsch", "acoth", "ln",
-                                  "abs"};
-
 std::variant<mlp::Operation, std::optional<mlp::Token>>
 get_next_token(std::string const &expression, std::size_t &i) {
     if (i >= expression.size())
@@ -94,10 +88,10 @@ get_next_token(std::string const &expression, std::size_t &i) {
     if (auto op = mlp::Operation::from_char(character))
         return *op;
 
-    if ('0' <= character && character <= '9') {
+    if (isdigit(character)) {
         std::string number;
 
-        while (i < expression.size() && '0' <= character && character < '9') {
+        while (i < expression.size() && isdigit(character)) {
             number.push_back(character);
 
             character = expression[++i];
@@ -116,7 +110,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
             number.push_back(character);
 
             character = expression[++i];
-        } while (i < expression.size() && '0' <= character && character <= '9');
+        } while (i < expression.size() && isdigit(character));
 
         if (i < expression.size())
             --i;
@@ -152,36 +146,35 @@ get_next_token(std::string const &expression, std::size_t &i) {
         return mlp::tokenise(expression.substr(start, end));
     }
 
-    for (std::size_t const offset : {5, 4, 3, 2}) {
-        if (i + offset >= expression.size())
-            continue;
+    if (isalpha(character)) {
+        std::string func;
 
-        std::string const &fn = expression.substr(i, offset);
+        std::size_t const copy = i;
 
-        if (!k_functions.contains(fn))
-            continue;
+        while (i < expression.size() && isalpha(expression[i]))
+            func += expression[i++];
 
-        i += offset;
+        if (mlp::Function::is_defined(func)) {
+            auto token = get_next_token(expression, i);
 
-        auto token = get_next_token(expression, i);
+            if (std::holds_alternative<mlp::Operation>(token))
+                throw std::runtime_error("Expression is not valid!");
 
-        if (std::holds_alternative<mlp::Operation>(token))
-            throw std::runtime_error("Expression is not valid!");
+            auto &parameter = std::get<std::optional<mlp::Token>>(token);
 
-        auto &parameter = std::get<std::optional<mlp::Token>>(token);
+            if (!parameter)
+                throw std::runtime_error("Expression is not valid!");
 
-        if (!parameter)
-            throw std::runtime_error("Expression is not valid!");
+            return mlp::Function(func, {std::move(*parameter)});
+        }
 
-        return mlp::Function(fn, std::move(*parameter));
-    }
+        i = copy;
 
-    if (character == 'e')
-        return std::numbers::e;
+        if (character == 'e')
+            return std::numbers::e;
 
-    if (('A' <= character && character <= 'Z') ||
-        ('a' <= character && character <= 'z'))
         return mlp::Variable(character);
+    }
 
     throw std::runtime_error("Expression is not valid!");
 }
@@ -494,7 +487,7 @@ std::istream &operator>>(std::istream &input, Token &output) {
 std::string to_string(mlp::Token const &token) {
     return std::visit(
         []<typename T>(T &&var) -> std::string {
-            if constexpr (std::is_same<std::decay_t<T>, mlp::Constant>())
+            if constexpr (std::is_same_v<std::decay_t<T>, mlp::Constant>)
                 return std::to_string(var);
 
             else

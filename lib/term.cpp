@@ -213,7 +213,7 @@ mlp::Token mlp::derivative(
 
     if (std::holds_alternative<Constant>(*token.base)) {
         auto derivative = simplified(
-            "ln"_f(*token.base) * mlp::derivative(*token.power, variable, 1)
+            "ln"_f({*token.base}) * mlp::derivative(*token.power, variable, 1)
         );
 
         if (order > 1)
@@ -226,7 +226,7 @@ mlp::Token mlp::derivative(
         token *
         (*token.power * mlp::derivative(*token.base, variable, 1) /
              *token.base +
-         mlp::derivative(*token.power, variable, 1) * "ln"_f(*token.base))
+         mlp::derivative(*token.power, variable, 1) * "ln"_f({*token.base}))
     );
 
     if (order > 1)
@@ -251,7 +251,7 @@ mlp::Token mlp::integral(Term const &token, Variable variable) {
         if (std::holds_alternative<Constant>(*token.power)) {
             if (auto const &power = std::get<Constant>(*token.power);
                 power == -1) {
-                terms *= "ln"_f(*token.base);
+                terms *= "ln"_f({*token.base});
             } else {
                 terms /= power + 1.0;
                 terms *= pow(*token.base, power + 1.0);
@@ -282,7 +282,7 @@ mlp::Token mlp::integral(Term const &token, Variable variable) {
         else if (std::holds_alternative<Variable>(*token.power))
             terms /= derivative(*token.power, variable, 1);
 
-        terms /= "ln"_f(*token.base);
+        terms /= "ln"_f({*token.base});
 
         return simplified(terms);
     }

@@ -5,11 +5,15 @@
 #include "../include/terms.h"
 #include "../include/variable.h"
 
+#include <algorithm>
+#include <functional>
 #include <map>
+#include <ranges>
 #include <sstream>
+#include <utility>
 
 namespace {
-std::map<std::string, mlp::Constant (*)(mlp::Constant)> k_functions{
+std::map<std::string, mlp::Constant (*)(mlp::Constant)> const k_functions{
     {"sin", std::sin},
     {"cos", std::cos},
     {"tan", std::tan},
@@ -64,6 +68,42 @@ std::map<std::string, mlp::Constant (*)(mlp::Constant)> k_functions{
     {"ln", std::log},
     {"abs", std::abs}
 };
+
+std::map<
+    std::string,
+    std::function<mlp::Token(std::vector<mlp::Token> const &)>> const
+    k_builtin_functions =
+        k_functions |
+        std::views::transform(
+            [](std::pair<
+                std::string, std::function<mlp::Constant(mlp::Constant)>> const
+                   &pair)
+                -> std::pair<
+                    std::string,
+                    std::function<
+                        mlp::Token(std::vector<mlp::Token> const &)>> {
+                auto const &[name, definition] = pair;
+                return {
+                    name,
+                    [&definition](std::vector<mlp::Token> const &parameters)
+                        -> mlp::Token {
+                        if (parameters.size() != 1 ||
+                            !std::holds_alternative<mlp::Constant>(parameters[0]
+                            ))
+                            throw std::runtime_error{"Invalid parameters!"};
+
+                        return definition(
+                            std::get<mlp::Constant>(parameters[0])
+                        );
+                    }
+                };
+            }
+        ) |
+        std::ranges::to<std::map>();
+
+std::map<
+    std::string, std::function<mlp::Token(std::vector<mlp::Token> const &)>>
+    k_custom_functions;
 
 std::map<std::string, std::string> k_inverses{
     {"sin", "asin"},   {"cos", "acos"},   {"tan", "atan"},   {"sec", "asec"},
@@ -133,37 +173,60 @@ std::map<std::string, std::string> k_integral_map{
 };
 } // namespace
 
-mlp::Function::Function(std::string function, Token parameter)
-    : function(std::move(function)),
-      parameter(new Token(std::move(parameter))) {}
+mlp::Function::Function(std::string function, std::vector<Token> parameters) {
+    if (!is_defined(function))
+        throw std::runtime_error{"Undefined function!"};
 
-mlp::Function::Function(Function const &function)
-    : function(function.function), parameter(new Token(*function.parameter)) {}
+    this->function = std::move(function);
+    this->parameters = std::move(parameters);
+}
 
-mlp::Function &mlp::Function::operator=(Function const &function) {
-    this->function = function.function;
-    *this->parameter = *function.parameter;
+void mlp::Function::define(
+    std::string const &name,
+    std::function<Token(std::vector<Token> const &)> definition
+) {
+    if (k_builtin_functions.contains(name))
+        throw std::runtime_error{"Cannot redefine built-in functions!"};
 
-    return *this;
+    k_custom_functions[name] = std::move(definition);
+}
+
+void mlp::Function::undef(std::string const &name) {
+    if (k_builtin_functions.contains(name))
+        throw std::runtime_error{"Cannot undefine built-in functions!"};
+
+    k_custom_functions.erase(name);
+}
+
+bool mlp::Function::is_defined(std::string const &name) {
+    return k_builtin_functions.contains(name) ||
+           k_custom_functions.contains(name);
 }
 
 mlp::Function::operator std::string() const {
     std::stringstream result;
 
-    result << this->function << '(' << to_string(*this->parameter) << ')';
+    result << this->function << '(';
+
+    for (Token const &token :
+         this->parameters | std::views::take(this->parameters.size() - 1))
+        result << token << ", ";
+
+    result << this->parameters.back() << ')';
 
     return result.str();
 }
 
 bool mlp::Function::operator==(Function const &rhs) const {
-    return this->function == rhs.function && *this->parameter == *rhs.parameter;
+    return this->function == rhs.function && this->parameters == rhs.parameters;
 }
 
 mlp::FunctionFactory::FunctionFactory(std::string function)
     : function(std::move(function)) {}
 
-mlp::Function mlp::FunctionFactory::operator()(Token const &token) const {
-    return {this->function, token};
+mlp::Function
+mlp::FunctionFactory::operator()(std::vector<Token> const &parameters) {
+    return {this->function, parameters};
 }
 
 mlp::Term mlp::operator-(Function token) { return {-1, token, 1.0}; }
@@ -419,31 +482,50 @@ mlp::Token mlp::pow(Function const &lhs, Terms const &rhs) {
 
 namespace mlp {
 bool is_dependent_on(Function const &token, Variable const variable) {
-    return is_dependent_on(*token.parameter, variable);
+    return std::ranges::any_of(
+        token.parameters,
+        [variable](Token const &t) -> bool {
+            return is_dependent_on(t, variable);
+        }
+    );
 }
 
 bool is_linear_of(Function const &, Variable) { return false; }
 
 Token evaluate(Function const &token, std::map<Variable, Token> const &values) {
-    auto param = evaluate(*token.parameter, values);
+    auto const parameters =
+        token.parameters |
+        std::views::transform([&values](Token const &t) -> Token {
+            return evaluate(t, values);
+        }) |
+        std::ranges::to<std::vector>();
 
-    if (std::holds_alternative<Constant>(param))
-        return k_functions.at(token.function)(std::get<Constant>(param));
+    if (k_builtin_functions.contains(token.function))
+        return k_builtin_functions.at(token.function)(parameters);
 
-    return Function(token.function, std::move(param));
+    return k_custom_functions.at(token.function)(parameters);
 }
 
 Token simplified(Function const &token) {
-    Token simplified = mlp::simplified(*token.parameter);
+    if (!k_functions.contains(token.function))
+        return simplified(k_custom_functions.at(token.function)(token.parameters
+        ));
+
+    auto parameters = token.parameters |
+                      std::views::transform([](Token const &t) -> Token {
+                          return simplified(t);
+                      }) |
+                      std::ranges::to<std::vector<Token>>();
+    Token simplified = mlp::simplified(parameters[0]);
 
     if (std::holds_alternative<Function>(simplified))
-        if (auto const &parameter = std::get<Function>(simplified);
+        if (auto const &p = std::get<Function>(simplified);
             k_inverses.contains(token.function) &&
-            parameter.function == k_inverses[token.function])
-            return mlp::simplified(*parameter.parameter);
+            p.function == k_inverses[token.function])
+            return mlp::simplified(p.parameters[0]);
 
     if (std::holds_alternative<Constant>(simplified))
-        return evaluate(Function(token.function, std::move(simplified)), {});
+        return k_builtin_functions.at(token.function)(parameters);
 
     if (token.function == "ln") {
         if (std::holds_alternative<Variable>(simplified)) {
@@ -453,32 +535,30 @@ Token simplified(Function const &token) {
 
             variable.coefficient = 1;
 
-            return k_functions["ln"](coefficient) + "ln"_f(variable);
+            return k_functions.at("ln")(coefficient) + "ln"_f(parameters);
         }
 
         if (std::holds_alternative<Term>(simplified))
             if (auto const &term = std::get<Term>(simplified);
                 !std::holds_alternative<Constant>(*term.power) ||
                 std::get<Constant>(*term.power) != 1)
-                return mlp::simplified(
-                    *term.power * Function("ln", *term.base)
-                );
+                return mlp::simplified(*term.power * "ln"_f({*term.base}));
 
         if (std::holds_alternative<Terms>(simplified)) {
             auto &terms = std::get<Terms>(simplified);
 
             Expression result;
 
-            result += k_functions["ln"](terms.coefficient);
+            result += k_functions.at("ln")(terms.coefficient);
 
             for (Token const &t : terms.terms)
-                result += mlp::simplified("ln"_f(t));
+                result += mlp::simplified("ln"_f({t}));
 
             return mlp::simplified(result);
         }
     }
 
-    return Function(token.function, std::move(simplified));
+    return Function(token.function, std::move(parameters));
 }
 
 Token derivative(
@@ -490,16 +570,24 @@ Token derivative(
     if (!is_dependent_on(token, variable))
         return 0.0;
 
-    auto parameter = to_string(*token.parameter);
+    if (!k_functions.contains(token.function))
+        return mlp::simplified(
+            mlp::derivative(
+                k_custom_functions.at(token.function)(token.parameters),
+                variable, order
+            )
+        );
 
-    auto derivative = simplified(
+    auto parameter = to_string(token.parameters[0]);
+
+    Token derivative = simplified(
         tokenise(
             std::vformat(
                 k_derivative_map.at(token.function),
                 std::make_format_args(parameter)
             )
         ) *
-        mlp::derivative(*token.parameter, variable, 1)
+        mlp::derivative(token.parameters[0], variable, 1)
     );
 
     if (order > 1)
@@ -512,8 +600,14 @@ Token integral(Function const &token, Variable const variable) {
     if (!is_dependent_on(token, variable))
         return variable * token;
 
-    if (is_linear_of(*token.parameter, variable)) {
-        auto string = to_string(*token.parameter);
+    if (!k_functions.contains(token.function))
+        return simplified(integral(
+            k_custom_functions.at(token.function)(token.parameters), variable
+        ));
+
+    if (auto const &parameter = token.parameters[0];
+        is_linear_of(parameter, variable)) {
+        auto string = to_string(parameter);
 
         return simplified(
             tokenise(
@@ -522,7 +616,7 @@ Token integral(Function const &token, Variable const variable) {
                     std::make_format_args(string)
                 )
             ) *
-            derivative(*token.parameter, variable, 1)
+            derivative(parameter, variable, 1)
         );
     }
 
@@ -531,8 +625,5 @@ Token integral(Function const &token, Variable const variable) {
 } // namespace mlp
 
 mlp::FunctionFactory operator""_f(char const *string, size_t) {
-    if (!k_functions.contains(string))
-        throw std::runtime_error(std::format("Unknown function {}!", string));
-
     return mlp::FunctionFactory(string);
 }
