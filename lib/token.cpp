@@ -15,77 +15,27 @@
 #include <set>
 #include <utility>
 
-namespace mlp {
-struct Operation final {
-    enum op { add, sub, mul, div, pow } operation;
-
-    explicit Operation(op operation);
-
-    Operation(Operation const &) = default;
-
-    static std::optional<Operation> from_char(char operation);
-
-    explicit operator std::string() const;
-
-    bool operator==(Operation const &) const = default;
-};
-} // namespace mlp
-
-mlp::Operation::Operation(op const operation) : operation(operation) {}
-
-std::optional<mlp::Operation> mlp::Operation::from_char(char const operation) {
-    switch (operation) {
-    case '+':
-        return Operation(add);
-
-    case '-':
-        return Operation(sub);
-
-    case '*':
-        return Operation(mul);
-
-    case '/':
-        return Operation(div);
-
-    case '^':
-        return Operation(pow);
-
-    default:
-        return {};
-    }
-}
-
-mlp::Operation::operator std::string() const {
-    switch (this->operation) {
-    case add:
-        return "+";
-    case sub:
-        return "-";
-    case mul:
-        return "*";
-    case div:
-        return "/";
-    case pow:
-        return "^";
-    }
-
-    return "";
-}
-
 namespace {
+enum class Operation { add, sub, mul, div, pow };
+
+std::map<char, Operation> const k_op_map{
+    {'+', Operation::add}, {'-', Operation::sub}, {'*', Operation::mul},
+    {'/', Operation::div}, {'^', Operation::pow},
+};
+
 std::map<char, char> const k_parenthesis_map{
     {'(', ')'}, {'[', ']'}, {'{', '}'}
 };
 
-std::variant<mlp::Operation, std::optional<mlp::Token>>
+std::variant<Operation, std::optional<mlp::Token>>
 get_next_token(std::string const &expression, std::size_t &i) {
     if (i >= expression.size())
         return std::optional<mlp::Token>{};
 
     char character = expression[i];
 
-    if (auto op = mlp::Operation::from_char(character))
-        return *op;
+    if (k_op_map.contains(character))
+        return k_op_map.at(character);
 
     if (isdigit(character)) {
         std::string number;
@@ -156,7 +106,7 @@ get_next_token(std::string const &expression, std::size_t &i) {
         if (mlp::Function::is_defined(func)) {
             auto token = get_next_token(expression, i);
 
-            if (std::holds_alternative<mlp::Operation>(token))
+            if (std::holds_alternative<Operation>(token))
                 throw std::runtime_error("Expression is not valid!");
 
             auto &parameter = std::get<std::optional<mlp::Token>>(token);
@@ -281,7 +231,7 @@ mlp::Token mlp::tokenise(std::string expression) {
         auto &operation = std::get<Operation>(token);
 
         if (copy == 0) {
-            switch (operation.operation) {
+            switch (operation) {
             case Operation::mul:
             case Operation::div:
             case Operation::pow:
@@ -306,10 +256,9 @@ mlp::Token mlp::tokenise(std::string expression) {
         if (!next_term)
             throw std::runtime_error("Expression is not valid!");
 
-        if (operation.operation == Operation::add ||
-            operation.operation == Operation::sub) {
+        if (operation == Operation::add || operation == Operation::sub) {
             Sign const sign =
-                operation.operation == Operation::add ? Sign::pos : Sign::neg;
+                operation == Operation::add ? Sign::pos : Sign::neg;
 
             if (last) {
                 Terms terms{};
@@ -342,14 +291,14 @@ mlp::Token mlp::tokenise(std::string expression) {
         if (!last)
             throw std::runtime_error("Expression is not valid!");
 
-        if (operation.operation == Operation::mul) {
+        if (operation == Operation::mul) {
             numerator.push_back(std::move(*next_term));
             last = &numerator.back();
 
             continue;
         }
 
-        if (operation.operation == Operation::div) {
+        if (operation == Operation::div) {
             denominator.push_back(std::move(*next_term));
             last = &denominator.back();
 
@@ -369,7 +318,7 @@ mlp::Token mlp::tokenise(std::string expression) {
 
                 operation = std::get<Operation>(next);
 
-                if (operation.operation == Operation::pow)
+                if (operation == Operation::pow)
                     continue;
 
                 --i;
