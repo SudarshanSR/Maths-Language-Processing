@@ -13,7 +13,6 @@
 #include <ranges>
 #include <regex>
 #include <set>
-#include <sstream>
 #include <utility>
 
 namespace mlp {
@@ -205,7 +204,7 @@ mlp::evaluate(Token const &token, std::map<Variable, Token> const &values) {
 
 mlp::Token mlp::simplified(Token const &token) {
     return std::visit(
-        []<typename t>(t &&var) -> Token { return simplified(var); }, token
+        [](auto &&var) -> Token { return simplified(var); }, token
     );
 }
 
@@ -259,7 +258,7 @@ mlp::Token mlp::tokenise(std::string expression) {
     auto s = Sign::pos;
     std::vector<Token> numerator;
     std::vector<Token> denominator;
-    bool last = false;
+    Token *last = nullptr;
 
     for (std::size_t i = 0; i < expression.size(); ++i) {
         std::size_t const copy = i;
@@ -274,6 +273,7 @@ mlp::Token mlp::tokenise(std::string expression) {
                 continue;
 
             numerator.push_back(std::move(*term));
+            last = &numerator.back();
 
             continue;
         }
@@ -311,7 +311,7 @@ mlp::Token mlp::tokenise(std::string expression) {
             Sign const sign =
                 operation.operation == Operation::add ? Sign::pos : Sign::neg;
 
-            if (!numerator.empty()) {
+            if (last) {
                 Terms terms{};
 
                 for (Token const &t : numerator)
@@ -334,20 +334,24 @@ mlp::Token mlp::tokenise(std::string expression) {
 
             s = sign;
             numerator.push_back(std::move(*next_term));
+            last = &numerator.back();
 
             continue;
         }
 
+        if (!last)
+            throw std::runtime_error("Expression is not valid!");
+
         if (operation.operation == Operation::mul) {
             numerator.push_back(std::move(*next_term));
-            last = false;
+            last = &numerator.back();
 
             continue;
         }
 
         if (operation.operation == Operation::div) {
             denominator.push_back(std::move(*next_term));
-            last = true;
+            last = &denominator.back();
 
             continue;
         }
@@ -384,10 +388,7 @@ mlp::Token mlp::tokenise(std::string expression) {
 
         power = std::move(simplified(power));
 
-        if (!last)
-            numerator.back() = pow(numerator.back(), power);
-        else
-            denominator.back() = pow(denominator.back(), power);
+        *last = pow(*last, power);
     }
 
     Terms terms{};
