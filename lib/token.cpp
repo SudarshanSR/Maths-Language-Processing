@@ -205,7 +205,7 @@ mlp::Token mlp::tokenise(std::string expression) {
         expression, std::regex("π"), std::to_string(std::numbers::pi)
     );
 
-    auto s = Sign::pos;
+    auto previous_sign = Sign::pos;
     std::vector<Token> numerator;
     std::vector<Token> denominator;
     Token *last = nullptr;
@@ -230,26 +230,74 @@ mlp::Token mlp::tokenise(std::string expression) {
 
         auto &operation = std::get<Operation>(token);
 
-        if (copy == 0) {
-            switch (operation) {
-            case Operation::mul:
-            case Operation::div:
-            case Operation::pow:
-                throw std::runtime_error("Expression is not valid!");
-            case Operation::sub:
-                s = Sign::neg;
-            case Operation::add:
-                break;
-            }
-
-            continue;
-        }
+        if (copy == 0 && operation != Operation::add &&
+            operation != Operation::sub)
+            throw std::runtime_error("Expression is not valid!");
 
         std::variant<Operation, std::optional<Token>> next =
             get_next_token(expression, ++i);
 
-        if (std::holds_alternative<Operation>(next))
-            throw std::runtime_error("Expression is not valid!");
+        if (operation == Operation::add || operation == Operation::sub) {
+            while (std::holds_alternative<Operation>(next)) {
+                if (auto const &next_op = std::get<Operation>(next);
+                    next_op == Operation::sub) {
+                    if (operation == Operation::add) {
+                        operation = Operation::sub;
+                        previous_sign = Sign::neg;
+                    } else {
+                        operation = Operation::add;
+                        previous_sign = Sign::pos;
+                    }
+                } else if (next_op != Operation::add) {
+                    throw std::runtime_error("Expression is not valid!");
+                }
+
+                next = get_next_token(expression, ++i);
+            }
+        } else if (operation != Operation::pow) {
+            if (!last)
+                throw std::runtime_error("Expression is not valid!");
+
+            while (std::holds_alternative<Operation>(next)) {
+                if (auto const &next_op = std::get<Operation>(next);
+                    next_op == Operation::sub)
+                    previous_sign =
+                        previous_sign == Sign::pos ? Sign::neg : Sign::pos;
+
+                else if (next_op != Operation::add)
+                    throw std::runtime_error("Expression is not valid!");
+
+                next = get_next_token(expression, ++i);
+            }
+        } else {
+            if (!last)
+                throw std::runtime_error("Expression is not valid!");
+
+            auto s = Sign::pos;
+
+            while (std::holds_alternative<Operation>(next)) {
+                if (auto const &next_op = std::get<Operation>(next);
+                    next_op == Operation::sub)
+                    s = s == Sign::pos ? Sign::neg : Sign::pos;
+
+                else if (next_op != Operation::add)
+                    throw std::runtime_error("Expression is not valid!");
+
+                next = get_next_token(expression, ++i);
+            }
+
+            if (s == Sign::neg) {
+                if (std::ranges::contains(numerator, *last)) {
+                    denominator.push_back(std::move(numerator.back()));
+                    numerator.pop_back();
+                    last = &denominator.back();
+                } else {
+                    numerator.push_back(std::move(denominator.back()));
+                    denominator.pop_back();
+                    last = &numerator.back();
+                }
+            }
+        }
 
         auto &next_term = std::get<std::optional<Token>>(next);
 
@@ -257,9 +305,6 @@ mlp::Token mlp::tokenise(std::string expression) {
             throw std::runtime_error("Expression is not valid!");
 
         if (operation == Operation::add || operation == Operation::sub) {
-            Sign const sign =
-                operation == Operation::add ? Sign::pos : Sign::neg;
-
             if (last) {
                 Terms terms{};
 
@@ -269,27 +314,18 @@ mlp::Token mlp::tokenise(std::string expression) {
                 for (Token const &t : denominator)
                     terms /= t;
 
-                result.add_token(s, simplified(terms));
+                result.add_token(previous_sign, simplified(terms));
 
                 numerator.clear();
                 denominator.clear();
             }
 
-            else if (sign == s)
-                result += 1;
-
-            else
-                result -= 1;
-
-            s = sign;
+            previous_sign = operation == Operation::add ? Sign::pos : Sign::neg;
             numerator.push_back(std::move(*next_term));
             last = &numerator.back();
 
             continue;
         }
-
-        if (!last)
-            throw std::runtime_error("Expression is not valid!");
 
         if (operation == Operation::mul) {
             numerator.push_back(std::move(*next_term));
@@ -348,7 +384,7 @@ mlp::Token mlp::tokenise(std::string expression) {
     for (Token const &t : denominator)
         terms /= t;
 
-    result.add_token(s, simplified(terms));
+    result.add_token(previous_sign, simplified(terms));
 
     return simplified(result);
 }

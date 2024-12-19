@@ -306,7 +306,7 @@ mlp::Terms &mlp::Terms::operator/=(Term term) {
 
     if (!std::holds_alternative<Expression>(*term.power)) {
         Expression power{};
-        power -= *term.power;
+        power += *term.power;
         *term.power = std::move(power);
     }
 
